@@ -417,6 +417,38 @@ int32 UAstraBoardSubsystem::PickMarines(int32 Total, TArray<TArray<int32>>& OutL
 
 // ================================================================================================================== the order
 
+int32 UAstraBoardSubsystem::BestCarrier(const FShipFacts& T) const
+{
+const UAstraBattleSubsystem* B = Battle();
+if (!B)
+{
+	return INDEX_NONE;
+}
+TArray<FShipFacts> All;
+B->ListShipFacts(All);
+double BestScore = -1.0e18;
+int32 Best = INDEX_NONE;
+for (const FShipFacts& F : All)
+{
+	if (F.Id == T.Id || F.bDisabled || (T.bPlayer ? F.Side != 1 : !F.bPlayer))
+	{
+		continue;
+	}
+	FAssess A;
+	if (!B->AssessBoarding(F.Id, T.Id, A) || !A.bCarrierOk)
+	{
+		continue;
+	}
+	const double Score = A.BerthsFree * 1000.0 - FVector::Dist(F.Pos, T.Pos) / 1000.0;
+	if (Score > BestScore)
+	{
+		BestScore = Score;
+		Best = F.Id;
+	}
+}
+return Best;
+}
+
 bool UAstraBoardSubsystem::StartAssault(const FAssaultSpec& Spec, FString& OutDetail)
 {
 	UAstraBattleSubsystem* B = Battle();
@@ -467,27 +499,7 @@ bool UAstraBoardSubsystem::StartAssault(const FAssaultSpec& Spec, FString& OutDe
 	else
 	{
 		// no carrier named: the Aquila's own boats against another ship; the Mandate's carrier with the most boats free (and the nearest) against the Aquila
-		TArray<FShipFacts> All;
-		B->ListShipFacts(All);
-		double BestScore = -1.0e18;
-		for (const FShipFacts& F : All)
-		{
-			if (F.Id == TargetId || F.bDisabled || (T.bPlayer ? F.Side != 1 : !F.bPlayer))
-			{
-				continue;
-			}
-			FAssess A;
-			if (!B->AssessBoarding(F.Id, TargetId, A) || !A.bCarrierOk)
-			{
-				continue;
-			}
-			const double Score = A.BerthsFree * 1000.0 - FVector::Dist(F.Pos, T.Pos) / 1000.0;
-			if (Score > BestScore)
-			{
-				BestScore = Score;
-				CarrierId = F.Id;
-			}
-		}
+		CarrierId = BestCarrier(T);
 		if (CarrierId == INDEX_NONE)
 		{
 			OutDetail = T.bPlayer ? FString(TEXT("no Mandate ship has a boarding craft free")) : FString(TEXT("the Aquila has no Kestrel free"));
@@ -705,6 +717,7 @@ bool UAstraBoardSubsystem::LaunchAssault(FString& OutDetail)
 	Req.TargetId = Assault.TargetId;
 	Req.Order = Assault.Order;
 	Req.bCaptain = Assault.bCaptain;
+	Req.bSilencePd = Assault.Spec.bDrill;                                 // (the drill: the boats are flown through the point defence unharmed)
 	Req.FirstS = Assault.bRoster ? 25.f : 4.f;
 	Req.GapS = 3.f;
 	Assault.Legs.Reset();
@@ -1146,6 +1159,7 @@ void UAstraBoardSubsystem::ResetScene(EMode NewMode)
 		ScenePlan.Reset();
 	}
 	Fight = FAstraBoardSim();
+	bBooksWritten = false;
 	MarineUnits.Reset();
 	RosterOfUnit.Reset();
 	PersonOfUnit.Reset();
@@ -1437,6 +1451,146 @@ void UAstraBoardSubsystem::MarkMarinesLost(FLeg& L, const FString& Cause)
 	}
 }
 
+// ================================================================================================================== the drill
+
+bool UAstraBoardSubsystem::StartDrill(const FString& Face, int32 Skiffs, const FString& Carrier, double Km, FString& OutDetail)
+{
+	UAstraBattleSubsystem* B = Battle();
+	if (!B)
+	{
+		OutDetail = TEXT("there is no battle to fly boats in");
+		return false;
+	}
+	FString Why;
+	const int32 AquilaId = B->ResolveShip(TEXT("aquila"), &Why);
+	FShipFacts T;
+	if (AquilaId < 0 || !B->ShipFacts(AquilaId, T))
+	{
+		OutDetail = TEXT("the Aquila is not in the battle");
+		return false;
+	}
+	const FString F = Face.IsEmpty() ? FString(TEXT("starboard")) : Face.ToLower();
+	const int32 Facing = F == TEXT("port") ? 2 : (F == TEXT("starboard") ? 3 : INDEX_NONE);
+	if (Facing == INDEX_NONE)
+	{
+		OutDetail = FString::Printf(TEXT("the drill is for a beam of the Aquila, where her airlocks are: port or starboard (not '%s')"), *Face);
+		return false;
+	}
+	if (Assault.bOn || Phase == EPhase::Active)
+	{
+		OutDetail = TEXT("a boarding is already on: end it first (astra.board.end)");
+		return false;
+	}
+	int32 CarrierId = INDEX_NONE;
+	if (!Carrier.IsEmpty() && !Carrier.Equals(TEXT("-")))
+	{
+		CarrierId = B->ResolveShip(Carrier, &Why);
+		if (CarrierId < 0)
+		{
+			OutDetail = Why.IsEmpty() ? FString(TEXT("no such carrier")) : Why;
+			return false;
+		}
+	}
+	else
+	{
+		CarrierId = BestCarrier(T);
+		if (CarrierId == INDEX_NONE)
+		{
+			OutDetail = TEXT("no Mandate ship has a boarding craft free: name a carrier (astra.board.drill <port|starboard> <skiffs> <carrier>)");
+			return false;
+		}
+	}
+	FShipFacts C;
+	if (!B->ShipFacts(CarrierId, C) || C.Side != 1)
+	{
+		OutDetail = TEXT("the carrier must be a ship of the Mandate (the drill is a boarding of the Aquila)");
+		return false;
+	}
+	AstraBoardCraft::FDrill D;
+	D.TargetId = AquilaId;
+	D.Face = Facing;
+	D.bSilencePd = true;
+	D.bShutDecks = true;
+	B->SetBoardingDrill(D);
+	if (Km > 0.0)
+	{
+		FString Park;
+		if (!B->ParkForDrill(CarrierId, AquilaId, Facing, Km, Park))
+		{
+			B->EndBoardingDrill();
+			OutDetail = Park;
+			return false;
+		}
+	}
+	FAssaultSpec A;
+	A.Target = TEXT("aquila");
+	A.Source = C.ContactId;
+	A.Face = F;
+	A.Craft = FMath::Clamp(Skiffs, 1, 4);
+	A.bLockdown = true;
+	A.By = TEXT("the Captain's boarding drill");
+	A.Reason = TEXT("a drill the Captain ordered: the shield on that face is held down, point defence is silent against the boats and her flight decks are shut so that the boats can be watched latching; it stands until it is over");
+	A.bDrill = true;
+	if (!StartAssault(A, OutDetail))
+	{
+		B->EndBoardingDrill();
+		return false;
+	}
+	OutDetail = FString::Printf(TEXT("drill: %s's %s face held down, point defence silent, the flight decks shut; %s"), *AsShipLabel(T), AsFaceName(Facing), *OutDetail);
+	return true;
+}
+
+void UAstraBoardSubsystem::EndDrill(const TCHAR* Why)
+{
+	if (UAstraBattleSubsystem* B = Battle(); B && B->BoardingDrill().bOn)
+	{
+		UE_LOG(LogASTRA, Log, TEXT("[Board] the drill is over: %s"), Why);
+		B->EndBoardingDrill();
+	}
+}
+
+// ================================================================================================================== the books
+
+void UAstraBoardSubsystem::WriteBooks()
+{
+	if (bBooksWritten || !Assault.bOn)
+	{
+		return;                                          // (the F5.1 boarding that simply happens has no ship's books to write to; a fight is written once)
+	}
+	bBooksWritten = true;
+	UAstraBattleSubsystem* B = Battle();
+	if (!B)
+	{
+		return;
+	}
+	const ESide Defending = Fight.Defender();
+	// the people of the ship that was boarded (when she is not the Aquila: the Aquila's are the roster's, and the marines' wounds were told as they fell) ...
+	FShipFacts T, C;
+	if (B->ShipFacts(Assault.TargetId, T) && !T.bPlayer)
+	{
+		TArray<FFleetCasualty> Cas;
+		AstraBoardScene::CasualtiesOf(Fight, Defending, Cas);
+		FFleetBoardingTally Tally;
+		if (!Cas.IsEmpty() && B->FleetBoardingResult(Assault.TargetId, Cas, Tally))
+		{
+			UE_LOG(LogASTRA, Log, TEXT("[Board] her books: %s's crew lost %d dead and %d hurt to the landing%s%s"), *Assault.TargetName, Tally.Killed, Tally.Wounded,
+			       Tally.bCaptainFell ? TEXT("; her captain fell") : TEXT(""), Tally.Unmatched ? *FString::Printf(TEXT(" (%d unplaced)"), Tally.Unmatched) : TEXT(""));
+			Log.Add(FString::Printf(TEXT("%.0fs: %s's crew: %d dead, %d hurt (her books)"), Since, *Assault.TargetName, Tally.Killed, Tally.Wounded));
+		}
+	}
+	// ... and the boarders of the carrier that sent the boats (the Mandate's: her marines, who have gone down on another ship's decks or with their boat)
+	if (!Assault.bRoster && B->ShipFacts(Assault.CarrierId, C) && !C.bPlayer)
+	{
+		TArray<FFleetCasualty> Cas;
+		AstraBoardScene::CasualtiesOf(Fight, Fight.Attacker(), Cas);
+		FFleetBoardingTally Tally;
+		if (!Cas.IsEmpty() && B->FleetBoardingResult(Assault.CarrierId, Cas, Tally))
+		{
+			UE_LOG(LogASTRA, Log, TEXT("[Board] her books: %s's marines lost %d dead and %d hurt in the landing"), *Assault.CarrierName, Tally.Killed, Tally.Wounded);
+		}
+	}
+}
+
 // ================================================================================================================== the end
 
 void UAstraBoardSubsystem::EndAssaultFight(const TCHAR* Why)
@@ -1462,6 +1616,10 @@ void UAstraBoardSubsystem::CloseAssault(const TCHAR* Why)
 		return;
 	}
 	UE_LOG(LogASTRA, Log, TEXT("[Board] assault %d closed: %s (%s)"), Assault.Order, Why, *AssaultText());
+	if (Assault.Spec.bDrill)
+	{
+		EndDrill(Why);
+	}
 	// the marines who never came home (a boat that was lost) are told
 	if (Assault.bRoster)
 	{

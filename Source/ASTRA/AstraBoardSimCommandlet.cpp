@@ -163,6 +163,7 @@ namespace
 		int32 BadPos = 0;
 		int32 Steps = 0;
 		int32 Slow = 0;                      // steps over 3 ms
+		TArray<FFleetCasualty> DefCas;       // (a scene's fight) what it did to the people of the side that held the ship: the books' casualties (AstraBoardScene::CasualtiesOf)
 	};
 
 	FRunResult RunSim(FAstraBoardSim& Sim, double Seconds, const TFunction<void(FAstraBoardSim&)>& PerSecond = nullptr)
@@ -1918,7 +1919,9 @@ static FRunResult RunScene(const FBoardShipPlan& Plan, const FTuning& Tuning, co
 	{
 		return Out;
 	}
-	return RunSim(Sim, 900.0);
+	Out = RunSim(Sim, 900.0);
+	AstraBoardScene::CasualtiesOf(Sim, Sim.Defender(), Out.DefCas);
+	return Out;
 }
 
 static void BoardScenarioAttack(const FString& Class, int32 Seed, int32 Seeds, const FTuning& Tuning)
@@ -2038,7 +2041,7 @@ static void BoardScenarioWar(const FString& Class, int32 Seed, int32 Seeds, cons
 	const FState States[] = {{TEXT("not hit (a full crew at her stations)"), 0, false}, {TEXT("hit a few times"), 14, false}, {TEXT("battered"), 60, false}, {TEXT("shot to pieces"), 220, false},
 	                         {TEXT("shot to pieces and disabled (no fight left in her)"), 220, true}};
 	int32 PrevDefenders = 1 << 30;
-	bool bFewer = true, bFits = true;
+	bool bFewer = true, bFits = true, bBooksOk = true;
 	TSharedRef<FJsonObject> Rec = MakeShared<FJsonObject>();
 	for (int32 si = 0; si < UE_ARRAY_COUNT(States); ++si)
 	{
@@ -2046,17 +2049,23 @@ static void BoardScenarioWar(const FString& Class, int32 Seed, int32 Seeds, cons
 		{
 			continue;
 		}
-		FAstraShipInterior I(FP.ToSharedRef(), 7, TEXT("Test"), 4242);
-		FRandomStream Shots(11);
-		const int32 NC = FP->Map->Comps.Num();
-		for (int32 b = 0; b < States[si].Blows; ++b)
+		const auto MakeInside = [&](int32 State) -> TSharedRef<FAstraShipInterior>
 		{
-			I.Strike(Shots.RandRange(0, NC - 1), 60.f + 80.f * Shots.FRand(), (uint8)Shots.RandRange(0, 2), b % 4 == 0);
-		}
-		for (int32 k = 0; k < 600; ++k)
-		{
-			I.Tick(0.1f);
-		}
+			TSharedRef<FAstraShipInterior> In = MakeShared<FAstraShipInterior>(FP.ToSharedRef(), 7, TEXT("Test"), 4242);
+			FRandomStream Shots(11);
+			const int32 NC = FP->Map->Comps.Num();
+			for (int32 b = 0; b < States[State].Blows; ++b)
+			{
+				In->Strike(Shots.RandRange(0, NC - 1), 60.f + 80.f * Shots.FRand(), (uint8)Shots.RandRange(0, 2), b % 4 == 0);
+			}
+			for (int32 k = 0; k < 600; ++k)
+			{
+				In->Tick(0.1f);
+			}
+			return In;
+		};
+		const TSharedRef<FAstraShipInterior> InsideRef = MakeInside(si);
+		FAstraShipInterior& I = *InsideRef;
 		FFleetSnapshot Snap;
 		I.Snapshot(Snap);
 		for (const FFleetSnapshot::FHand& H : Snap.Hands)
@@ -2114,6 +2123,49 @@ static void BoardScenarioWar(const FString& Class, int32 Seed, int32 Seeds, cons
 			bFewer &= Def / N <= PrevDefenders + 1.0;
 			PrevDefenders = FMath::RoundToInt(Def / N);
 		}
+		// the landing's books: the dead and the hurt of one fight (the first seed's) written into a fresh copy of her inside (the same ship, the same blows)
+		{
+			AstraBoardScene::FResult Scene;
+			const FRunResult R = RunScene(*P, Tuning, Spec, Seed, &Scene);
+			const TSharedRef<FAstraShipInterior> Copy = MakeInside(si);
+			FFleetSnapshot Before;
+			Copy->Snapshot(Before);
+			const int32 Total = Copy->CrewTotal(), Fit0 = Copy->CrewFit(), Hurt0 = Copy->CrewWounded(), Dead0 = Copy->CrewDead();
+			int32 Killed = 0, Hurt = 0;
+			for (const FFleetCasualty& C : R.DefCas)
+			{
+				++(C.bKilled ? Killed : Hurt);
+			}
+			const FFleetBoardingTally Tally = Copy->ApplyBoarding(R.DefCas);
+			FFleetSnapshot After;
+			Copy->Snapshot(After);
+			bool bOk = Copy->CrewFit() + Copy->CrewWounded() + Copy->CrewDead() == Total;                        // nobody is lost or made up
+			bOk &= Copy->CrewDead() == Dead0 + Tally.Killed && Copy->CrewWounded() == Hurt0 + Tally.Wounded;     // the counts are what the landing did
+			bOk &= Copy->CrewFit() == Fit0 - Tally.Killed - Tally.Wounded;
+			bOk &= Tally.Killed <= Killed && Tally.Killed + Tally.Wounded <= Killed + Hurt && Tally.Unmatched == 0;
+			bOk &= After.Fallen.Num() == Copy->CrewDead();                                                       // every dead man lies somewhere on her decks
+			// a man killed by the landing lies where he fell (and a man of the war's picture is the same person in the books)
+			int32 Lie = 0, Placed = 0;
+			for (const FFleetCasualty& C : R.DefCas)
+			{
+				if (!C.bKilled || !Copy->GetPeople().IsValidIndex(C.Person) || Copy->GetPeople()[C.Person].State != 2)
+				{
+					continue;
+				}
+				++Placed;
+				Lie += Copy->GetPeople()[C.Person].Comp == C.Comp ? 1 : 0;
+			}
+			bOk &= Lie == Placed;
+			const FFleetBoardingTally Again = Copy->ApplyBoarding(R.DefCas);                                   // a book is written once: the same men are not taken twice
+			bOk &= Again.Killed == 0 && Again.Wounded == 0;
+			if (Tally.bCaptainFell)
+			{
+				bOk &= Copy->CaptainState() != 0;
+			}
+			BNote(FString::Printf(TEXT("%s, %s: the landing's books: %d dead and %d hurt of her crew (%d fit, %d hurt, %d dead of %d before; %d fit, %d hurt, %d dead after); %d lie where they fell%s"), *Class, States[si].Name, Tally.Killed,
+			                      Tally.Wounded, Fit0, Hurt0, Dead0, Total, Copy->CrewFit(), Copy->CrewWounded(), Copy->CrewDead(), Lie, Tally.bCaptainFell ? TEXT("; her captain fell") : TEXT("")));
+			bBooksOk &= bOk;
+		}
 		TSharedRef<FJsonObject> O = MakeShared<FJsonObject>();
 		O->SetStringField(TEXT("state"), States[si].Name);
 		O->SetNumberField(TEXT("fit"), I.CrewFit());
@@ -2123,6 +2175,7 @@ static void BoardScenarioWar(const FString& Class, int32 Seed, int32 Seeds, cons
 		O->SetNumberField(TEXT("loss_attackers"), LossAtt / N);
 		Rec->SetObjectField(FString::Printf(TEXT("state%d"), si), O);
 	}
+	BCheck("war: the landing's books", bBooksOk, FString::Printf(TEXT("%s: the dead and the hurt of a landing go back into her crew's books: the counts add up, nobody is taken twice, the dead lie where they fell"), *Class));
 	BCheck("war: the people are the war's", bFits && bFewer, FString::Printf(TEXT("%s: every person the war has is in a room of the plan; the more she has been hit, the fewer fight"), *Class));
 	BRecord->SetObjectField(TEXT("war"), Rec);
 }

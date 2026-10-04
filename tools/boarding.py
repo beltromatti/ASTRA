@@ -198,6 +198,16 @@ ASSAULT_SETUPS = {
                          "11014=astra.board.recall Archon_Varek_Solm the Aquila's marines are at the breach and I will not feed them skiffs",
                       expect=[r"order \d+: Raider launches 2 Skiffs", r"options: .*\"ordered_by\":\"the Mandate's command staff\"", r"\"met_at_launch\":\{[^}]*\"her_shield_on_that_face_pct\":0[^}]*\"her_point_defence_channels\":0",
                               r"Raider recalls her boats: the Aquila's marines are at the breach and I will not feed them skiffs", r"not one boarder reached the ship|the boats of order 1 are told to go home"]),
+    # the Captain's drill (ABBORDAGGI-3): in play every boat is stopped (the Falcons, the Praetorian's point defence, the shield the crew raises again: all correct); the drill holds those off for the length of
+    # one assault so that the boats can be watched latching and the fight in the corridors. `in_play` is the same war with no drill: the boats are stopped.
+    "in_drill": dict(doc="the Captain's drill: her shield up on the port beam, a Praetorian with point defence and four fighters on cap beside her, the crew's orders as they are — and both skiffs latch", seconds=11700,
+                     exec=f"{_AQ};astra.war.spawn praetorian astra -0.3 -1.6 0 0 id=A1 name=Picket static hold passive;astra.war.spawn acheron mandate 0 -3 0 90 id=M1 name=Raider static hold passive;astra.war.wing A1 fighter 4 cap;{_NOFATE}",
+                     at="11000=astra.board.drill port 2 M1 2|11040=astra.cmd set_shields {'mode':'balanced'}",
+                     expect=[r"drill: on", r"drill ordered: drill:", r"order \d+: Raider launches 2 Skiffs", r"launched Skiff 1", r"launched Skiff 2", r"docked Skiff 1", r"docked Skiff 2", r"the hull is cut open at"]),
+    "in_play": dict(doc="the same war with no drill: the shield holds the boats off the hull (and the Praetorian's point defence and the fighters have their say): the boats are stopped, as they should be", seconds=11500,
+                    exec=f"{_AQ};astra.war.spawn praetorian astra -0.3 -1.6 0 0 id=A1 name=Picket static hold passive;astra.war.spawn acheron mandate 0 -3 0 90 id=M1 name=Raider static hold passive;astra.war.wing A1 fighter 4 cap;{_NOFATE}",
+                    at="11000=astra.board.assault in M1 - 2 port",
+                    expect=[r"launched Skiff 1", r"(aborted|destroyed) Skiff", r"not one boarder reached the ship"]),
     # the same, one boat: a lone skiff against a shield that is up on that face: it holds off and turns back; nobody comes aboard
     "in_shield": dict(doc="a skiff at a shield that holds: it turns back, no boarder comes", seconds=11400,
                       exec=f"{_AQ};astra.war.spawn acheron mandate 0 -3 0 90 id=M1 name=Raider static hold passive;{_NOFATE}",

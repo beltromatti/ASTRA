@@ -142,7 +142,11 @@ bool UAstraBattleSubsystem::BoardingDockOpen(const FAstraBattleShip& T, const FV
 {
 	float Frac = 0.f;
 	bool bOpen = true;
-	if (T.bDisabled)
+	if (BoardDrill.bOn && BoardDrill.Face >= 0 && T.Id == BoardDrill.TargetId && AstraFacingOf(LocalNormal) == BoardDrill.Face)
+	{
+		Frac = 0.f;                                              // the drill holds that face of her shield at nothing (the crew may raise it: TickBoardingDrill puts it down again)
+	}
+	else if (T.bDisabled)
 	{
 		Frac = 0.f;                                              // no power: no shield
 	}
@@ -606,6 +610,7 @@ namespace
 
 void UAstraBattleSubsystem::TickBoardingLaunches(float Dt)
 {
+	TickBoardingDrill(Dt);
 	for (const FBenchOp& Op : GBenchOps)
 	{
 		const int32 Id = ResolveShip(Op.Key);
@@ -766,6 +771,7 @@ void UAstraBattleSubsystem::TickBoardingLaunches(float Dt)
 		B.CarrierId = Req.CarrierId;
 		B.Men = Men;
 		B.bCaptain = Req.bCaptain && Leg == 0;
+		B.bPdSilenced = Req.bSilencePd;
 		B.Kind = K->Key;
 		B.DockId = Dock.Id;
 		B.Dock = Dock.Local;
@@ -865,6 +871,121 @@ int32 UAstraBattleSubsystem::AbortBoardingOrder(int32 Order, const FString& Why)
 }
 
 
+
+// ---------------------------------------------------------------------------------------------------------- the boarding drill
+void UAstraBattleSubsystem::SetBoardingDrill(const FDrill& D)
+{
+	BoardDrill = D;
+	BoardDrill.bOn = true;
+	BoardDrill.AgeS = 0.f;
+	if (BoardDrill.bShutDecks)
+	{
+		// the flight decks are shut: what is in the air is recalled (it lands and stays), and nothing is launched while the drill lasts
+		for (const FAstraSquadron& Q : Squadrons)
+		{
+			if (Q.Side == EAstraSide::Astra)
+			{
+				FString Ignore;
+				RecallSquadron(Q.Name, Ignore);
+			}
+		}
+	}
+	UE_LOG(LogASTRA, Log, TEXT("[Board] drill: on — %s face of her shield held at nothing, point defence %s, flight decks %s%s"), BoardDrill.Face >= 0 ? AstraWar::FacingName(BoardDrill.Face) : TEXT("no"),
+	       BoardDrill.bSilencePd ? TEXT("silent against the boats") : TEXT("as it is"), BoardDrill.bShutDecks ? TEXT("shut") : TEXT("as they are"),
+	       BoardDrill.CarrierId >= 0 ? *FString::Printf(TEXT(", the carrier kept %.1f km abeam"), BoardDrill.ParkM / 1000.0) : TEXT(""));
+}
+
+void UAstraBattleSubsystem::EndBoardingDrill()
+{
+	if (!BoardDrill.bOn)
+	{
+		return;
+	}
+	if (FAstraBattleShip* C = BoardDrill.CarrierId >= 0 ? FindById(BoardDrill.CarrierId) : nullptr)
+	{
+		C->bHoldFire = BoardDrill.bCarrierHeldFire;               // (her guns are her own again)
+	}
+	UE_LOG(LogASTRA, Log, TEXT("[Board] drill: off after %.0f s — the war is as it was"), BoardDrill.AgeS);
+	BoardDrill = FDrill();
+}
+
+bool UAstraBattleSubsystem::ParkForDrill(int32 CarrierId, int32 TargetId, int32 Facing, double Km, FString& OutWhy)
+{
+	FAstraBattleShip* C = FindById(CarrierId);
+	const FAstraBattleShip* T = FindById(TargetId);
+	if (!C || !T || !C->bAlive || !T->bAlive || C->bCraft || Facing < 0 || Facing > 5)
+	{
+		OutWhy = TEXT("no carrier to keep abeam");
+		return false;
+	}
+	const FVector N = AstraWar::FacingVector(Facing);
+	const double Half = Facing == 0 || Facing == 1 ? (T->Box.Valid() ? T->Box.Hx : T->Radius) : (Facing >= 4 ? (T->Box.Valid() ? T->Box.Hz : T->Radius) : (T->Box.Valid() ? T->Box.Hy : T->Radius));
+	const double CarrierHalf = C->Box.Valid() ? FMath::Max(C->Box.Hx, FMath::Max(C->Box.Hy, C->Box.Hz)) : (double)C->Radius;
+	BoardDrill.ParkM = Km * 1000.0;
+	BoardDrill.ParkLocal = N * (Half + CarrierHalf + FMath::Max(0.0, BoardDrill.ParkM));
+	// her boat bay is on one side of her: that side faces the target
+	const FBerths Bth = BerthsOf(C->ClassKey, FVector(C->Box.Hx, C->Box.Hy, C->Box.Hz), C->Box.Mid);
+	const FVector BayN = Bth.Kind ? Bth.BayNormal.GetSafeNormal() : FVector(0.0, 1.0, 0.0);
+	const FVector Toward = (-N).GetSafeNormal();                   // (in the target's frame: from the carrier to the target)
+	const FQuat Yaw180(FVector::UpVector, PI);
+	BoardDrill.ParkRel = FVector::DotProduct(BayN, Toward) >= 0.0 ? FQuat::Identity : Yaw180;
+	if (Facing >= 4)
+	{
+		BoardDrill.ParkRel = FQuat::Identity;
+	}
+	BoardDrill.CarrierId = CarrierId;
+	BoardDrill.bCarrierHeldFire = C->bHoldFire;
+	C->bHoldFire = true;
+	C->bHoldStation = false;
+	return true;
+}
+
+void UAstraBattleSubsystem::TickBoardingDrill(float Dt)
+{
+	if (!BoardDrill.bOn)
+	{
+		return;
+	}
+	BoardDrill.AgeS += Dt;
+	FAstraBattleShip* T = FindById(BoardDrill.TargetId);
+	if (!T || !T->bAlive)
+	{
+		EndBoardingDrill();
+		return;
+	}
+	// the face of her shield is held at nothing: whatever the crew raises or the generators put back, the sector is down again at the next step
+	if (BoardDrill.Face >= 0 && T->Dmg.bModel)
+	{
+		if (T->Dmg.Sector[BoardDrill.Face] > 0.f)
+		{
+			T->Dmg.Sector[BoardDrill.Face] = 0.f;
+			SyncTotals(*T);
+		}
+	}
+	// the flight decks stay shut
+	if (BoardDrill.bShutDecks)
+	{
+		for (FAstraSquadron& Q : Squadrons)
+		{
+			if (Q.Side == EAstraSide::Astra && Q.ToLaunch > 0)
+			{
+				Q.ToLaunch = 0;
+			}
+		}
+	}
+	// the carrier keeps her place abeam, flying with the target, her guns held
+	if (BoardDrill.CarrierId >= 0)
+	{
+		if (FAstraBattleShip* C = FindById(BoardDrill.CarrierId); C && C->bAlive)
+		{
+			C->Pos = T->Pos + T->Att.RotateVector(BoardDrill.ParkLocal);
+			C->Vel = T->Vel;
+			C->Att = T->Att * BoardDrill.ParkRel;
+			C->bHoldFire = true;
+			C->Mode = EAstraShipMode::Idle;
+		}
+	}
+}
 
 // ---------------------------------------------------------------------------------------------------------- the bench's console
 namespace

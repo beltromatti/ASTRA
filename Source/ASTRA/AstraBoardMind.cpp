@@ -430,6 +430,12 @@ bool UAstraBoardSubsystem::HandleCommand(const FString& Name, const TSharedPtr<F
 			}
 			// the recall and its reason: the bridge hears the ship that recalls her boats, and why (the minds give a reason with every order)
 			const FString By = BdStr(Args, TEXT("by")), Reason = BdStr(Args, TEXT("reason"));
+			if (Assault.bOn && Assault.Spec.bDrill && !By.StartsWith(TEXT("the Captain")))
+			{
+				// the Captain's drill is his to end (his own words to the XO come as `the Captain's order`, the console's `astra.board.drill off`): the Mandate's admiral is not asked to stop it
+				OutDetail = TEXT("this is the Captain's boarding drill: it stands until it is over; only the Captain calls it off (astra.board.drill off, or his word to the XO)");
+				return false;
+			}
 			FString Told;
 			if (Assault.bOn && !Assault.bRoster)
 			{
@@ -739,6 +745,26 @@ namespace
 			const bool bOk = B->StartAssault(S, D);
 			UE_LOG(LogASTRA, Log, TEXT("[Board] %s: %s"), bOk ? TEXT("assault ordered") : TEXT("assault refused"), *D);
 			if (GEngine) { GEngine->AddOnScreenDebugMessage(-1, 8.f, bOk ? FColor::Green : FColor::Red, D); }
+		}));
+	FAutoConsoleCommandWithWorldAndArgs BdCmdDrill(TEXT("astra.board.drill"), TEXT("Testing: the Aquila boarded, staged so that it can be watched: astra.board.drill [port|starboard] [skiffs 1..4] [carrier|-] [km]   (the shield on that face is held at nothing, point defence is silent against the boats, the flight decks are shut, the carrier is kept <km> abeam with her guns held; then the skiffs fly in as in any boarding)  |  astra.board.drill off"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* W)
+		{
+			UAstraBoardSubsystem* B = BdBoard(W);
+			if (!B)
+			{
+				return;
+			}
+			if (A.Num() >= 1 && A[0].Equals(TEXT("off")))
+			{
+				B->EndBoarding(TEXT("drill off"));
+				B->EndDrill(TEXT("console"));
+				UE_LOG(LogASTRA, Log, TEXT("[Board] drill: off (the boarding is called off, everything the drill held is given back)"));
+				return;
+			}
+			FString D;
+			const bool bOk = B->StartDrill(A.Num() > 0 ? A[0] : FString(), A.Num() > 1 ? FMath::Clamp(FCString::Atoi(*A[1]), 1, 4) : 2, A.Num() > 2 ? A[2] : FString(), A.Num() > 3 ? FCString::Atod(*A[3]) : 0.0, D);
+			UE_LOG(LogASTRA, Log, TEXT("[Board] %s: %s"), bOk ? TEXT("drill ordered") : TEXT("drill refused"), *D);
+			if (GEngine) { GEngine->AddOnScreenDebugMessage(-1, 10.f, bOk ? FColor::Green : FColor::Red, D); }
 		}));
 	FAutoConsoleCommandWithWorld BdCmdEnd(TEXT("astra.board.end"), TEXT("Testing: calls the boarding off (bulkheads open, marines back to duty)"),
 		FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* W) { if (UAstraBoardSubsystem* B = BdBoard(W)) { B->EndBoarding(TEXT("console")); } }));
