@@ -328,6 +328,9 @@ public:
 	void CaptainFired();
 	/** An outside hand wounds, kills or heals (a rescue, the Medbay): a unit that is down is taken out of the fight alive. */
 	void CarryOut(int32 UnitId);
+	/** An outside hand takes a man off her decks, whole (the transporter): he is alive and gone, counted among those who got away (a man who is down is carried out as CarryOut does). Whoever carried him, or
+	 *  was to carry him, is free. */
+	void LeaveShip(int32 UnitId);
 
 	// ------------------------------------------------------------------------------------------------ asking
 	const TArray<FUnit>& Units() const { return People; }

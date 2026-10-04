@@ -6,6 +6,7 @@
 #include "ASTRA.h"
 #include "ASTRAPlayerController.h"
 #include "AstraBattleSubsystem.h"
+#include "AstraBoardSubsystem.h"
 #include "AstraDeckStreaming.h"
 #include "AstraLifeSubsystem.h"
 #include "AstraShipSubsystem.h"
@@ -348,6 +349,87 @@ TSharedRef<FJsonObject> UAstraTransporterSubsystem::SnapshotJson() const
 			Away.Add(MakeShared<FJsonValueObject>(AO));
 		}
 		O->SetArrayField(TEXT("away"), Away);
+	}
+	// a ship our marines are fighting aboard: the way in and the way out for the Captain and the marines (the options below are for a person to any ship; a ship's inside is in the pattern library only here)
+	if (const UAstraBoardSubsystem* Bd = Board())
+	{
+		FString Contact, Name;
+		if (Bd->BoardedByUs(Contact, Name))
+		{
+			TSharedRef<FJsonObject> B = MakeShared<FJsonObject>();
+			B->SetStringField(TEXT("ship"), Contact);
+			B->SetStringField(TEXT("name"), Name);
+			const bool bCapAboard = Bd->CaptainAboardOtherShip();
+			B->SetStringField(TEXT("the_captain"), bCapAboard ? TEXT("on her decks, with the marines (beam him up with `captain`, to a pad)") : TEXT("aboard the Aquila (a boat of ours is at her hatches)"));
+			FEnd Far;
+			FString Comp, Err;
+			if (ResolveEnd(Contact, true, TArray<FAstraXportSubject>(), Far, Comp, Err))
+			{
+				// what the beam itself says (her shield on the face, ours, the range, the jamming, our manoeuvring): the same rules as for any ship, for one person
+				const auto Say = [&](const FEnd& From, const FEnd& To, bool bCaptain, bool bAway, TSharedRef<FJsonObject> Into, const TCHAR* Key, const FString& Where)
+				{
+					FRequest R;
+					FSubject S;
+					S.Kind = bCaptain ? ESubject::Captain : ESubject::Person;
+					S.Id = TEXT("probe");
+					S.Label = bCaptain ? TEXT("the Captain") : TEXT("a marine");
+					S.MassKg = 90.f;
+					S.bAway = bAway;
+					R.Subjects.Add(S);
+					R.From = From;
+					R.To = To;
+					const FVerdict V = Evaluate(T, E, R);
+					FRequest RW = R;
+					RW.bShieldWindow = true;
+					const FVerdict VW = Evaluate(T, E, RW);
+					FString Answer = V.bOk && V.Unknown.Num() == 0 ? FString::Printf(TEXT("can be done now (lock in about %.1f s at %.0f%%)%s"), V.LockS, XpPc(V.Quality), Where.IsEmpty() ? TEXT("") : *(FString(TEXT("; ")) + Where))
+					                                                : FString(TEXT("cannot be done now"));
+					TArray<FString> Why;
+					for (const FBlocker& Bl : V.Blockers)
+					{
+						Why.Add(Bl.Why);
+					}
+					for (const FString& U : V.Unknown)
+					{
+						Why.Add(U);
+					}
+					if (Why.Num())
+					{
+						Into->SetArrayField(*FString::Printf(TEXT("%s_in_the_way"), Key), XpJStrs(Why));
+						if (!(V.bOk) && VW.bOk && VW.Unknown.Num() == 0)
+						{
+							Into->SetStringField(*FString::Printf(TEXT("%s_what_clears_it"), Key), TEXT("a shield window (Tactical holds our shields down for the cycle) clears it"));
+						}
+					}
+					Into->SetStringField(Key, Answer);
+				};
+				FEnd Pad;
+				Pad.Kind = EEndKind::Pad;
+				Pad.bPad = true;
+				Pad.Pad = 0;
+				Pad.Label = TEXT("pad 1");
+				Pad.CompKind = T.RoomKind;
+				Pad.Room = E.Main;
+				// the way in: the beam, and the room beside our marines the host would set them down in (never one the Mandate holds, never one with no air)
+				TArray<FVector> Spots;
+				TArray<float> Yaws;
+				FString Place, Why;
+				bool bScene = false;
+				const bool bFound = BoardedArrival(Contact, 1, !bCapAboard, Spots, Yaws, Place, Why, bScene);
+				Say(Pad, Far, !bCapAboard, false, B, TEXT("beam_in"), bFound ? FString::Printf(TEXT("it would set a person down in %s"), *Place) : FString());
+				if (!bFound)
+				{
+					B->SetStringField(TEXT("beam_in_arrival"), FString::Printf(TEXT("no room to set a person down in: %s"), *Why));
+				}
+				// the way out, for the Captain when he is aboard her
+				if (bCapAboard)
+				{
+					FEnd Far2 = Far;
+					Say(Far2, Pad, true, true, B, TEXT("beam_out_the_captain"), FString());
+				}
+			}
+			O->SetObjectField(TEXT("boarded_by_our_marines"), B);
+		}
 	}
 	// what the console would answer to a request now
 	{

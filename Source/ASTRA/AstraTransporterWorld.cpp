@@ -8,6 +8,7 @@
 #include "ASTRACharacter.h"
 #include "ASTRAPlayerController.h"
 #include "AstraBattleSubsystem.h"
+#include "AstraBoardSubsystem.h"
 #include "AstraCrewMember.h"
 #include "AstraDamageModel.h"
 #include "AstraDeckStreaming.h"
@@ -110,6 +111,7 @@ namespace
 // ================================================================================================ the services the subsystem reads
 UAstraShipSubsystem* UAstraTransporterSubsystem::Ship() const { return GetWorld() ? GetWorld()->GetSubsystem<UAstraShipSubsystem>() : nullptr; }
 UAstraBattleSubsystem* UAstraTransporterSubsystem::Battle() const { return GetWorld() ? GetWorld()->GetSubsystem<UAstraBattleSubsystem>() : nullptr; }
+UAstraBoardSubsystem* UAstraTransporterSubsystem::Board() const { return GetWorld() ? GetWorld()->GetSubsystem<UAstraBoardSubsystem>() : nullptr; }
 UAstraLifeSubsystem* UAstraTransporterSubsystem::Life() const { return GetWorld() ? GetWorld()->GetSubsystem<UAstraLifeSubsystem>() : nullptr; }
 UAstraShipPlan* UAstraTransporterSubsystem::Plan() const { return GetWorld() ? GetWorld()->GetSubsystem<UAstraShipPlan>() : nullptr; }
 UAstraDeckStreaming* UAstraTransporterSubsystem::Streaming() const { return GetWorld() ? GetWorld()->GetSubsystem<UAstraDeckStreaming>() : nullptr; }
@@ -361,11 +363,18 @@ void UAstraTransporterSubsystem::BuildEnv(FEnv& Out) const
 bool UAstraTransporterSubsystem::CaptainFeet(FVector& OutFeetCm, float& OutYaw, bool& bOnGround, bool& bSeated) const
 {
 	bSeated = false;
+	// ABBORDAGGI: in the troop bay of a boat that flies there is no pattern to lock on (a hull in the way); on the decks of the ship the marines are fighting aboard he is away from the Aquila, as one on a world is
+	const UAstraBoardSubsystem* Bd = Board();
+	if (Bd && Bd->CaptainInBoat())
+	{
+		return false;
+	}
+	const bool bAboardOther = Bd && Bd->CaptainAboardOtherShip();
 	if (bTestCaptain)
 	{
 		OutFeetCm = TestFeetCm;
 		OutYaw = 0.f;
-		bOnGround = bTestPlanetside;
+		bOnGround = bTestPlanetside || bAboardOther;
 		return true;
 	}
 	const APawn* P = UGameplayStatics::GetPlayerPawn(this, 0);
@@ -377,7 +386,7 @@ bool UAstraTransporterSubsystem::CaptainFeet(FVector& OutFeetCm, float& OutYaw, 
 	OutFeetCm = P->GetActorLocation() - FVector(0.0, 0.0, P->GetDefaultHalfHeight());
 	OutYaw = P->GetActorRotation().Yaw;
 	const UAstraShipSubsystem* S = Ship();
-	bOnGround = S && S->IsPlanetside();
+	bOnGround = (S && S->IsPlanetside()) || bAboardOther;
 	if (const AASTRAPlayerController* PC = Cast<AASTRAPlayerController>(P->GetController()))
 	{
 		bSeated = PC->IsSeated();
@@ -695,7 +704,17 @@ bool UAstraTransporterSubsystem::ResolveSubjects(const FAstraXportOrder& O, TArr
 			}
 			if (Sub.AwayWhere.IsEmpty())
 			{
-				Sub.S.bFound = false;                          // away, but not by the transporter: nobody knows where
+				// not sent by the transporter: a marine who went in a boat to the ship our marines are fighting aboard is on her decks, in the fight (the boarding host knows where)
+				FString Contact;
+				const UAstraBoardSubsystem* Bd = Board();
+				if (Bd && Bd->PersonAboardOtherShip(P.Roster, &Contact))
+				{
+					Sub.AwayWhere = Contact;
+				}
+				else
+				{
+					Sub.S.bFound = false;                      // away, but not by the transporter: nobody knows where
+				}
 			}
 		}
 		else
@@ -740,12 +759,16 @@ bool UAstraTransporterSubsystem::ResolveSubjects(const FAstraXportOrder& O, TArr
 			bool bG, bSeated;
 			if (!CaptainFeet(Feet, Yaw, bG, bSeated))
 			{
-				OutErr = TEXT("the Captain is in a cockpit or a pod: there is no pattern to lock on (his badge is not on the ship's net)");
+				const UAstraBoardSubsystem* Bd = Board();
+				OutErr = Bd && Bd->CaptainInBoat() ? TEXT("the Captain is in the troop bay of a Kestrel in flight: no beam locks through a boat's hull (he is on the boat's own net)")
+				                                   : TEXT("the Captain is in a cockpit or a pod: there is no pattern to lock on (his badge is not on the ship's net)");
 				return false;
 			}
 			Sub.bAway = bG;
 			if (bG)
 			{
+				Sub.FromCm = Feet;                                    // (where he stands, wherever that is: a pattern recomposed at its origin is put back there)
+				Sub.FromYaw = Yaw;
 				for (const FAstraXportAway& A : AwayList)
 				{
 					if (A.Id == TEXT("captain"))
@@ -755,7 +778,10 @@ bool UAstraTransporterSubsystem::ResolveSubjects(const FAstraXportOrder& O, TArr
 				}
 				if (Sub.AwayWhere.IsEmpty())
 				{
-					Sub.AwayWhere = TEXT("surface");
+					// not sent by the transporter: on the decks of the ship the marines are fighting aboard (he went in a boat), or down on a world
+					FString Contact;
+					const UAstraBoardSubsystem* Bd = Board();
+					Sub.AwayWhere = Bd && Bd->CaptainAboardOtherShip(&Contact) && !Contact.IsEmpty() ? Contact : FString(TEXT("surface"));
 				}
 			}
 			else
@@ -1464,15 +1490,40 @@ bool UAstraTransporterSubsystem::MakeRequest(const FAstraXportOrder& O, FAstraXp
 		OutErr = FString::Printf(TEXT("they are already on %s"), *To.Label);
 		return false;
 	}
-	if (!bAway && (To.Kind == EEndKind::Surface || To.Kind == EEndKind::Ship))
+	FString BoardedPlace;
+	if (!bAway && To.Kind == EEndKind::Ship)
 	{
-		// leaving the ship: the Captain only goes down to a world (a ship's interior is not in the pattern library)
+		// a ship our marines are fighting aboard has her decks in the pattern library (ABBORDAGGI makes them solid round the Captain, and the marines hold a room of them): the beam sets people down beside the
+		// marines, in a room the Mandate does not hold and where there is air. Any other ship's inside is not in the library: the Captain does not go there (a person does, and is away aboard her, as ever)
+		bool bCaptainGoes = false;
 		for (const FAstraXportSubject& Sub : OutJob.Subs)
 		{
-			if (Sub.S.Kind == ESubject::Captain && To.Kind == EEndKind::Ship)
+			bCaptainGoes |= Sub.S.Kind == ESubject::Captain;
+		}
+		TArray<FVector> Spots;
+		TArray<float> Yaws;
+		FString Why;
+		bool bScene = false;
+		const bool bFound = BoardedArrival(To.Ship.Id, OutJob.Subs.Num(), bCaptainGoes, Spots, Yaws, BoardedPlace, Why, bScene);
+		if (bCaptainGoes && !bScene)
+		{
+			OutErr = FString::Printf(TEXT("the Captain cannot be beamed aboard %s: %s"), *To.Label, *Why);       // (no boarding to land beside: nothing else matters)
+			return false;
+		}
+		if (bScene)
+		{
+			OutJob.bBoarded = true;
+			if (bFound)
 			{
-				OutErr = TEXT("the Captain cannot be beamed onto another ship: her pads are not in the pattern library (no docking handshake). A world below, yes; a ship, send a shuttle");
-				return false;
+				for (int32 i = 0; i < OutJob.Subs.Num() && i < Spots.Num(); ++i)
+				{
+					OutJob.Subs[i].ToCm = Spots[i];
+					OutJob.Subs[i].ToYaw = Yaws[i];
+				}
+			}
+			else
+			{
+				OutJob.ArrivalWhy = bCaptainGoes ? FString::Printf(TEXT("the Captain cannot be beamed aboard %s: %s"), *To.Label, *Why) : Why;       // (the beam's own rules are read all the same: one refusal says it all)
 			}
 		}
 	}
@@ -1637,7 +1688,45 @@ bool UAstraTransporterSubsystem::MakeRequest(const FAstraXportOrder& O, FAstraXp
 	OutJob.ToContact = To.Kind == EEndKind::Ship ? To.Ship.Id : (From.Kind == EEndKind::Ship ? From.Ship.Id : FString());
 	OutJob.FromText = DescribeEnd(From, FromComp);
 	OutJob.ToText = DescribeEnd(To, ToComp);
+	if (OutJob.bBoarded)
+	{
+		OutJob.ToText += FString::Printf(TEXT(", set down in %s"), *BoardedPlace);
+	}
 	OutJob.bEmergency = From.bEmergencyPad || To.bEmergencyPad;
+	return true;
+}
+
+bool UAstraTransporterSubsystem::BoardedArrival(const FString& ShipContact, int32 N, bool bCaptain, TArray<FVector>& OutSpots, TArray<float>& OutYaws, FString& OutPlace, FString& OutWhy, bool& bOutScene) const
+{
+	OutSpots.Reset();
+	OutYaws.Reset();
+	OutPlace.Reset();
+	OutWhy.Reset();
+	bOutScene = false;
+	const UAstraBoardSubsystem* Bd = Board();
+	if (!Bd)
+	{
+		OutWhy = TEXT("there is no boarding aboard her to land beside");
+		return false;
+	}
+	UAstraBoardSubsystem::FBeamLimits Lim;
+	Lim.AirMin = T.AirMin;
+	Lim.FireMax = T.FireMax;
+	Lim.SmokeMax = T.SmokeMax;
+	UAstraBoardSubsystem::FBeamAboard W;
+	const bool bOk = Bd->BeamAboardQuery(ShipContact, N, bCaptain, Lim, W);
+	bOutScene = W.bScene;
+	if (!bOk)
+	{
+		OutWhy = W.Fix.IsEmpty() ? W.Why : FString::Printf(TEXT("%s (to clear it: %s)"), *W.Why, *W.Fix);
+		return false;
+	}
+	for (const UAstraBoardSubsystem::FBeamSpot& S : W.Spots)
+	{
+		OutSpots.Add(S.FeetWorld);
+		OutYaws.Add(S.Yaw);
+	}
+	OutPlace = W.Place;
 	return true;
 }
 
@@ -1704,5 +1793,15 @@ AstraXport::FVerdict UAstraTransporterSubsystem::Preflight(const FAstraXportOrde
 	BuildEnv(E);
 	FRequest R = J.Req;
 	RefreshRequest(R, J);
-	return Evaluate(T, E, R);
+	V = Evaluate(T, E, R);
+	if (!J.ArrivalWhy.IsEmpty())
+	{
+		FBlocker B;
+		B.Code = FName(TEXT("arrival"));
+		B.Why = J.ArrivalWhy;
+		B.bHard = true;
+		V.Blockers.Add(B);
+		V.bOk = false;
+	}
+	return V;
 }

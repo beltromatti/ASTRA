@@ -20,6 +20,7 @@
 
 class UAstraShipSubsystem;
 class UAstraBattleSubsystem;
+class UAstraBoardSubsystem;
 class UAstraLifeSubsystem;
 class UAstraShipPlan;
 class UAstraDeckStreaming;
@@ -104,6 +105,9 @@ struct FAstraXportJob
 	float MinQ = 1.f;                          // the lowest the lock's quality fell to during the cycle
 	float Quality = 0.f;                       // the lock's quality now
 	float StreamWaitS = 0.f;                   // the buffer waits for the destination deck to load (the Captain)
+	bool bBoarded = false;                     // the destination is a ship our marines are fighting aboard (ABBORDAGGI): the arrival is asked of the boarding host, and held in the buffer while no room is safe
+	bool bNotedHold = false;                   // ... and the Chief has been told the pattern waits
+	FString ArrivalWhy;                        // (at the order) no room of hers is one the beam may set them down in just now: said with the beam's own blockers, in one refusal
 	bool bWindow = false;                      // our shields are held down for this cycle (Tactical's shield window)
 	bool bReturning = false;                   // aborted in the buffer: the pattern goes back to where it came from
 	bool bNotedLost = false;
@@ -311,6 +315,7 @@ private:
 	void BuildPads(const FAstraPlanCompartment& Comp);
 	UAstraShipSubsystem* Ship() const;
 	UAstraBattleSubsystem* Battle() const;
+	UAstraBoardSubsystem* Board() const;
 	UAstraLifeSubsystem* Life() const;
 	UAstraShipPlan* Plan() const;
 	UAstraDeckStreaming* Streaming() const;
@@ -382,6 +387,9 @@ private:
 	void DropAway(const FString& Id);
 	FString AwayWhereText(const FAstraXportJob& J) const;
 	bool AwayHere(const FString& Id) const;
+	/** A ship our marines are fighting aboard (ABBORDAGGI, docs/TELETRASPORTO.md §10): where the boarding host would set N people down now, beside the marines. bOutScene: such a fight is on aboard that ship at all
+	 *  (else nothing is asked of the host and the ship is as any other). False (OutWhy says why, with what would clear it) when there is no room where the beam may set them down. */
+	bool BoardedArrival(const FString& ShipContact, int32 N, bool bCaptain, TArray<FVector>& OutSpots, TArray<float>& OutYaws, FString& OutPlace, FString& OutWhy, bool& bOutScene) const;
 
 	friend struct FAstraXportTestAccess;
 };

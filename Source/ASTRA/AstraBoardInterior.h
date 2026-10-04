@@ -81,6 +81,8 @@ public:
 	void Follow(const FVector& EyeWorld, const FVector& LookWorld);
 	/** The stairs: where a pad of one deck is and where it leads (cm, the plan's frame); a pad within reach of a point. -1 when none. */
 	int32 PadNear(const FVector& PlanCm, float ReachCm, FVector& OutTo, FString& OutText) const;
+	/** The plan is made solid (Begin has been called and End has not). */
+	bool IsBegun() const { return Plan.IsValid(); }
 	int32 NumRooms() const { return Built.Num(); }
 	int32 NumSlabs() const { return NumInstances; }
 	/** Everything goes. */

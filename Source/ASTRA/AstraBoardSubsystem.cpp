@@ -612,6 +612,10 @@ bool UAstraBoardSubsystem::CaptainFeet(FVector& OutFeet, float& OutYaw, bool& bO
 	{
 		return false;                                 // in a boat's troop bay: out of any fight
 	}
+	if (bCaptainInBeam)
+	{
+		return false;                                 // his pattern is in the beam: he is in no fight until it is set down
+	}
 	if (bTestCaptain)
 	{
 		OutFeet = TestFeet;

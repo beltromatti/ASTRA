@@ -170,6 +170,13 @@ class WhatSheReads(unittest.TestCase):
         self.assertIn("`options`", p)                                         # she is told to read the card before she acts
         self.assertIn("Never invent", p)
 
+    def test_she_knows_the_one_ship_whose_inside_she_has_and_the_way_home_from_it(self) -> None:
+        p = transporter.system_prompt("en")
+        for needle in ("boarded_by_our_marines", "beside our marines", "Never in a compartment the Mandate holds and never where there is no air", "no override reaches that",
+                       "only while one of our boats is at her hatches", "A ship with no marine of ours aboard has", "(\"beam me up\")", "the Kestrel at her hatch is his way home"):
+            self.assertIn(needle, p)
+        self.assertIn("The Captain on the decks of a ship the marines are fighting aboard is 'captain' too", transporter.WHO_HELP)
+
     def test_the_board_shows_the_plot_the_captain_and_her_console(self) -> None:
         text = transporter.board(STATE)
         self.assertIn("Where the Captain is: in the Transporter Room", text)
@@ -522,6 +529,17 @@ class TheRealCard(unittest.TestCase):
             self.assertIn(json.dumps(card["room"], separators=(",", ":"), ensure_ascii=False), board, name)
             self.assertTrue(transporter.brief(card).startswith("room "), name)
             self.assertLess(len(json.dumps(card)), 6000, name)                # the card is the prompt's biggest part: it stays small
+
+    def test_a_ship_our_marines_are_boarding_is_on_the_card_with_the_way_in_and_the_way_out(self) -> None:
+        cards = self.cards()
+        before, after = cards["card_boarded"]["boarded_by_our_marines"], cards["card_captain_aboard"]["boarded_by_our_marines"]
+        self.assertEqual((before["ship"], after["ship"]), ("B-01", "B-01"))
+        self.assertIn("aboard the Aquila", before["the_captain"])
+        self.assertIn("on her decks", after["the_captain"])
+        self.assertIn("beam_in", before)                                      # the way in, with what is in the way (our shield: a window clears it)
+        self.assertTrue(before.get("beam_in_in_the_way") and before.get("beam_in_what_clears_it"))
+        self.assertIn("beam_out_the_captain", after)                          # and, with him aboard, the way home
+        self.assertNotIn("beam_out_the_captain", before)
 
     def test_the_battles_card_says_what_clears_what_and_what_cannot_be_aimed(self) -> None:
         card = self.cards()["card_battle"]

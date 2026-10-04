@@ -639,6 +639,16 @@ void UAstraBattleSubsystem::TickBoardingLaunches(float Dt)
 		{
 			S->bFixture = true;                                      // (what SPAZIO-VIVO makes of a station: the war bench has no living space to ask it of)
 		}
+		else if (Op.What == TEXT("jammer"))
+		{
+			// a Mandate capital ship under the fog of war with her strobe on (12 to 55 km out, she floods the Aquila's radar along her bearing): the transporter's jamming is read off her
+			S->bFog = true;
+			S->bDark = false;
+			S->Track = 2;
+			S->bClassified = true;
+			S->bIdentified = true;
+			S->EwMode = 1;
+		}
 		UE_LOG(LogASTRA, Display, TEXT("[Boarding] bench: %s %s %g"), *Op.What, *S->Name, Op.Value);
 	}
 	GBenchOps.Reset();
@@ -973,5 +983,6 @@ namespace
 	BC_OP_COMMAND(disable, "Testing: a ship loses all power (a hulk): astra.board.disable <ship>", false);
 	BC_OP_COMMAND(pd, "Testing: a ship's point-defence channels: astra.board.pd <ship> <n>", true);
 	BC_OP_COMMAND(fixture, "Testing: a ship becomes a place of the system, as a station is (nobody docks a boat at her or flies one from her): astra.board.fixture <ship>", false);
+	BC_OP_COMMAND(jammer, "Testing: a Mandate capital ship jams the Aquila's radar from where she is (12 to 55 km out): astra.board.jammer <ship>", false);
 #undef BC_OP_COMMAND
 }

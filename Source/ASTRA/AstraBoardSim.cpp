@@ -1346,6 +1346,53 @@ void FAstraBoardSim::CarryOut(int32 UnitId)
 	}
 }
 
+void FAstraBoardSim::LeaveShip(int32 UnitId)
+{
+	if (!People.IsValidIndex(UnitId))
+	{
+		return;
+	}
+	FUnit& U = People[UnitId];
+	if (U.Act == EAct::Dead || U.Act == EAct::Gone)
+	{
+		return;
+	}
+	if (U.Act == EAct::Down)
+	{
+		CarryOut(UnitId);
+		return;
+	}
+	if (U.Carrying != INDEX_NONE && People.IsValidIndex(U.Carrying))
+	{
+		People[U.Carrying].CarriedBy = INDEX_NONE;                   // (the man he was carrying is put down where he stands)
+		People[U.Carrying].Bearer = INDEX_NONE;
+		People[U.Carrying].Pos = U.Pos;
+	}
+	U.Carrying = INDEX_NONE;
+	if (U.Act == EAct::Waiting)
+	{
+		for (int32 i = Pending.Num() - 1; i >= 0; --i)
+		{
+			if (Pending[i].Unit == UnitId)
+			{
+				Pending.RemoveAt(i);
+			}
+		}
+		Stats.Spawned[(int32)U.Side] = FMath::Max(0, Stats.Spawned[(int32)U.Side] - 1);      // he was not in yet: not a man of this fight
+		if (Teams.IsValidIndex(U.Squad))
+		{
+			Teams[U.Squad].StartStrength = FMath::Max(0.f, Teams[U.Squad].StartStrength - 1.f);
+		}
+		U.Act = EAct::Gone;
+		return;
+	}
+	U.Act = EAct::Gone;
+	U.Path.Reset();
+	U.Speed = 0.f;
+	++Stats.Exited[(int32)U.Side];
+	Emit(EEvent::Exit, U.Id, INDEX_NONE, U.Pos, U.Pos, 0.f, false, U.Name);
+}
+
 // ================================================================================================================== fighting
 
 void FAstraBoardSim::Fight(FUnit& U, float Dt)

@@ -6,6 +6,7 @@
 
 #include "ASTRA.h"
 #include "AstraBattleSubsystem.h"
+#include "AstraBoardSubsystem.h"
 #include "AstraCrewMember.h"
 #include "AstraDamageModel.h"
 #include "AstraDeckStreaming.h"
@@ -518,9 +519,13 @@ bool UAstraTransporterSubsystem::Order(const FAstraXportOrder& O, FString& OutDe
 	RefreshRequest(R, J);
 	R.bShieldWindow = O.bWindow;
 	const FVerdict V = Evaluate(T, E, R);
-	if (!V.bOk || V.Unknown.Num() > 0)
+	if (!V.bOk || V.Unknown.Num() > 0 || !J.ArrivalWhy.IsEmpty())
 	{
-		OutDetail = RefusalText(J, V);
+		OutDetail = V.bOk && V.Unknown.Num() == 0 ? FString(TEXT("refused: ")) : RefusalText(J, V) + (J.ArrivalWhy.IsEmpty() ? FString() : FString(TEXT(" | ")));
+		if (!J.ArrivalWhy.IsEmpty())
+		{
+			OutDetail += FString::Printf(TEXT("[arrival] %s"), *J.ArrivalWhy);
+		}
 		return false;
 	}
 	J.Serial = NextSerial++;
@@ -969,6 +974,53 @@ void UAstraTransporterSubsystem::TickCycle(FAstraXportJob& J, float Dt)
 		{
 			break;                                              // the lock is being built again (OnLockLost): the pattern waits
 		}
+		// a ship our marines are fighting aboard (ABBORDAGGI): where they are set down is asked again now, the fight has moved while the pattern was in the buffer; it waits there, within the buffer's
+		// limit, while no room of hers is one the beam may set a person down in (never one the Mandate holds, never one with no air)
+		if (J.bBoarded)
+		{
+			TArray<FVector> Spots;
+			TArray<float> Yaws;
+			FString Place, Why;
+			bool bScene = false;
+			const bool bFound = BoardedArrival(J.ToContact, J.Subs.Num(), J.bCaptain, Spots, Yaws, Place, Why, bScene);
+			if (!bScene)
+			{
+				RecomposeAtOrigin(J, TEXT("the boarding ended"));
+				Finish(J, EAstraXportPhase::Failed, FString::Printf(TEXT("the boarding of %s ended while the pattern was in the buffer: the console recomposed it on the pads it left"), *J.Req.To.Ship.Name));
+				return;
+			}
+			if (!bFound)
+			{
+				if (!J.bNotedHold)
+				{
+					J.bNotedHold = true;
+					News(J, FString::Printf(TEXT("%s: the pattern is held in the buffer: %s (the buffer holds %.0f s more)"), *J.Tag, *Why, FMath::Max(0.f, T.BufferHoldS - J.BufferS)), true, true);
+				}
+				return;
+			}
+			for (int32 i = 0; i < J.Subs.Num() && i < Spots.Num(); ++i)
+			{
+				J.Subs[i].ToCm = Spots[i];
+				J.Subs[i].ToYaw = Yaws[i];
+			}
+			J.StreamWaitS -= Dt;
+			if (J.StreamWaitS <= 0.f && J.bCaptain)
+			{
+				J.StreamWaitS = 1.f;
+				if (UAstraBoardSubsystem* Bd = Board())
+				{
+					UAstraBoardSubsystem::FBeamAboard Where;
+					for (int32 i = 0; i < Spots.Num(); ++i)
+					{
+						UAstraBoardSubsystem::FBeamSpot S;
+						S.FeetWorld = Spots[i];
+						S.Yaw = Yaws[i];
+						Where.Spots.Add(S);
+					}
+					Bd->BeamPrepare(Where, true);                  // (his decks are solid where he will stand by the time he is there)
+				}
+			}
+		}
 		// the Captain's destination deck: it is loading, he waits in the buffer for it (six seconds at most, then it is made ready at once)
 		UAstraDeckStreaming* DS = Streaming();
 		if (J.bCaptain && DS && J.Req.To.Aboard())
@@ -1145,6 +1197,21 @@ void UAstraTransporterSubsystem::Depart(FAstraXportJob& J)
 			}
 		}
 	}
+	// leaving a ship our marines are fighting aboard: the people who were in her fight are out of it from now (the Captain's decks stay until his pattern is set down)
+	if (UAstraBoardSubsystem* Bd = Board(); Bd && J.Req.From.Kind == EEndKind::Ship)
+	{
+		for (FAstraXportSubject& S : J.Subs)
+		{
+			if (S.bAway && S.S.Kind == ESubject::Captain)
+			{
+				Bd->SetCaptainInBeam(true);
+			}
+			else if (S.bAway && S.S.Kind == ESubject::Person)
+			{
+				Bd->BeamedOff(S.S.Roster, false, FVector::ZeroVector);
+			}
+		}
+	}
 	J.Arrival = RollArrival(TuningFor(J), J.MinQ, J.bForced, Rng);
 	J.Phase = EAstraXportPhase::Buffer;
 	J.T = 0.f;
@@ -1275,9 +1342,9 @@ void UAstraTransporterSubsystem::EnterRemat(FAstraXportJob& J)
 		float Yaw = bBack ? S.FromYaw : S.ToYaw;
 		if (bBack && S.bAway)
 		{
-			if (const FAstraXportAway* Old = AwayList.FindByPredicate([&S](const FAstraXportAway& W) { return W.Id == S.S.Id; }))
+			if (const FAstraXportAway* Old = AwayList.FindByPredicate([&S](const FAstraXportAway& W) { return W.Id == S.S.Id; }); Old && Old->Where == TEXT("surface"))
 			{
-				Spot = Old->GroundCm;                           // called back to the world it was on: where it stood
+				Spot = Old->GroundCm;                           // called back to the world it was on: where it stood (on a ship, where the order found him: S.FromCm)
 				Yaw = Old->GroundYaw;
 			}
 		}
@@ -1402,6 +1469,13 @@ void UAstraTransporterSubsystem::Finish(FAstraXportJob& J, EAstraXportPhase End,
 	if (EmergencyOwner == J.Serial)
 	{
 		EmergencyOwner = INDEX_NONE;
+	}
+	if (J.bCaptain || J.bBoarded)
+	{
+		if (UAstraBoardSubsystem* Bd = Board())
+		{
+			Bd->BeamOver();
+		}
 	}
 	if (CaptainBeamJob == J.Serial)
 	{
@@ -1563,6 +1637,13 @@ void UAstraTransporterSubsystem::PlaceSubject(FAstraXportJob& J, FAstraXportSubj
 		}
 		PlaceCaptain(Spot, Yaw, false);
 		LockCaptain(true);                                      // (standing up from the chair gave the controls back)
+		if (J.Req.From.Kind == EEndKind::Ship)
+		{
+			if (UAstraBoardSubsystem* Bd = Board())
+			{
+				Bd->BeamedOff(INDEX_NONE, true, Spot);          // (off the decks of the ship our marines were fighting aboard: the fight goes on without him)
+			}
+		}
 		break;
 	case ESubject::Person:
 		if (UAstraLifeSubsystem* L = Life(); L && L->IsRunning() && S.Person != INDEX_NONE)
@@ -1623,11 +1704,34 @@ void UAstraTransporterSubsystem::SetSubjectAway(FAstraXportJob& J, FAstraXportSu
 				Sh->SetCaptainPlanetside(FString::Printf(TEXT("on foot at %s, beamed down from the Aquila's Transporter Room; the XO has the conn"), *J.ToText));
 			}
 		}
+		else if (J.Req.To.Kind == EEndKind::Ship || (J.bReturning && S.bAway))
+		{
+			// the decks of the ship our marines are fighting aboard: he stands beside them (the boarding host makes the fight his)
+			PlaceCaptain(Spot, Yaw, true);
+			LockCaptain(true);
+			if (UAstraBoardSubsystem* Bd = Board())
+			{
+				UAstraBoardSubsystem::FBeamSpot At;
+				At.FeetWorld = Spot;
+				At.Yaw = Yaw;
+				Bd->BeamedAboard(INDEX_NONE, true, At);
+			}
+		}
 		break;
 	case ESubject::Person:
 		if (UAstraLifeSubsystem* L = Life(); L && L->IsRunning() && S.Person != INDEX_NONE)
 		{
 			L->Sim().SetAway(S.Person, A.WhereText);
+		}
+		if (J.bBoarded && S.S.Roster != INDEX_NONE)
+		{
+			if (UAstraBoardSubsystem* Bd = Board())
+			{
+				UAstraBoardSubsystem::FBeamSpot At;
+				At.FeetWorld = Spot;
+				At.Yaw = Yaw;
+				Bd->BeamedAboard(S.S.Roster, false, At);
+			}
 		}
 		break;
 	case ESubject::Cargo:

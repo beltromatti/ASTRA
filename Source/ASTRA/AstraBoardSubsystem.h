@@ -104,6 +104,51 @@ public:
 	FString CaptainWhereText() const;
 	/** The tests: a Captain with no pawn (the war bench): where his feet are, which way he faces. The ride and the fight use him as they use the pawn. */
 	void SetTestCaptain(bool bOn, const FVector& Feet = FVector::ZeroVector, float Yaw = 0.f);
+
+	// ------------------------------------------------------------------------------------------------ the transporter (TELETRASPORTO: the Captain and the marines set down aboard a ship our marines hold a room of, and taken off her)
+	/** What a place of her decks must be for a pattern to be set down in it: the transporter's own limits (its tuning gives them). */
+	struct FBeamLimits
+	{
+		float AirMin = 0.6f, FireMax = 0.2f, SmokeMax = 0.5f;
+	};
+	/** One place where a person is set down: the feet in the world (the boarded ship's decks stand in a zone of their own), and the way he faces. */
+	struct FBeamSpot
+	{
+		FVector FeetWorld = FVector::ZeroVector;
+		float Yaw = 0.f;
+	};
+	/** The answer to "may the beam set people down aboard that ship now, and where". */
+	struct FBeamAboard
+	{
+		bool bScene = false;             // our marines are fighting aboard her (else there is nothing to land beside, and her decks are not in the pattern library)
+		bool bOk = false;
+		FString Why, Fix;                // (refused) what holds it and what would clear it, one plain sentence each
+		FString Place;                   // (accepted) where, in words
+		TArray<FBeamSpot> Spots;         // one for each person asked for
+		int32 MarinesThere = 0;          // marines of ours on their feet in that room
+	};
+	/** A ship our marines are fighting aboard (the simulation runs on her plan, their boats at her hatches): her contact id and name. False when there is none. */
+	bool BoardedByUs(FString& OutContact, FString& OutName) const;
+	/** May the beam set Count people down aboard that ship now, and where: in a room of hers that our marines hold (one of ours on his feet in it, no enemy who can fight in it, none who can see the spot), with
+	 *  air and no fire, beside them, on clear floor: never in a room the Mandate holds, never where there is no air. bCaptain: one of them is the Captain, who goes only while a boat of ours is at her hatches (the way
+	 *  home if the beam is blocked). */
+	bool BeamAboardQuery(const FString& ShipContact, int32 Count, bool bCaptain, const FBeamLimits& Limits, FBeamAboard& Out) const;
+	/** The pattern has left (it is in the buffer): the decks round where it will stand are made solid, so that there is a floor when it comes. */
+	void BeamPrepare(const FBeamAboard& Where, bool bCaptain);
+	/** The beam set a person down aboard (the Captain, or a marine of the roster): he is in the fight. */
+	void BeamedAboard(int32 Roster, bool bCaptain, const FBeamSpot& At);
+	/** The beam took a person off her decks (the Captain, or a person of the roster): he is out of the fight, and aboard the Aquila at FeetWorld (the Captain's). */
+	void BeamedOff(int32 Roster, bool bCaptain, const FVector& FeetWorld);
+	/** The Captain's pattern is in the beam leaving her decks (or is not any more, because it was recomposed where he stood): out of the fight while it is. */
+	void SetCaptainInBeam(bool bOn);
+	/** A transport that carried the Captain or went to her decks is over, however it ended: his pattern is not in the beam, and the decks made for him, if he is not on them, are let go. */
+	void BeamOver();
+	/** He is on her decks (by the boat or by the beam), and which ship (her contact id). */
+	bool CaptainAboardOtherShip(FString* OutContact = nullptr) const;
+	/** He is in the troop bay of a boat that flies (out or home): no beam locks through a boat's hull. */
+	bool CaptainInBoat() const { return Ride == ERide::Out || Ride == ERide::Home; }
+	/** A person of the roster who is aboard that ship in the fight (a marine that went in a Kestrel or was beamed there): her contact id. */
+	bool PersonAboardOtherShip(int32 Roster, FString* OutContact = nullptr) const;
 	/** The Aquila's own boats and the marines fit to go in them (ship_state.boarding_boats: the crew's tool `board_ship` exists where this does). Empty when the battle has no Aquila yet. */
 	TSharedRef<FJsonObject> BoatsJson() const;
 
@@ -336,6 +381,11 @@ private:
 	UPROPERTY() TObjectPtr<AAstraBoardInterior> Cabin;         // the troop bay of the boat
 	FVector CabinSpot = FVector::ZeroVector;                   // where he stands in it (feet)
 	bool bMoveLocked = false, bLookLocked = false;
+	bool bBeamed = false;                            // he came by the transporter (not in a boat): the way home is the beam, or the boat's
+	bool bCaptainInBeam = false;                     // his pattern is in the beam leaving her decks: out of the fight meanwhile
+	bool EnsureEnemyDecks(const FVector& NearPlanCm, int32 MaxRooms);          // her decks made solid (begun if they are not) round a point of her plan
+	void EndEnemyDecks();
+	int32 BoatForTheWayHome() const;                 // a leg whose boat is at her hatches (the first), or INDEX_NONE
 	void TickRide(float Dt);
 	void RideBegin(FLeg& L);
 	void RideArrive(FLeg& L);

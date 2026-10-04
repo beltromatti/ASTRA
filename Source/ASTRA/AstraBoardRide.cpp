@@ -196,6 +196,53 @@ void UAstraBoardSubsystem::MakeCabin()
 	}
 }
 
+bool UAstraBoardSubsystem::EnsureEnemyDecks(const FVector& NearPlanCm, int32 MaxRooms)
+{
+	UWorld* W = GetWorld();
+	if (!W || !ScenePlan.IsValid())
+	{
+		return false;
+	}
+	if (!Interior)
+	{
+		FActorSpawnParameters P;
+		P.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		Interior = W->SpawnActor<AAstraBoardInterior>(FVector::ZeroVector, FRotator::ZeroRotator, P);
+	}
+	if (!Interior)
+	{
+		return false;
+	}
+	RemoteOffset = AAstraBoardInterior::ZoneOrigin();
+	if (!Interior->IsBegun())
+	{
+		FShipFacts T;
+		const UAstraBattleSubsystem* B = Battle();
+		bool bHulk = !B || !B->ShipFacts(Assault.TargetId, T) || T.bDisabled;
+		if (Assault.bFromWar && ScenePlan->Dmg.IsValid())
+		{
+			// the war's picture of her rooms: the strips of the rooms with no power are the red of the emergency lighting, and the whole is lit as the ship is (more than half her rooms dark: a hulk)
+			int32 Dark = 0;
+			for (const TPair<int32, FBoardRoomMood>& KV : Assault.Moods)
+			{
+				Dark += KV.Value.Dark() ? 1 : 0;
+			}
+			bHulk = Dark * 2 > ScenePlan->Dmg->Comps.Num();
+		}
+		Interior->Begin(ScenePlan, RemoteOffset, bHulk ? EAstraInteriorStyle::Emergency : EAstraInteriorStyle::Lit, Assault.bFromWar ? &Assault.Moods : nullptr);
+	}
+	Interior->EnsureAround(NearPlanCm, MaxRooms);
+	return true;
+}
+
+void UAstraBoardSubsystem::EndEnemyDecks()
+{
+	if (Interior)
+	{
+		Interior->End();
+	}
+}
+
 FVector UAstraBoardSubsystem::HomeSpot() const
 {
 	// the boat bay of Deck 8 (feet on its floor): where the Kestrels set him down
@@ -271,11 +318,10 @@ void UAstraBoardSubsystem::CaptainLeftScene(const TCHAR* Why)
 		return;
 	}
 	bCaptainAboard = false;
+	bBeamed = false;
+	bCaptainInBeam = false;
 	Fight.SetCaptain(FVector(0.0, 0.0, -1.0e7), 0.f, false, 0.f, false);          // (out of the fight: the simulation has no one of his there)
-	if (Interior)
-	{
-		Interior->End();
-	}
+	EndEnemyDecks();
 	Ride = ERide::None;
 	LockCaptain(false, false);
 	bCapDown = false;
@@ -368,14 +414,7 @@ void UAstraBoardSubsystem::TickRide(float Dt)
 				FadeCaptain(false, 0.5f);
 				break;
 			}
-			UWorld* W = GetWorld();
-			if (!Interior && W)
-			{
-				FActorSpawnParameters P;
-				P.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-				Interior = W->SpawnActor<AAstraBoardInterior>(FVector::ZeroVector, FRotator::ZeroRotator, P);
-			}
-			if (!Interior)
+			if (!EnsureEnemyDecks(Leg->InCm, 60))
 			{
 				Ride = ERide::Home;
 				RideStep = 31;
@@ -383,22 +422,6 @@ void UAstraBoardSubsystem::TickRide(float Dt)
 				FadeCaptain(false, 0.5f);
 				break;
 			}
-			RemoteOffset = AAstraBoardInterior::ZoneOrigin();
-			FShipFacts T;
-			const UAstraBattleSubsystem* B = Battle();
-			bool bHulk = !B || !B->ShipFacts(Assault.TargetId, T) || T.bDisabled;
-			if (Assault.bFromWar && ScenePlan.IsValid() && ScenePlan->Dmg.IsValid())
-			{
-				// the war's picture of her rooms: the strips of the rooms with no power are the red of the emergency lighting, and the whole is lit as the ship is (more than half her rooms dark: a hulk)
-				int32 Dark = 0;
-				for (const TPair<int32, FBoardRoomMood>& KV : Assault.Moods)
-				{
-					Dark += KV.Value.Dark() ? 1 : 0;
-				}
-				bHulk = Dark * 2 > ScenePlan->Dmg->Comps.Num();
-			}
-			Interior->Begin(ScenePlan, RemoteOffset, bHulk ? EAstraInteriorStyle::Emergency : EAstraInteriorStyle::Lit, Assault.bFromWar ? &Assault.Moods : nullptr);
-			Interior->EnsureAround(Leg->InCm, 60);
 			if (Cabin)
 			{
 				Cabin->End();
@@ -434,12 +457,10 @@ void UAstraBoardSubsystem::TickRide(float Dt)
 		{
 			// the decks go; the troop bay again
 			bCaptainAboard = false;
+			bBeamed = false;
 			Fight.SetCaptain(FVector(0.0, 0.0, -1.0e7), 0.f, false, 0.f, false);
 			ClearBodies();
-			if (Interior)
-			{
-				Interior->End();
-			}
+			EndEnemyDecks();
 			MakeCabin();
 			TeleportCaptain(CabinSpot, 0.f, false);
 			LockCaptain(true, false);
@@ -482,10 +503,7 @@ void UAstraBoardSubsystem::TickRide(float Dt)
 			{
 				Cabin->End();
 			}
-			if (Interior)
-			{
-				Interior->End();
-			}
+			EndEnemyDecks();
 			bCaptainAboard = false;
 			TeleportCaptain(Bay, 90.f, false);
 			LockCaptain(false, false);
@@ -511,6 +529,10 @@ void UAstraBoardSubsystem::TickAboard(float Dt)
 	}
 	if (!bCaptainIn)
 	{
+		if (bCaptainInBeam)
+		{
+			return;                                      // (his pattern is in the transporter's buffer: out of the fight; the decks stay until it is set down)
+		}
 		// the ship's own chain carried him out (the Medbay) or the world has him elsewhere: the decks round him go
 		CaptainLeftScene(TEXT("carried out"));
 		return;
@@ -518,7 +540,7 @@ void UAstraBoardSubsystem::TickAboard(float Dt)
 	if (!bHomeHintShown && RideT > 7.f)
 	{
 		bHomeHintShown = true;                           // (the first thing he reads is where he is; then how he gets out)
-		CaptainPrompt(TEXT("TO COME HOME: TELL THE XO TO CALL OFF THE BOARDING  ·  THE BOAT WAITS AT THE HATCH"), 7.f);
+		CaptainPrompt(TEXT("TO COME HOME: ASK THE CHIEF TO BEAM YOU UP, OR TELL THE XO TO CALL OFF THE BOARDING  ·  THE BOAT WAITS AT THE HATCH"), 7.f);
 	}
 	if (RideT > 0.6f && RideStep == 0)
 	{
