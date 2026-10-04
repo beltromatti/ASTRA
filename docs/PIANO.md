@@ -39,18 +39,18 @@ Il 30/9 sera questo principio è stato applicato:
 - ai messaggi del nemico: la brevità è della persona;
 - al palco della voce (1/10): le battute che hanno aspettato o sono state interrotte le ripensa chi le doveva dire (§4.2).
 
-## 2. Dove siamo (3/10 pomeriggio)
+## 2. Dove siamo (4/10)
 
 | Area | Stato |
 |---|---|
 | **Controlli in prima persona**, banco di prova da terminale | fatto; strumenti del lead: `tools/play.py`, `tools/soak.py` (costo e tempi di un'ora), `tools/perf_ab.py` (A/B di prestazioni), `astra.debug.under/lookat` |
 | **Plancia viva** (F1) | quasi fatta: postazioni vere, schermo principale intelligente (la sua telecamera cede il passo quando il fotogramma sfora), tavolo olografico (anche la guerra della March nella vista del settore), datapad, finestrone in realtà aumentata, HUD del caccia, equipaggio agente che vede ciò che è stato detto e ciò che aspetta di esserlo, plancia v3 **rifinita da ARTE-PLANCIA-2** (ottone, luce calda, corridoi del Ponte 1, alloggi del Capitano, abitacolo del Falcon), voce v2 col palco che ripensa, ordini del Capitano che non si perdono più. Mancano: le persone vere (F3), l'immagine più nitida (RETINA da provare) |
-| **Guerra grande** (F2) | fatta la battaglia a scala di flotte; **fatta CAMPAGNA** (la guerra della March: flotte, Gate, rifornimenti, due menti strategiche, Rourke; le forze arrivano da 85–120 km e si vedono venire, la March gioca anche l'apertura; [GUERRA.md §10](GUERRA.md)). Costo misurato delle partite dell'utente: **1,20 $/ora** (prompt dell'equipaggio riordinato: ~15 % in meno) |
+| **Guerra grande** (F2) | fatta la battaglia a scala di flotte; **lo spazio vivo** (SPAZIO-VIVO, primo traguardo nel gioco: Keeper Station, Arsenal, raffineria, miniera, 37 navi civili con orari e reazioni alla guerra; in corso relitti, detriti, capsule e il moto leggibile delle capitali); lo schermo principale pulito a ogni zoom; **fatta CAMPAGNA** (la guerra della March: flotte, Gate, rifornimenti, due menti strategiche, Rourke; le forze arrivano da 85–120 km e si vedono venire, la March gioca anche l'apertura; [GUERRA.md §10](GUERRA.md)). Costo misurato delle partite dell'utente: **1,20 $/ora** (prompt dell'equipaggio riordinato: ~15 % in meno) |
 | **Persone vere** (F3) | ferma: serve l'autorizzazione Epic per i MetaHuman (RICHIESTE) |
-| **La nave intera** (F4) | fatta: la pianta di NAVE-3 nel gioco (3234 compartimenti, 34 turboascensori e la navetta, tubi di Jefferies, atrio della plancia; nessun buco nei pavimenti, e una rete contro le cadute), 560 persone (VITA), danni interni veri (DISTRUZIONE). **In corso ARTE-INTERNI** (le stanze al livello dei corridoi: oggi sono un greybox ammobiliato) e **FLOTTA-VIVA** (le altre navi con piano, equipaggio e modello dei danni; i piani delle classi servono anche agli abbordaggi) |
-| **Abbordaggi e prima persona** (F5) | F5.1 unito e provato; **braccia giuste** (cinematica inversa, tacca sull'asse in mira); in volo il Capitano torna a bordo con la guida di recupero (F o Flight Control); **in corso F5.2** (abbordare le navi nemiche, navette d'assalto vere, la guerra che decide) |
+| **La nave intera** (F4) | fatta: la pianta di NAVE-3 nel gioco (3234 compartimenti, 34 turboascensori e la navetta, tubi di Jefferies, atrio della plancia; nessun buco nei pavimenti, e una rete contro le cadute), 560 persone (VITA), danni interni veri (DISTRUZIONE), **le stanze rifatte da ARTE-INTERNI** (~97 tipi: mensa, alloggi, sale comuni, giardini con piante vere, infermeria, sala macchine, ponte di volo; viste nel gioco), **FLOTTA-VIVA** (le altre navi con la pianta della loro classe, equipaggio, comandante e modello dei danni: nel gioco l'Acheron perde gente e comandante prima di spezzarsi) |
+| **Abbordaggi e prima persona** (F5) | F5.1 unito e provato; **braccia giuste** (cinematica inversa, tacca sull'asse in mira); in volo il Capitano torna a bordo con la guida di recupero (F o Flight Control); **le armi del Capitano** (armeria, armadietto del Ready Room, «portatemi un'arma»); **F5.2 nel gioco** (navette Skiff e Kestrel vere: partono, i marine si mobilitano, caccia, difesa di punto e scudi le fermano come devono); in corso: il Capitano che va all'abbordaggio (navetta o teletrasporto), lo scontro visto dentro l'Aquila |
 | **Teletrasporto** (F6) | fatto e provato: sala, Capo con la sua mente, regole alla Star Trek, effetti |
-| Pianeta (F7) · Rete e Windows (F8) | dopo |
+| Pianeta (F7) · Rete e Windows (F8) | F7 dopo; **F8 Windows avviato** (WINDOWS: avvio della mente senza zsh, dati per piattaforma, MetalFX solo Mac, mente con il riconoscimento portabile, script di pacchetto e controllo di portabilità) |
 
 ## 3. Le fasi
 
@@ -152,9 +152,9 @@ nello stesso contratto: Parakeet ONNX su CPU, TSR.
 Fino a tre agenti (Sonnet 5.5, sforzo massimo) su moduli indipendenti, ognuno nel suo worktree. Il lead dirige,
 integra, prova nel gioco vero, e li chiude quando il modulo è perfetto. Brief in `docs/brief/`.
 
-| Fatti e uniti | Adesso (2/10 sera) | Poi (appena si libera un posto) |
+| Fatti e uniti | Adesso (4/10) | Poi (appena si libera un posto) |
 |---|---|---|
-| MENTE-EQUIPAGGIO, ARTE-PLANCIA, VOCE, NAVE, NAVE-2, ARTE-NAVI, GUERRA, VITA, METALFX, VFX, MENTE-GUERRA, SCALA, DISTRUZIONE, VOLO, **NAVE-3, ASCENSORI, ABBORDAGGI (F5.1), TELETRASPORTO** | **ARTE-PLANCIA-2** · **CAMPAGNA** (lo strato strategico) · **ABBORDAGGI-2** (correzioni e F5.2) | **FLOTTA-VIVA** (con i piani delle altre classi: la fase C di NAVE-3) · ARTE-INTERNI (l'aspetto dei ponti al livello della plancia) · PRESTAZIONI-GPU (il costo fisso della scena in battaglia: traslucidi, mesh a istanze, telecamera dello schermo principale) |
+| MENTE-EQUIPAGGIO, ARTE-PLANCIA, VOCE, NAVE, NAVE-2, ARTE-NAVI, GUERRA, VITA, METALFX, VFX, MENTE-GUERRA, SCALA, DISTRUZIONE, VOLO, NAVE-3, ASCENSORI, ABBORDAGGI (F5.1), TELETRASPORTO, ARTE-PLANCIA-2, CAMPAGNA, **ARTE-INTERNI (primo giro), FLOTTA-VIVA** | **ABBORDAGGI** (F5.2: il Capitano all'abbordaggio) · **SPAZIO-VIVO** (relitti, detriti, capsule, moto delle capitali) · **WINDOWS** (portabilità) | ARTE-INTERNI-2 (le stanze più deboli, i letti vecchi, i soffitti) · PRESTAZIONI-GPU (il costo fisso della scena in battaglia: traslucidi, mesh a istanze, telecamera dello schermo principale) · VFX-2 (armi e motori più leggibili alle distanze vere: dopo che il lead le ha giudicate nel gioco) |
 
 Il lead, intanto: l'integrazione e le prove di ogni modulo; **partite intere giocate da Capitano** (plancia, battaglia, nave) e la
 rifinitura di ciò che trova; le prestazioni; la plancia al dettaglio.

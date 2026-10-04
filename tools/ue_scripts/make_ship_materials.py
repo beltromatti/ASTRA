@@ -11,7 +11,20 @@ tools = unreal.AssetToolsHelpers.get_asset_tools()
 MAT = "/Game/ASTRA/Materials"
 MI = "/Game/ASTRA/Materials/Instances"
 TEX = "/Game/ASTRA/Materials/Textures"
+FX_ONLY = globals().get("FX_ONLY", False)      # True: only the FX materials are rebuilt (the hull instances and the ships are left as they are)
 log = []
+
+# the vertex shader that keeps a glow a few pixels wide in whatever view draws it, however far and however zoomed (war_fx_hlsl.MINSIZE): the
+# view's own field of view and size, not one eye's distance worked out on the CPU (through the main viewscreen's x35 zoom a battleship's
+# running lights, sized for the bridge's eye, were red discs 70 m across, 4 Oct)
+MINSIZE = """
+float d = max(length(WPrel), 1.0);
+float pxCm = d * 2.0 * TanHalf.x / max(ViewSz.x, 1.0);
+float curR = length(RadW);
+float minR = 0.5 * MinPx * pxCm;
+float extra = max(0.0, minR - curR);
+return (curR > 0.001) ? (RadW / curR) * extra : float3(0.0, 0.0, 0.0);
+"""
 
 
 def lin(h):
@@ -58,7 +71,7 @@ FACTIONS = {
     "G": dict(plate=("#938A74", PAINT, 0.0, 0.35, 0.75), frame=("#44484C", GUN, 0.0, 0.3, 0.7), livery=("#A2561B", PAINT, 0.0, 0.4, 0.7),
               glow=(0.9, 0.9, 1.0, 60.0), lights=(1.0, 0.95, 0.85, 30.0), radiator=("#303236", GUN, 0.0, 0.4, 0.7, None)),
 }
-for f, d in FACTIONS.items():
+for f, d in ({} if FX_ONLY else FACTIONS).items():
     for part in ("plate", "frame", "livery"):
         col, tex, metal, rmin, rmax = d[part]
         mi(f"MI_HULL_{f}_{part.capitalize()}", hard, scalars=dict(HULL, **PLATING[part], MetallicFromMap=0.0, MetallicBias=metal,
@@ -81,9 +94,9 @@ log.append("hull instances ok")
 
 
 # --- FX materials: additive unlit glow (tracers, beams, flashes) and fresnel shell (shields, blast shells)
-def fx_material(name, fresnel, soft=False):
+def fx_material(name, fresnel, soft=False, min_px=0.0):
     """fresnel: bright at the rim (shields, blast shells); soft: bright at the core and fading to nothing at the rim
-    (a glow ball that never shows the sphere's edge: drive flares)."""
+    (a glow ball that never shows the sphere's edge: drive flares); min_px: never smaller than this many pixels in any view (MINSIZE)."""
     p = f"{MAT}/{name}"
     if eal.does_asset_exist(p):
         m = eal.load_asset(p)
@@ -133,6 +146,28 @@ def fx_material(name, fresnel, soft=False):
         mel.connect_material_expressions(fr, "", c, "B")
         out = c
     mel.connect_material_property(out, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    if min_px > 0.0:
+        lp = E(unreal.MaterialExpressionLocalPosition, -1300, 600)
+        rad = E(unreal.MaterialExpressionTransform, -1100, 600)
+        rad.set_editor_property("transform_source_type", unreal.MaterialVectorCoordTransformSource.TRANSFORMSOURCE_INSTANCE)
+        rad.set_editor_property("transform_type", unreal.MaterialVectorCoordTransform.TRANSFORM_WORLD)
+        mel.connect_material_expressions(lp, "", rad, "")
+        wp = E(unreal.MaterialExpressionWorldPosition, -1100, 720, world_position_shader_offset=unreal.WorldPositionIncludedOffsets.WPT_CAMERA_RELATIVE_NO_OFFSETS)
+        tanh = E(unreal.MaterialExpressionViewProperty, -1100, 820, property_=unreal.MaterialExposedViewProperty.MEVP_TAN_HALF_FIELD_OF_VIEW)
+        vsz = E(unreal.MaterialExpressionViewProperty, -1100, 920, property_=unreal.MaterialExposedViewProperty.MEVP_VIEW_SIZE)
+        mp = E(unreal.MaterialExpressionScalarParameter, -1100, 1020, parameter_name="MinPx", default_value=min_px)
+        c = E(unreal.MaterialExpressionCustom, -800, 750)
+        c.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT3)
+        c.set_editor_property("code", MINSIZE)
+        ins = []
+        for nm in ("RadW", "WPrel", "TanHalf", "ViewSz", "MinPx"):
+            ci = unreal.CustomInput()
+            ci.set_editor_property("input_name", nm)
+            ins.append(ci)
+        c.set_editor_property("inputs", ins)
+        for i, src in enumerate((rad, wp, tanh, vsz, mp)):
+            mel.connect_material_expressions(src, "", c, ("RadW", "WPrel", "TanHalf", "ViewSz", "MinPx")[i])
+        mel.connect_material_property(c, "", unreal.MaterialProperty.MP_WORLD_POSITION_OFFSET)
     mel.recompile_material(m)
     eal.save_loaded_asset(m, only_if_is_dirty=False)
     return m
@@ -140,6 +175,6 @@ def fx_material(name, fresnel, soft=False):
 
 fx_material("M_FX_Glow", False)
 fx_material("M_FX_Shell", True)
-fx_material("M_FX_Flare", False, soft=True)
+fx_material("M_FX_Flare", False, soft=True, min_px=2.0)   # running lights and drive flares: their own size up close, two pixels far off
 log.append("fx materials ok")
 print(json.dumps(log))
