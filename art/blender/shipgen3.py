@@ -6,7 +6,8 @@ Usage:
   <out_dir>          FBX files + manifest.json (default art/export/ships_v3, not in git)
 Options:
   --only a,b         build only these ships (short names: Aquila, Praetorian, Vigilant, Acheron, Styx, Lethe, Freighter, Watch,
-                     Falcon, Hammer, Wasp, Harpy; or full asset names)
+                     Falcon, Hammer, Wasp, Harpy; or full asset names). The manifest.json on disk is MERGED: the ships built here
+                     replace their own entries (and their pieces'), the entries of the others stay
   --detail 0.6       thin out the scattered details (1.0 = full); the triangle counts follow
   --seed N           add N to every ship's seed (other dice, same designs)
   --no-export        build (and preview) without writing FBX files
@@ -19,7 +20,8 @@ Exported meshes (origin = the ship's origin, x forward, the FBX export mirrors y
   SM_SHIP_<FACTION>_<Name>               the whole ship (slots MI_HULL_<A|M|G>_<Part>)
   SM_SHIP_<FACTION>_<Name>_Sec<Bow|Mid|Stern>   the pieces of a capital ship, in the same frame, with burnt cut faces
   SM_CRAFT_*, SM_STATION_*               craft and the station
-manifest.json lists per mesh: triangles, size, bounds, slots, and for the pieces the cut planes, cut faces, section limits, pivots.
+manifest.json lists per mesh: triangles, size, bounds, slots, and for the pieces the cut planes, cut faces, section limits, pivots; for each whole ship `nav`, the places of its navigation lights
+(tools/ue_scripts/extract_nav_lights.py gathers them into data/ship/nav_lights.json).
 """
 from __future__ import annotations
 
@@ -170,6 +172,29 @@ def unreal_bounds(V: np.ndarray) -> dict:
     return {"min": [round(x, 3) for x in lo], "max": [round(x, 3) for x in hi]}
 
 
+def nav_lights(V: np.ndarray) -> dict:
+    """Where a ship's navigation lights go, from the mesh's own vertices in the Unreal frame (centimetres, +X the bow, +Y starboard; V is in Blender metres, whose +Y is Unreal -Y): the widest points amidships (port red,
+    starboard green), the highest point (the white strobe), the lowest amidships (the red belly strobe: a flat keel has hundreds of equally low points, the one nearest the middle of it is taken), the stern and the bow
+    on the centreline. The same numbers tools/ue_scripts/extract_nav_lights.py used to read from the imported assets (it opened every ship mesh in the editor and left them all modified): they are made here, and that
+    script only gathers them from the manifest into data/ship/nav_lights.json (the game loads it: UAstraNavLights)."""
+    P = np.asarray(V, np.float64) * np.array([100.0, -100.0, 100.0])
+    xs = P[:, 0]
+    x0, x1 = float(xs.min()), float(xs.max())
+    length = x1 - x0
+    mid = P[np.abs(xs - (x0 + x1) / 2) < 0.3 * length]
+    if len(mid) == 0:
+        mid = P
+    half_band = 0.12 * float(P[:, 1].max() - P[:, 1].min()) + 1.0
+    centre = P[np.abs(P[:, 1]) < half_band]
+    if len(centre) == 0:
+        centre = P
+    low = mid[mid[:, 2] < float(mid[:, 2].min()) + 1.0]
+    belly = low[int(np.argmin(np.abs(low[:, 0] - (x0 + x1) / 2) + 3.0 * np.abs(low[:, 1])))]
+    r = lambda p: [round(float(p[0]), 1), round(float(p[1]), 1), round(float(p[2]), 1)]  # noqa: E731
+    return {"port": r(mid[int(np.argmin(mid[:, 1]))]), "starboard": r(mid[int(np.argmax(mid[:, 1]))]), "top": r(P[int(np.argmax(P[:, 2]))]), "belly": r(belly),
+            "stern": r(centre[int(np.argmin(centre[:, 0]))]), "bow": r(centre[int(np.argmax(centre[:, 0]))]), "length_m": round(length / 100.0, 1)}
+
+
 def build_ship(name: str, spec: dict, args: dict) -> dict:
     fac = spec["fac"]
     g = G.Geo([f"MI_HULL_{fac}_{p}" for p in FACTION_SLOTS[fac]])
@@ -195,6 +220,23 @@ def main() -> None:
     A.reset_scene()
     manifest: dict = {"version": 3, "generator": "art/blender/shipgen3.py", "frame": "Blender frame in the FBX (x forward, z up, y mirrored on "
                       "import: Unreal +Y is Blender -Y); bounds below are in the Unreal frame, metres", "meshes": {}, "budget": {}}
+    if args["only"] and args["export"]:
+        # --only builds some of the ships: the manifest keeps the entries of the others as they were (it used to be written with only these, and what is made from the whole manifest — the war's effects table, the
+        # nav lights — then lost the rest). The ships rebuilt here replace their own entries, and their section pieces too when the pieces are rebuilt (a piece the ship no longer has must not stay behind).
+        old_path = os.path.join(out_dir, "manifest.json")
+        if os.path.exists(old_path):
+            try:
+                with open(old_path, encoding="utf-8") as fh:
+                    old_meshes = json.load(fh).get("meshes", {})
+            except (OSError, ValueError) as err:
+                old_meshes = {}
+                print("the manifest on disk could not be read and is not kept:", err)
+            redo = set(names)
+            for mname, ment in old_meshes.items():
+                if mname in redo or (args["pieces"] and ment.get("class") == "section" and ment.get("of") in redo):
+                    continue
+                manifest["meshes"][mname] = ment
+            print(f"manifest: {len(manifest['meshes'])} entries kept from the one on disk")
     previews = []
     for name in names:
         spec = reg[name]
@@ -213,6 +255,7 @@ def main() -> None:
         for k in ("length_m", "notes", "checks"):
             if k in info:
                 entry[k] = info[k]
+        entry["nav"] = nav_lights(asm["V"])            # the navigation lights' places, from this mesh's own vertices (tools/ue_scripts/extract_nav_lights.py gathers them: no asset is opened)
         manifest["meshes"][name] = entry
         print(f"{name}: {st['tris']:,} tris, {len(mats)} slots, {st['size_m']} m, {time.time() - t0:.1f}s")
         # ---------------------------------------------------------------------------------- the section pieces
