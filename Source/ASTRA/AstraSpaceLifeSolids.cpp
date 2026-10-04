@@ -254,6 +254,57 @@ namespace AstraSpace
 			const double Fill = (double)S->NumCells * S->Cell * S->Cell * S->Cell / FMath::Max(1.0, Ext.X * Ext.Y * Ext.Z);
 			Expect(FMath::Abs(Share - Fill) < 0.02, FString::Printf(TEXT("%s: a random point is solid %.3f of the time, the cells say %.3f"), Name, Share, Fill));
 		}
+		// ---- the wrecks of the war: the ships' whole hulls and their three pieces, each as long as the war says her hull is (data/war/classes.json: hull_m.x, cuts_x_m), the pieces end to end along her length
+		{
+			const FString Path = FPaths::ProjectDir() / TEXT("data/war/classes.json");
+			FString Text;
+			TSharedPtr<FJsonObject> Root;
+			const TArray<TSharedPtr<FJsonValue>>* List = nullptr;
+			if (FFileHelper::LoadFileToString(Text, *Path) && FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), Root) && Root.IsValid() && Root->TryGetArrayField(TEXT("classes"), List))
+			{
+				int32 Ships = 0, Pieces = 0;
+				for (const TSharedPtr<FJsonValue>& V : *List)
+				{
+					const TSharedPtr<FJsonObject> O = V->AsObject();
+					FString Key, Mesh;
+					const TSharedPtr<FJsonObject>* Hull = nullptr;
+					const TArray<TSharedPtr<FJsonValue>>* X = nullptr;
+					if (!O.IsValid() || !O->TryGetStringField(TEXT("key"), Key) || !O->TryGetStringField(TEXT("mesh"), Mesh) || Mesh.IsEmpty() || Key == TEXT("aquila") || !O->TryGetObjectField(TEXT("hull_m"), Hull) || !(*Hull)->TryGetArrayField(TEXT("x"), X) || X->Num() < 2)
+					{
+						continue;
+					}
+					const double Len = (*X)[1]->AsNumber() - (*X)[0]->AsNumber();
+					const FSolids* Whole = Data.Find(Mesh);
+					Expect(Whole != nullptr, FString::Printf(TEXT("no solids for the hull of the %s (%s)"), *Key, *Mesh));
+					if (!Whole)
+					{
+						continue;
+					}
+					++Ships;
+					const double WholeLen = Whole->Max.X - Whole->Min.X;
+					Expect(FMath::Abs(WholeLen - Len) < 4.0 * Whole->Cell + 0.03 * Len, FString::Printf(TEXT("the %s's solids are %.0f m long and her class says %.0f"), *Key, WholeLen, Len));
+					Expect(Whole->NumBoxes >= 20 && Whole->NumBoxes <= 8000, FString::Printf(TEXT("%s has %d boxes"), *Mesh, Whole->NumBoxes));
+					const TArray<TSharedPtr<FJsonValue>>* Cuts = nullptr;
+					if (!O->TryGetArrayField(TEXT("cuts_x_m"), Cuts) || Cuts->Num() < 2 || ((*Cuts)[0]->AsNumber() == 0.0 && (*Cuts)[1]->AsNumber() == 0.0))
+					{
+						continue;                                       // (a station is not cut in three)
+					}
+					const FSolids* Sec[3] = {Data.Find(Mesh + TEXT("_SecBow")), Data.Find(Mesh + TEXT("_SecMid")), Data.Find(Mesh + TEXT("_SecStern"))};
+					bool bAll = Sec[0] && Sec[1] && Sec[2];
+					Expect(bAll, FString::Printf(TEXT("the %s's three pieces have no solids"), *Key));
+					if (bAll)
+					{
+						Pieces += 3;
+						// end to end: the bow's tip is the hull's, the stern's is the hull's, and the middle lies between them (the cut faces' recess makes them overlap a little)
+						Expect(FMath::Abs(Sec[0]->Max.X - Whole->Max.X) < 3.0 * Whole->Cell && FMath::Abs(Sec[2]->Min.X - Whole->Min.X) < 3.0 * Whole->Cell, FString::Printf(TEXT("the %s's pieces do not reach the hull's ends"), *Key));
+						Expect(Sec[1]->Min.X >= Sec[2]->Min.X && Sec[1]->Max.X <= Sec[0]->Max.X && Sec[0]->Min.X >= Sec[1]->Min.X && Sec[2]->Max.X <= Sec[1]->Max.X, FString::Printf(TEXT("the %s's pieces are not in order along her length"), *Key));
+						Expect(Sec[0]->Min.X <= Sec[1]->Max.X + 2.0 * Whole->Cell && Sec[1]->Min.X <= Sec[2]->Max.X + 2.0 * Whole->Cell, FString::Printf(TEXT("the %s's pieces do not meet at the cuts"), *Key));
+					}
+				}
+				Expect(Ships >= 6, FString::Printf(TEXT("only %d ships have solids (the Praetorian, Vigilant, Acheron, Styx, Lethe, the Guilds' freighter and the Watch station should)"), Ships));
+				Notes.Add(FString::Printf(TEXT("the wrecks' hulls: %d ships, %d pieces, each as long as her class says"), Ships, Pieces));
+			}
+		}
 		// ---- a lookup is cheap
 		{
 			const FSolids* S = Data.Find(TEXT("SM_PLACE_Arsenal"));
@@ -284,7 +335,7 @@ bool UAstraSpaceLife::PilotHit(const FVector& Prev, const FVector& Now, FString&
 	const AstraSpace::FSolidData& Data = AstraSpace::SolidData();
 	if (!Data.bLoaded)
 	{
-		return false;
+		return PilotHitWrecks(Prev, Now, OutWhat);          // (no boxes: the wrecks have their spheres)
 	}
 	for (const FSpaceLifePlace& P : Places)
 	{
@@ -337,6 +388,50 @@ bool UAstraSpaceLife::PilotHit(const FVector& Prev, const FVector& Now, FString&
 		{
 			OutWhat = FString::Printf(TEXT("the hull of %s"), *N.Name);          // (as the war says it of a ship)
 			return true;
+		}
+	}
+	return PilotHitWrecks(Prev, Now, OutWhat);
+}
+
+bool UAstraSpaceLife::PilotHitWrecks(const FVector& Prev, const FVector& Now, FString& OutWhat) const
+{
+	if (Wrecks.Sites().Num() == 0)
+	{
+		return false;
+	}
+	const AstraSpace::FSolidData& Data = AstraSpace::SolidData();
+	const double Clk = WreckClock();
+	for (const AstraSpace::FSite& Si : Wrecks.Sites())
+	{
+		if (Si.System != SystemKey)
+		{
+			continue;
+		}
+		for (int32 pi = 0; pi < Si.Pieces.Num(); ++pi)
+		{
+			// a piece of a broken ship (or her whole hull, burnt dark) where her record has her now: the solids of her own mesh, in her own frame, turned as she is drawn
+			const AstraSpace::FPieceRec& P = Si.Pieces[pi];
+			const FVector Pivot = Sky.ToSystem(AstraSpace::FWrecks::PosAt(P, Clk));
+			if (FMath::Min(FVector::Dist(Now, Pivot), FVector::Dist(Prev, Pivot)) > (double)P.Radius * 2.2 + 200.0)
+			{
+				continue;
+			}
+			bool bHit = false;
+			if (const AstraSpace::FSolids* Sol = Data.bLoaded ? Data.Find(AstraSpace::FWrecks::PieceMesh(Si, pi)) : nullptr)
+			{
+				const FQuat Q = Sky.ToSystem(AstraSpace::FWrecks::AttAt(P, Clk));
+				const FVector Origin = Pivot - Q.RotateVector(P.PivotLocal);
+				bHit = Sol->Crosses(Q.UnrotateVector(Prev - Origin), Q.UnrotateVector(Now - Origin));
+			}
+			else
+			{
+				bHit = FMath::PointDistToSegment(Pivot, Prev, Now) < (double)P.Radius * 0.5;       // (a mesh with no solids: a sphere about her pivot, inside her outline)
+			}
+			if (bHit)
+			{
+				OutWhat = FString::Printf(TEXT("the %s"), *AstraSpace::FWrecks::PieceName(Si, pi));
+				return true;
+			}
 		}
 	}
 	return false;
@@ -419,9 +514,35 @@ bool UAstraSpaceLife::DebugSolids(float Seconds, double RadiusM, FString& OutDet
 			}
 		}
 	}
-	OutDetail = NumPlaces ? FString::Printf(TEXT("%d runs of solid cells within %.0f m of the eye drawn (orange) for %.0f s, in %d place(s): the Falcon is lost inside them%s"), Drawn, RadiusM, Seconds, NumPlaces, Drawn >= 3000 ? TEXT(" (the first 3000; ask for a smaller radius)") : TEXT(""))
-	                   : FString(TEXT("no place within reach of the eye (astra.space.look keeper 4)"));
-	return NumPlaces > 0;
+	// the pieces of the ships the war broke, where their records have them now
+	int32 NumPieces = 0;
+	const double Clk = WreckClock();
+	for (const AstraSpace::FSite& Si : Wrecks.Sites())
+	{
+		if (Si.System != SystemKey)
+		{
+			continue;
+		}
+		for (int32 pi = 0; pi < Si.Pieces.Num(); ++pi)
+		{
+			const AstraSpace::FPieceRec& P = Si.Pieces[pi];
+			const FVector Pivot = Sky.ToSystem(AstraSpace::FWrecks::PosAt(P, Clk));
+			if (FVector::Dist(Eye, Pivot) > (double)P.Radius * 2.2 + RadiusM)
+			{
+				continue;
+			}
+			if (const AstraSpace::FSolids* Sol = Data.Find(AstraSpace::FWrecks::PieceMesh(Si, pi)))
+			{
+				const FQuat Q = Sky.ToSystem(AstraSpace::FWrecks::AttAt(P, Clk));
+				Draw(*Sol, FTransform(Q, Pivot - Q.RotateVector(P.PivotLocal)));
+				++NumPieces;
+			}
+		}
+	}
+	OutDetail = NumPlaces + NumPieces ? FString::Printf(TEXT("%d runs of solid cells within %.0f m of the eye drawn (orange) for %.0f s, in %d place(s) and %d wreck piece(s): the Falcon is lost inside them%s"), Drawn, RadiusM, Seconds, NumPlaces, NumPieces,
+	                                                  Drawn >= 3000 ? TEXT(" (the first 3000; ask for a smaller radius)") : TEXT(""))
+	                                  : FString(TEXT("no place or wreck within reach of the eye (astra.space.look keeper 4, astra.space.look wreck 1)"));
+	return NumPlaces + NumPieces > 0;
 }
 
 bool UAstraSpaceLife::DebugSolidsTest(FString& OutDetail)
@@ -509,7 +630,65 @@ bool UAstraSpaceLife::DebugSolidsTest(FString& OutDetail)
 			Clock = Saved;
 		}
 	}
-	OutDetail = FString::Printf(TEXT("%d checks over %s%s: %s"), Checked, *Names, bRing ? TEXT(" (the turning ring too)") : TEXT(""), Failed ? *Lines : TEXT("every hull is where it is drawn"));
+	// the pieces of the ships the war broke: a solid cell of a piece's own mesh is hit where her record has her now, and named as the war names a ship's hull; the air 5 km off is not; the pivot the effects
+	// gave her lies inside her own mesh (a frame that was mirrored or shifted would put it outside)
+	int32 Pieces = 0, WithSolids = 0;
+	{
+		const double Clk = WreckClock();
+		for (const AstraSpace::FSite& Si : Wrecks.Sites())
+		{
+			if (Si.System != SystemKey)
+			{
+				continue;
+			}
+			for (int32 pi = 0; pi < Si.Pieces.Num() && Pieces < 16; ++pi)
+			{
+				const AstraSpace::FPieceRec& P = Si.Pieces[pi];
+				++Pieces;
+				const AstraSpace::FSolids* Sol = Data.Find(AstraSpace::FWrecks::PieceMesh(Si, pi));
+				if (!Sol)
+				{
+					continue;
+				}
+				++WithSolids;
+				const FVector Pivot = Sky.ToSystem(AstraSpace::FWrecks::PosAt(P, Clk));
+				const FQuat Q = Sky.ToSystem(AstraSpace::FWrecks::AttAt(P, Clk));
+				const FVector Origin = Pivot - Q.RotateVector(P.PivotLocal);
+				const FString Mesh = AstraSpace::FWrecks::PieceMesh(Si, pi);
+				const FVector Slack(Sol->Cell * 2.0);
+				Expect(P.PivotLocal.X >= Sol->Min.X - Slack.X && P.PivotLocal.X <= Sol->Max.X + Slack.X && P.PivotLocal.Y >= Sol->Min.Y - Slack.Y && P.PivotLocal.Y <= Sol->Max.Y + Slack.Y
+				       && P.PivotLocal.Z >= Sol->Min.Z - Slack.Z && P.PivotLocal.Z <= Sol->Max.Z + Slack.Z,
+				       FString::Printf(TEXT("%s: the pivot %s lies outside her mesh (%s to %s)"), *Mesh, *P.PivotLocal.ToString(), *Sol->Min.ToString(), *Sol->Max.ToString()));
+				bool bFound = false;
+				for (int32 X = Sol->NX / 2; X < Sol->NX && !bFound; ++X)
+				{
+					for (int32 Y = 0; Y < Sol->NY && !bFound; ++Y)
+					{
+						for (int32 Z = 0; Z < Sol->NZ && !bFound; ++Z)
+						{
+							if (Sol->Bits[(X * Sol->NY + Y) * Sol->NZ + Z])
+							{
+								const FVector In = Sol->Origin + FVector(X + 0.5, Y + 0.5, Z + 0.5) * Sol->Cell;
+								const FVector Sys = Origin + Q.RotateVector(In);
+								FString What;
+								Expect(PilotHit(Sys - Q.GetForwardVector() * 1.0, Sys, What) && What == FString::Printf(TEXT("the %s"), *AstraSpace::FWrecks::PieceName(Si, pi)), FString::Printf(TEXT("%s: a solid cell of her is not hit (%s)"), *Mesh, *What));
+								bFound = true;
+							}
+						}
+					}
+				}
+				FString Air;
+				const FVector Off = Pivot + FVector(0.0, 0.0, 5000.0);
+				Expect(!PilotHit(Off, Off, Air), FString::Printf(TEXT("%s: air 5 km above her is hit (%s)"), *Mesh, *Air));
+			}
+		}
+		if (Pieces > 0)
+		{
+			Expect(WithSolids > 0, FString::Printf(TEXT("%d wreck pieces here and not one has solids (art/blender/space3_solids.py --ships, then tools/space.py sync)"), Pieces));
+		}
+	}
+	OutDetail = FString::Printf(TEXT("%d checks over %s%s%s: %s"), Checked, *Names, bRing ? TEXT(" (the turning ring too)") : TEXT(""), Pieces ? *FString::Printf(TEXT(" and %d wreck piece(s)"), Pieces) : TEXT(""),
+	                            Failed ? *Lines : TEXT("every hull is where it is drawn"));
 	return Failed == 0 && Checked > 0;
 }
 

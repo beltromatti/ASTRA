@@ -127,6 +127,9 @@ struct FAstraBattleShip
 	bool bLeader = false;                // leads its group (the commander on the channel)
 	bool bDerelict = false;              // a dead station or hulk to investigate: no power, tumbling slowly
 	bool bFixture = false;               // a place of the system (Keeper Station, the Arsenal...: AstraSpaceLife.*): in the plot as a neutral contact, posed once and never moved, hit by nothing, run by no AI
+	bool bWreck = false;                 // a piece of a ship the war broke (AstraWrecks.*, docs/SPAZIO.md): a derelict contact of the plot that the living space carries along its record's arithmetic every frame (a fixture for the war's
+	                                     // rules: no AI, hit by nothing), named and targeted by the crew; WreckSite and WreckPiece say which record it is (UAstraSpaceLife::GetWrecks().FindById(WreckSite)->Pieces[WreckPiece])
+	int32 WreckSite = -1, WreckPiece = -1;
 	bool bPiloted = false;               // the Captain flies it (first person): no AI, the stick drives it
 	float SpinDeg = 0.f;
 	// tactical orders by datalink (the Mandate commander's to their ships, the Captain's requests to the fleet)
@@ -579,6 +582,7 @@ public:
 		bool bFleeing = false;
 		bool bFiringAtUs = false;  // its guns or its commander's orders are on the Aquila
 		bool bDerelict = false;
+		bool bWreck = false;       // a piece of a ship the war broke (a section or her burnt hull): also a derelict; what it was is in the living space's records (AstraWrecks.h)
 		bool bJamming = false;
 		bool bUnknown = false;     // not classified yet (or running cold) and not shown hostile: of no known side
 		FVector Pos = FVector::ZeroVector;   // m, system frame (bearing-only: somewhere along the bearing)

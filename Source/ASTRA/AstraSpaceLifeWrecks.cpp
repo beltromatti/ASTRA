@@ -27,6 +27,13 @@ namespace
 	TAutoConsoleVariable<int32> CVarWkWrecks(TEXT("astra.space.wrecks"), 1, TEXT("What the war leaves (wrecks, debris, lifepods): 1 on, 0 off (a loss is then not recorded; the war's own effects stand alone)"));
 	TAutoConsoleVariable<float> CVarWkWreckKm(TEXT("astra.space.wrecks.km"), 220.f, TEXT("A wreck's pieces are drawn out to this range from the Aquila (km)"));
 	TAutoConsoleVariable<int32> CVarWkChunks(TEXT("astra.space.wrecks.chunks"), 420, TEXT("The most chunks of debris drawn at once (the nearest fields first)"));
+	TAutoConsoleVariable<float> CVarWkPlotKm(TEXT("astra.space.wrecks.plot.km"), (float)AstraSpace::FWrecks::ContactKm, TEXT("The pieces of wrecks within this range of the Aquila (km) are contacts on the plot: the crew names them, the screens show them (0: none)"));
+	TAutoConsoleVariable<int32> CVarWkPlotMax(TEXT("astra.space.wrecks.plot.max"), AstraSpace::FWrecks::MaxContacts, TEXT("The most wreck contacts on the plot at once, the nearest first (the plot's lists are read every frame by a dozen readers)"));
+	TAutoConsoleVariable<int32> CVarWkListed(TEXT("astra.space.wrecks.listed"), AstraSpace::FWrecks::ListedContacts, TEXT("How many of the nearest wreck contacts (within 40 km) the crew's own state lists: the minds read it every turn"));
+
+	double WkPlotKm() { return FMath::Clamp((double)CVarWkPlotKm.GetValueOnGameThread(), 0.0, 120.0); }
+	int32 WkPlotMax() { return FMath::Clamp(CVarWkPlotMax.GetValueOnGameThread(), 0, 32); }
+	int32 WkListed() { return FMath::Clamp(CVarWkListed.GetValueOnGameThread(), 0, 8); }
 
 	constexpr double WkKm = 1000.0;
 	constexpr double WkChunkFieldKm = 24.0;                  // a field is looked into when its edge is this near
@@ -51,6 +58,39 @@ AstraSpace::FSkyFrame UAstraSpaceLife::SkyFrame() const
 	Fr.Origin = A.bGate ? A.GatePos : A.Origin;
 	Fr.Att = A.bGate ? A.GateAtt : FQuat::Identity;
 	return Fr;
+}
+
+// ------------------------------------------------------------------------------------------------------------------ what is aboard
+void AstraSpaceFillAboardRooms(const FAstraShipInterior& Interior, AstraSpace::FAboard& Out)
+{
+	FFleetSnapshot Snap;
+	Interior.Snapshot(Snap);
+	for (const FFleetSnapshot::FRoom& R : Snap.Rooms)
+	{
+		if (Out.Rooms.Num() >= 400)
+		{
+			break;
+		}
+		AstraSpace::FAboardRoom Room;
+		Room.Comp = R.Comp;
+		Room.Air = R.Air;
+		Room.Hole = R.Hole;
+		Room.Fire = R.Fire;
+		Room.Smoke = R.Smoke;
+		Room.Heat = R.Heat;
+		Room.Power = R.Power;
+		Room.Wreck = R.Wreck;
+		Room.bGutted = R.bGutted;
+		Room.bLocked = R.bLocked;
+		Out.Rooms.Add(Room);
+	}
+	for (const FName& D : Snap.SealedDoors)
+	{
+		if (Out.SealedDoors.Num() < 120)
+		{
+			Out.SealedDoors.Add(D.ToString());
+		}
+	}
 }
 
 // ------------------------------------------------------------------------------------------------------------------ a ship is lost
@@ -97,34 +137,7 @@ void UAstraSpaceLife::OnShipLost(const FAstraBattleShip& S, const FAstraDeathEve
 		A.Complement = I->CrewTotal();
 		A.Killed = I->CrewDead();
 		A.Alive = I->CrewLostWithShip();
-		FFleetSnapshot Snap;
-		I->Snapshot(Snap);
-		for (const FFleetSnapshot::FRoom& R : Snap.Rooms)
-		{
-			if (A.Rooms.Num() >= 400)
-			{
-				break;
-			}
-			AstraSpace::FAboardRoom Room;
-			Room.Comp = R.Comp;
-			Room.Air = R.Air;
-			Room.Hole = R.Hole;
-			Room.Fire = R.Fire;
-			Room.Smoke = R.Smoke;
-			Room.Heat = R.Heat;
-			Room.Power = R.Power;
-			Room.Wreck = R.Wreck;
-			Room.bGutted = R.bGutted;
-			Room.bLocked = R.bLocked;
-			A.Rooms.Add(Room);
-		}
-		for (const FName& D : Snap.SealedDoors)
-		{
-			if (A.SealedDoors.Num() < 120)
-			{
-				A.SealedDoors.Add(D.ToString());
-			}
-		}
+		AstraSpaceFillAboardRooms(*I, A);
 	}
 	// her pieces, as the war's effects made them (they hold them as actors for the first minute)
 	TArray<AstraSpace::FPieceIn> Pieces;
@@ -209,7 +222,7 @@ void UAstraSpaceLife::HandOver(double Now)
 // ------------------------------------------------------------------------------------------------------------------ a frame
 void UAstraSpaceLife::TickWrecks(float SimDt)
 {
-	if (Wrecks.Sites().Num() == 0)
+	if (Wrecks.Sites().Num() == 0 && WreckContactsNow == 0)
 	{
 		return;
 	}
@@ -236,7 +249,355 @@ void UAstraSpaceLife::TickWrecks(float SimDt)
 		WreckPruneT = 60.f;
 		Wrecks.Prune(Now);
 	}
+	TickWreckContacts(Now, SimDt);
 	WrecksMs += (FPlatformTime::Seconds() - T0) * 1000.0;
+}
+
+// ------------------------------------------------------------------------------------------------------------------ the pieces as contacts of the plot
+const FPieceRec* UAstraSpaceLife::PieceOfContact(const FAstraBattleShip& S, const FSite** OutSite) const
+{
+	if (!S.bWreck)
+	{
+		return nullptr;
+	}
+	const FSite* Site = Wrecks.FindById(S.WreckSite);
+	if (!Site || !Site->Pieces.IsValidIndex(S.WreckPiece))
+	{
+		return nullptr;
+	}
+	if (OutSite)
+	{
+		*OutSite = Site;
+	}
+	return &Site->Pieces[S.WreckPiece];
+}
+
+bool UAstraSpaceLife::WreckMeshFrame(const FAstraBattleShip& S, FVector& OutOrigin, FQuat& OutAtt) const
+{
+	const FPieceRec* P = PieceOfContact(S);
+	if (!P)
+	{
+		return false;
+	}
+	const double Now = WreckClock();
+	OutAtt = Sky.ToSystem(FWrecks::AttAt(*P, Now));
+	OutOrigin = Sky.ToSystem(FWrecks::PosAt(*P, Now)) - OutAtt.RotateVector(P->PivotLocal);
+	return true;
+}
+
+FPieceRec* UAstraSpaceLife::MutablePieceOfContact(const FAstraBattleShip& S, FSite** OutSite)
+{
+	if (!S.bWreck)
+	{
+		return nullptr;
+	}
+	for (FSite& Si : Wrecks.SitesMutable())
+	{
+		if (Si.Id == S.WreckSite && Si.Pieces.IsValidIndex(S.WreckPiece))
+		{
+			if (OutSite)
+			{
+				*OutSite = &Si;
+			}
+			return &Si.Pieces[S.WreckPiece];
+		}
+	}
+	return nullptr;
+}
+
+int32 UAstraSpaceLife::MakeWreckContact(FSite& Site, int32 Piece, double Now)
+{
+	FPieceRec& P = Site.Pieces[Piece];
+	FString Id = FWrecks::PieceContactId(Site, Piece);
+	if (Owner->FindByContact(Id))
+	{
+		Id = FString::Printf(TEXT("%s-%d"), *Id, Site.Id);          // (another ship has her number: a campaign that began again with the old ones)
+	}
+	const FVector Pos = Sky.ToSystem(FWrecks::PosAt(P, Now));
+	// not a ship of any class: "wreck", no mesh of her own (the pieces are drawn as instances), so the war makes no model of her (AstraWar::KeyFor knows no such class)
+	const int32 I = Owner->AddShip(Id, FWrecks::PieceName(Site, Piece), TEXT("wreck"), TEXT("SM_WRECK"), EAstraSide::Neutral, Pos, 0.f, 0.f, FMath::Max(P.Radius, 10.f), 0.f, 0.f);
+	FAstraBattleShip& C = Owner->Ships[I];
+	C.Pos = Pos;
+	C.Vel = Sky.DirToSystem(P.Vel);
+	C.Att = Sky.ToSystem(FWrecks::AttAt(P, Now));
+	C.bFixture = true;                                   // for the war's rules she is a fixture: no AI runs her, nothing hits her, nobody fights over her (her place is the record's arithmetic, kept every frame)
+	C.bDerelict = true;
+	C.bWreck = true;
+	C.WreckSite = Site.Id;
+	C.WreckPiece = Piece;
+	C.RailDamage = 0.f;
+	C.Missiles = 0;
+	C.PDChannels = 0;
+	C.bShieldsUp = false;
+	C.Mode = EAstraShipMode::Idle;
+	C.bIdentified = C.bClassified = true;                // (she was seen to go: the crew knows what she was)
+	C.Track = 2;
+	P.PlotId = C.Id;
+	return C.Id;
+}
+
+void UAstraSpaceLife::RemoveWreckContacts()
+{
+	for (FSite& S : Wrecks.SitesMutable())
+	{
+		for (FPieceRec& P : S.Pieces)
+		{
+			P.PlotId = -1;
+		}
+	}
+	ListedWrecks.Reset();
+	WreckContactsNow = 0;
+	if (!Owner)
+	{
+		return;
+	}
+	const int32 Before = Owner->Ships.Num();
+	Owner->Ships.RemoveAll([](const FAstraBattleShip& S) { return S.bWreck; });
+	if (Owner->Ships.Num() != Before)
+	{
+		Owner->RebuildIdIndex();
+		Owner->BuildGrid();                              // (the battle's lists of indices into its ships are made again: nobody reads a stale one between ticks)
+		++Owner->PlotStamp;
+	}
+}
+
+void UAstraSpaceLife::TickWreckContacts(double Now, float SimDt)
+{
+	if (!Owner || Owner->Ships.Num() == 0)
+	{
+		return;
+	}
+	const FVector Me = Owner->Ships[0].Pos;
+	if ((WreckContactT -= SimDt) <= 0.f)
+	{
+		WreckContactT = 0.5f;
+		// ---- who is on the plot: every piece within the plot's reach of the Aquila (a little farther for those already on it), the nearest few
+		const double PlotKm = WkPlotKm();
+		struct FCand
+		{
+			FSite* Site;
+			int32 Piece;
+			double D;
+		};
+		TArray<FCand, TInlineAllocator<48>> Cands;
+		for (FSite& S : Wrecks.SitesMutable())
+		{
+			if (S.System != SystemKey)
+			{
+				continue;
+			}
+			for (int32 pi = 0; pi < S.Pieces.Num(); ++pi)
+			{
+				const double D = FVector::Dist(Sky.ToSystem(FWrecks::PosAt(S.Pieces[pi], Now)), Me);
+				if (D < (PlotKm + (S.Pieces[pi].PlotId >= 0 ? 10.0 : 0.0)) * WkKm)
+				{
+					Cands.Add({&S, pi, D});
+				}
+			}
+		}
+		Cands.Sort([](const FCand& A, const FCand& B) { return A.D < B.D; });
+		if (Cands.Num() > WkPlotMax())
+		{
+			Cands.SetNum(WkPlotMax());
+		}
+		TSet<const FPieceRec*> Keep;
+		for (const FCand& C : Cands)
+		{
+			Keep.Add(&C.Site->Pieces[C.Piece]);
+		}
+		TArray<int32> Gone;                              // plot ids of contacts that leave the plot
+		for (FSite& S : Wrecks.SitesMutable())
+		{
+			for (FPieceRec& P : S.Pieces)
+			{
+				if (P.PlotId >= 0 && !Keep.Contains(&P))
+				{
+					Gone.Add(P.PlotId);
+					P.PlotId = -1;
+				}
+			}
+		}
+		for (int32 i = 1; i < Owner->Ships.Num(); ++i)  // (and any whose site was let go of, or whose piece no longer says it is hers)
+		{
+			const FAstraBattleShip& S = Owner->Ships[i];
+			if (S.bWreck && !Gone.Contains(S.Id))
+			{
+				const FPieceRec* P = PieceOfContact(S);
+				if (!P || P->PlotId != S.Id)
+				{
+					Gone.Add(S.Id);
+				}
+			}
+		}
+		if (Gone.Num())
+		{
+			Owner->Ships.RemoveAll([&Gone](const FAstraBattleShip& S) { return S.bWreck && Gone.Contains(S.Id); });
+			Owner->RebuildIdIndex();
+			Owner->BuildGrid();
+			++Owner->PlotStamp;
+		}
+		for (const FCand& C : Cands)
+		{
+			if (C.Site->Pieces[C.Piece].PlotId < 0)
+			{
+				MakeWreckContact(*C.Site, C.Piece, Now);
+			}
+		}
+		// the few the crew's own state lists: the nearest within ListedKm
+		ListedWrecks.Reset();
+		for (const FCand& C : Cands)
+		{
+			if (ListedWrecks.Num() >= WkListed() || C.D > FWrecks::ListedKm * WkKm)
+			{
+				break;
+			}
+			ListedWrecks.Add(C.Site->Pieces[C.Piece].PlotId);
+		}
+		WreckContactsNow = Cands.Num();
+		WreckContactsPeak = FMath::Max(WreckContactsPeak, WreckContactsNow);
+		// ---- the eyes near a piece learn what the range allows: the Aquila's own sensors, a flight of ours sent to look, the Captain's Falcon (her rooms from 4 km, her dead alongside)
+		struct FEye
+		{
+			FVector Pos;
+			int32 Squadron;                              // -1: the Aquila
+			bool bFalcon;
+		};
+		TArray<FEye, TInlineAllocator<64>> Eyes;
+		Eyes.Add({Me, -1, false});
+		for (const FAstraBattleShip& S : Owner->Ships)
+		{
+			if (S.bCraft && S.bAlive && S.Side == EAstraSide::Astra && S.CraftKind != 3 && Eyes.Num() < 240)
+			{
+				Eyes.Add({S.Pos, S.Squadron, S.bPiloted});
+			}
+		}
+		for (const FCand& C : Cands)
+		{
+			FPieceRec& P = C.Site->Pieces[C.Piece];
+			if (P.Seen >= 3)
+			{
+				continue;
+			}
+			const FEye* Best = nullptr;
+			double BestD = 1.0e18;
+			const FVector At = Sky.ToSystem(FWrecks::PosAt(P, Now));
+			for (const FEye& E : Eyes)
+			{
+				const double D = FVector::Dist(E.Pos, At);
+				if (D < BestD)
+				{
+					BestD = D;
+					Best = &E;
+				}
+			}
+			const int32 Stage = Best ? FWrecks::StageForRange(BestD) : 0;
+			if (Stage < 2 || Stage <= P.Seen)
+			{
+				continue;
+			}
+			FString Told;
+			for (int32 St = FMath::Max<int32>(P.Seen + 1, 2); St <= Stage; ++St)
+			{
+				Told += (Told.IsEmpty() ? TEXT("") : TEXT("; ")) + Wrecks.Findings(*C.Site, C.Piece, St, Now);
+			}
+			P.Seen = (uint8)Stage;
+			C.Site->bDirty = true;
+			AstraSpace::FEvent E;
+			E.Kind = AstraSpace::EEventKind::WreckLook;
+			E.bReport = !Owner->bEngagementActive;
+			E.At = At;
+			FString By = TEXT("sensors");
+			if (Best->Squadron >= 0 || Best->bFalcon)
+			{
+				By = Best->bFalcon ? FString(TEXT("flight: Eagle")) : (Owner->Squadrons.IsValidIndex(Best->Squadron) ? FString::Printf(TEXT("flight: %s"), *Owner->Squadrons[Best->Squadron].CallSign) : FString(TEXT("flight")));
+			}
+			E.Text = FString::Printf(TEXT("%s: %.1f km from the %s (%s) — %s"), *By, BestD / WkKm, *FWrecks::PieceName(*C.Site, C.Piece), *FWrecks::PieceContactId(*C.Site, C.Piece), *Told);
+			Events.Add(E);
+		}
+	}
+	// ---- every frame: each contact is where its record has it (a few: the plot's own tick leaves a fixture alone)
+	if (WreckContactsNow > 0)
+	{
+		for (FSite& S : Wrecks.SitesMutable())
+		{
+			if (S.System != SystemKey)
+			{
+				continue;
+			}
+			for (FPieceRec& P : S.Pieces)
+			{
+				if (P.PlotId < 0)
+				{
+					continue;
+				}
+				if (FAstraBattleShip* C = Owner->FindById(P.PlotId))
+				{
+					C->Pos = Sky.ToSystem(FWrecks::PosAt(P, Now));
+					C->Vel = Sky.DirToSystem(P.Vel);
+					C->Att = Sky.ToSystem(FWrecks::AttAt(P, Now));
+				}
+			}
+		}
+	}
+}
+
+bool UAstraSpaceLife::WreckContactJson(const FAstraBattleShip& S, TSharedRef<FJsonObject>& Out) const
+{
+	const FSite* Site = nullptr;
+	const FPieceRec* P = PieceOfContact(S, &Site);
+	if (!P || !Owner || Owner->Ships.Num() == 0 || !ListedWrecks.Contains(S.Id))
+	{
+		return false;
+	}
+	const FVector Me = Owner->Ships[0].Pos;
+	Out->SetStringField(TEXT("id"), S.ContactId);
+	Out->SetStringField(TEXT("class"), TEXT("wreck"));
+	Out->SetStringField(TEXT("name"), S.Name);
+	Out->SetStringField(TEXT("status"), Wrecks.Status(*Site, S.WreckPiece, WreckClock()));
+	Out->SetNumberField(TEXT("range_km"), FMath::RoundToDouble(FVector::Dist(Me, S.Pos) / 100.0) / 10.0);
+	Out->SetNumberField(TEXT("bearing_deg"), FMath::RoundToDouble(Owner->BearingTo(S.Pos)));
+	Out->SetNumberField(TEXT("mark_deg"), FMath::RoundToDouble(Owner->MarkTo(S.Pos)));
+	Out->SetNumberField(TEXT("speed_mps"), FMath::RoundToDouble(S.Vel.Size()));
+	return true;
+}
+
+bool UAstraSpaceLife::ScanWreck(const FAstraBattleShip& S, FString& OutDetail)
+{
+	FSite* Site = nullptr;
+	FPieceRec* P = MutablePieceOfContact(S, &Site);
+	if (!P || !Owner || Owner->Ships.Num() == 0)
+	{
+		OutDetail = FString::Printf(TEXT("scan of %s: nothing there any more"), *S.ContactId);
+		return true;
+	}
+	const double Now = WreckClock();
+	// the nearest eyes: the Aquila's own, or one of our craft's (a flight sent to look sees closer than she does)
+	double RangeM = FVector::Dist(Owner->Ships[0].Pos, S.Pos);
+	for (const FAstraBattleShip& C : Owner->Ships)
+	{
+		if (C.bCraft && C.bAlive && C.Side == EAstraSide::Astra && C.CraftKind != 3)
+		{
+			RangeM = FMath::Min(RangeM, (double)FVector::Dist(C.Pos, S.Pos));
+		}
+	}
+	const int32 Stage = FWrecks::StageForRange(RangeM);
+	const int32 SiteIndex = S.WreckPiece;
+	const FString Head = FString::Printf(TEXT("scan of %s (%s) from %.1f km"), *S.ContactId, *FWrecks::PieceName(*Site, SiteIndex), RangeM / WkKm);
+	if (Stage <= P->Seen)
+	{
+		OutDetail = FString::Printf(TEXT("%s: nothing new from this range — %s"), *Head,
+		                            Stage < 2 ? TEXT("a flight sent to look, or the Aquila closing to 4 km, would show her rooms") : (Stage < 3 ? TEXT("closing to 800 m would count her dead") : TEXT("everything there is to learn from outside has been learned")));
+		return true;
+	}
+	FString Told;
+	for (int32 St = P->Seen + 1; St <= Stage; ++St)
+	{
+		Told += (Told.IsEmpty() ? TEXT("") : TEXT("; ")) + Wrecks.Findings(*Site, SiteIndex, St, Now);
+	}
+	P->Seen = (uint8)Stage;
+	Site->bDirty = true;
+	OutDetail = FString::Printf(TEXT("%s: %s"), *Head, *Told);
+	return true;
 }
 
 // ------------------------------------------------------------------------------------------------------------------ drawing
@@ -446,7 +807,20 @@ void UAstraSpaceLife::DrawWrecks(double Now)
 // ------------------------------------------------------------------------------------------------------------------ the campaign
 TSharedRef<FJsonObject> UAstraSpaceLife::SaveJson()
 {
-	return Wrecks.ToJson(WreckClock());
+	const TSharedRef<FJsonObject> J = Wrecks.ToJson(WreckClock());
+	// the hulks left behind: those of the system the Aquila is in as the plot has them now (they are made again from this when the campaign is resumed), the others' as they were recorded when she left
+	AstraSpace::FDerelicts Hulks = Derelicts;
+	if (bLaidOut)
+	{
+		TArray<AstraSpace::FDerelict> Here;
+		CaptureDerelicts(Here);
+		Hulks.Replace(SystemKey, Here);
+	}
+	if (Hulks.All().Num())
+	{
+		J->SetObjectField(TEXT("derelicts"), Hulks.ToJson());
+	}
+	return J;
 }
 
 void UAstraSpaceLife::LoadSaved(const TSharedPtr<FJsonObject>& J)
@@ -458,10 +832,18 @@ void UAstraSpaceLife::LoadSaved(const TSharedPtr<FJsonObject>& J)
 		Wrecks.Settle(WreckClock());
 		UE_LOG(LogASTRA, Log, TEXT("[Space] the campaign's wrecks are back: %d sites, clock %.0f s"), Wrecks.Sites().Num(), SavedClock);
 	}
+	const TSharedPtr<FJsonObject>* Hulks = nullptr;
+	if (J.IsValid() && J->TryGetObjectField(TEXT("derelicts"), Hulks) && Derelicts.FromJson(*Hulks))
+	{
+		UE_LOG(LogASTRA, Log, TEXT("[Space] the campaign's hulks left behind are back: %d"), Derelicts.All().Num());
+	}
 }
 
 void UAstraSpaceLife::NewCampaign()
 {
+	RemoveWreckContacts();                       // (their records go with the war: no contact stays on the plot for a wreck that is not)
+	Derelicts.Reset();
+	FoundHulks.Reset();
 	Wrecks.Reset();
 	ClockBase = 0.0;
 }
@@ -572,6 +954,11 @@ TSharedRef<FJsonObject> UAstraSpaceLife::WreckSummaryJson() const
 		const FSite& S = *Near[i].Site;
 		TSharedRef<FJsonObject> J = MakeShared<FJsonObject>();
 		J->SetStringField(TEXT("of"), S.KnownAs);
+		J->SetStringField(TEXT("piece"), FWrecks::PieceName(S, Near[i].Piece));
+		if (const FAstraBattleShip* Cn = S.Pieces[Near[i].Piece].PlotId >= 0 ? Owner->FindById(S.Pieces[Near[i].Piece].PlotId) : nullptr)
+		{
+			J->SetStringField(TEXT("contact"), Cn->ContactId);          // (on the plot: the crew can name it, target it, put it on the screen, send a flight to look)
+		}
 		J->SetStringField(TEXT("how"), AstraSpace::HowLostName(S.How));
 		J->SetNumberField(TEXT("lost_min_ago"), FMath::RoundToDouble((Now - S.DiedAt) / 6.0) / 10.0);
 		J->SetNumberField(TEXT("bearing_deg"), FMath::RoundToDouble(Owner->BearingTo(Near[i].At)));
@@ -790,6 +1177,139 @@ bool UAstraSpaceLife::DebugLose(const FString& Which, const FString& How, int32 
 	return true;
 }
 
+FString UAstraSpaceLife::WreckContactsList() const
+{
+	if (!Owner)
+	{
+		return TEXT("no battle");
+	}
+	FString Out;
+	int32 N = 0;
+	const double Now = WreckClock();
+	for (const FSite& Si : Wrecks.Sites())
+	{
+		if (Si.System != SystemKey)
+		{
+			continue;
+		}
+		for (int32 pi = 0; pi < Si.Pieces.Num(); ++pi)
+		{
+			const FAstraBattleShip* C = Si.Pieces[pi].PlotId >= 0 ? Owner->FindById(Si.Pieces[pi].PlotId) : nullptr;
+			if (!C)
+			{
+				continue;
+			}
+			++N;
+			Out += FString::Printf(TEXT("\n  %-8s %-34s bearing %03.0f mark %+.0f %6.1f km %5.0f m/s%s | %s"), *C->ContactId, *C->Name, Owner->BearingTo(C->Pos), Owner->MarkTo(C->Pos), FVector::Dist(Owner->PlayerPos(), C->Pos) / WkKm, C->Vel.Size(),
+			                       ListedWrecks.Contains(C->Id) ? TEXT(" [listed]") : TEXT(""), *Wrecks.Status(Si, pi, Now));
+		}
+	}
+	return FString::Printf(TEXT("%d wreck contacts on the plot (the nearest %d within %.0f km are in the crew's list)%s"), N, WkListed(), FWrecks::ListedKm, *Out);
+}
+
+bool UAstraSpaceLife::DebugWreckContacts(FString& OutDetail)
+{
+	if (!bLaidOut || !Owner || Owner->Ships.Num() == 0)
+	{
+		OutDetail = TEXT("no living space laid out here");
+		return false;
+	}
+	int32 Checked = 0, Failed = 0;
+	FString Lines;
+	const auto Expect = [&](bool bOk, const FString& What)
+	{
+		++Checked;
+		if (!bOk)
+		{
+			++Failed;
+			if (Failed <= 6)
+			{
+				Lines += FString::Printf(TEXT("FAIL %s; "), *What);
+			}
+		}
+	};
+	const double Now = WreckClock();
+	const FVector Me = Owner->Ships[0].Pos;
+	const TArray<UAstraBattleSubsystem::FContactView>& Plot = Owner->Contacts();
+	TArray<TSharedPtr<FJsonValue>> Listed = Owner->ContactsJson();
+	int32 Near = 0, OnPlot = 0, Listable = 0, ListedIn = 0, Pieces = 0;
+	double Worst = 0.0;
+	for (const TSharedPtr<FJsonValue>& V : Listed)
+	{
+		const TSharedPtr<FJsonObject> O = V.IsValid() ? V->AsObject() : nullptr;
+		FString Class;
+		ListedIn += (O.IsValid() && O->TryGetStringField(TEXT("class"), Class) && Class == TEXT("wreck")) ? 1 : 0;
+	}
+	for (const FSite& S : Wrecks.Sites())
+	{
+		if (S.System != SystemKey)
+		{
+			continue;
+		}
+		for (int32 pi = 0; pi < S.Pieces.Num(); ++pi)
+		{
+			const FPieceRec& P = S.Pieces[pi];
+			++Pieces;
+			const double D = FVector::Dist(Sky.ToSystem(FWrecks::PosAt(P, Now)), Me);
+			Near += D < (WkPlotKm() - 5.0) * WkKm ? 1 : 0;
+			Listable += D < (FWrecks::ListedKm - 5.0) * WkKm ? 1 : 0;
+			if (P.PlotId < 0)
+			{
+				continue;
+			}
+			++OnPlot;
+			const FAstraBattleShip* C = Owner->FindById(P.PlotId);
+			Expect(C && C->bWreck && C->bAlive && C->WreckSite == S.Id && C->WreckPiece == pi, FString::Printf(TEXT("site %d piece %d: the plot has no wreck contact for her"), S.Id, pi));
+			if (!C)
+			{
+				continue;
+			}
+			Worst = FMath::Max(Worst, (double)FVector::Dist(C->Pos, Sky.ToSystem(FWrecks::PosAt(P, Now))));
+			Expect(C->ContactId.StartsWith(FWrecks::PieceContactId(S, pi)) && C->Name == FWrecks::PieceName(S, pi), FString::Printf(TEXT("%s is not called what her record says (%s, %s)"), *C->ContactId, *FWrecks::PieceContactId(S, pi), *FWrecks::PieceName(S, pi)));
+			Expect(Owner->FindByContact(C->ContactId) == C && Owner->ResolveShip(C->ContactId) == C->Id, FString::Printf(TEXT("the crew cannot name %s"), *C->ContactId));
+			Expect(C->bFixture && C->bDerelict && !C->Dmg.bModel && C->Side == EAstraSide::Neutral && !C->bHostile, FString::Printf(TEXT("%s is not a plain derelict fixture"), *C->ContactId));
+			const UAstraBattleSubsystem::FContactView* V = Plot.FindByPredicate([C](const UAstraBattleSubsystem::FContactView& X) { return X.Id == C->Id; });
+			Expect(V && V->bWreck && V->bDerelict && V->Track >= 2 && !V->bCapital && !V->bCraft && V->Side == EAstraSide::Neutral && FMath::Abs(V->RangeKm - FVector::Dist(Me, C->Pos) / WkKm) < 0.05,
+			       FString::Printf(TEXT("%s is not on the plot as a firm neutral wreck"), *C->ContactId));
+			double Brg = 0.0, Mrk = 0.0, Rng = 0.0;
+			Expect(Owner->ContactGeometry(C->ContactId, Brg, Mrk, Rng) && Rng > 0.0, FString::Printf(TEXT("the helm cannot lay a course to %s"), *C->ContactId));
+		}
+	}
+	Expect(OnPlot >= FMath::Min(Near, WkPlotMax()) && OnPlot <= WkPlotMax(), FString::Printf(TEXT("%d pieces are within reach and %d are contacts (at most %d)"), Near, OnPlot, WkPlotMax()));
+	int32 Entries = 0;
+	for (const FAstraBattleShip& S : Owner->Ships)
+	{
+		Entries += S.bWreck ? 1 : 0;
+	}
+	Expect(Entries == OnPlot, FString::Printf(TEXT("the plot holds %d wreck contacts and the records say %d (an orphan, or a piece with no contact)"), Entries, OnPlot));
+	Expect(Worst < 1.0, FString::Printf(TEXT("a contact is %.1f m from where her record has her"), Worst));
+	Expect(ListedIn <= WkListed() && (Listable == 0 || WkListed() == 0 || ListedIn >= 1), FString::Printf(TEXT("the crew's list holds %d wrecks (%d pieces within %.0f km)"), ListedIn, Listable, FWrecks::ListedKm - 5.0));
+	// scanning: the nearest contact answers, with its number, and a second look from the same range has nothing new
+	if (OnPlot > 0)
+	{
+		const FAstraBattleShip* Nearest = nullptr;
+		double Best = 1.0e18;
+		for (const FAstraBattleShip& S : Owner->Ships)
+		{
+			if (S.bWreck && S.bAlive && FVector::DistSquared(S.Pos, Me) < Best)
+			{
+				Best = FVector::DistSquared(S.Pos, Me);
+				Nearest = &S;
+			}
+		}
+		FString Detail, Again;
+		if (Nearest)
+		{
+			const FString Id = Nearest->ContactId;
+			Expect(Owner->PlayerScan(Id, Detail) && Detail.Contains(TEXT("scan of")) && Detail.Contains(Id), FString::Printf(TEXT("the scan of %s says: %s"), *Id, *Detail));
+			Expect(Owner->PlayerScan(Id, Again) && Again.Contains(TEXT("nothing new")), FString::Printf(TEXT("a second scan of %s from the same range says: %s"), *Id, *Again));
+		}
+	}
+	OutDetail = FString::Printf(TEXT("%d checks: %d pieces here, %d within reach, %d on the plot (peak %d), %d in the crew's list, the farthest contact %.2f m from her record%s"), Checked, Pieces, Near, OnPlot, WreckContactsPeak, ListedIn, Worst,
+	                            Failed ? *(FString(TEXT("; ")) + Lines) : TEXT(""));
+	return Failed == 0 && Checked > 0;
+}
+
 // ------------------------------------------------------------------------------------------------------------------ the console
 namespace
 {
@@ -889,6 +1409,24 @@ namespace
 			FString Detail;
 			S->DebugDump(A[0], A.Num() > 1 ? FCString::Atoi(*A[1]) : 0, A.Num() > 2 ? FCString::Atod(*A[2]) : 180.0, Detail);
 			UE_LOG(LogASTRA, Display, TEXT("[Space] %s"), *Detail);
+		}));
+
+	FAutoConsoleCommandWithWorld CmdSpaceWreckContacts(TEXT("astra.space.wrecks.contacts"), TEXT("The pieces of the wrecks that are contacts of the plot now: number, name, where, what has been looked into, and which of them the crew's own list holds"),
+		FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* W)
+		{
+			UAstraSpaceLife* S = WkSpaceOf(W);
+			if (!S) { UE_LOG(LogASTRA, Display, TEXT("[Space] none in this world")); return; }
+			UE_LOG(LogASTRA, Display, TEXT("[Space] %s"), *S->WreckContactsList());
+		}));
+
+	FAutoConsoleCommandWithWorld CmdSpaceWreckContactsTest(TEXT("astra.space.wrecks.contacts.test"), TEXT("The wreck contacts in this world: each piece near is on the plot where its record puts it, named, targetable, scannable, listed by the nearest few"),
+		FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* W)
+		{
+			UAstraSpaceLife* S = WkSpaceOf(W);
+			if (!S) { UE_LOG(LogASTRA, Display, TEXT("[Space] none in this world")); return; }
+			FString Detail;
+			const bool bOk = S->DebugWreckContacts(Detail);
+			UE_LOG(LogASTRA, Display, TEXT("[Space] wreck contacts: %s %s"), *Detail, bOk ? TEXT("WRECK_CONTACTS_OK") : TEXT("WRECK_CONTACTS_FAILED"));
 		}));
 
 	FAutoConsoleCommandWithWorld CmdSpaceWrecksReset(TEXT("astra.space.wrecks.reset"), TEXT("Forget every wreck of every system (a new war)"),

@@ -2135,6 +2135,10 @@ bool UAstraBattleSubsystem::PlayerScan(const FString& ContactId, FString& OutDet
 		                            Found, *DecoyNote);
 		return true;
 	}
+	if (T && T->bWreck && T->bAlive && Space)
+	{
+		return Space->ScanWreck(*T, OutDetail);        // a piece of a ship the war broke (SPAZIO-VIVO): what an active look learns of it, by the range (AstraWrecks.h: Findings)
+	}
 	if (T && T->ContactId == TEXT("T-11") && StageDone == 0)
 	{
 		Time = FMath::Max(Time, 78.f);   // the ping gives us away: the frigate reacts
@@ -3629,6 +3633,16 @@ TArray<TSharedPtr<FJsonValue>> UAstraBattleSubsystem::ContactsJson() const
 	{
 		if (S.bPlayer || !S.bAlive || S.bCraft)
 		{
+			continue;
+		}
+		if (S.bWreck)
+		{
+			// a piece of a ship the war broke (SPAZIO-VIVO): the living space says what the crew knows of it, and lists only the few nearest (the rest are on the plot for the screens)
+			TSharedRef<FJsonObject> W = MakeShared<FJsonObject>();
+			if (Space && Space->WreckContactJson(S, W))
+			{
+				Out.Add(MakeShared<FJsonValueObject>(W));
+			}
 			continue;
 		}
 		if (S.bFog && S.Track == 0)

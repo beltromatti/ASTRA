@@ -14,7 +14,7 @@ the push it gives, and the torque, is along what the ship's motion asks for) is 
 
 Usage (headless Blender; the generators need bpy, the rest is numpy):
   blender -b --factory-startup --python-exit-code 1 -P art/blender/space3_thrusters.py -- [--out data/space/thrusters.json] [--only aquila,styx] [--detail 0.02]
-                                                                                           [--preview docs/progressi/spazio] [--size 1500x850] [--samples 24]
+                                                                                           [--preview docs/progressi/spazio] [--size 1500x850] [--samples 24] [--no-jets]
 Then  tools/space.py sync  stages the file for the game.
 """
 from __future__ import annotations
@@ -324,7 +324,7 @@ def preview(name: str, spec: dict, rec: dict, outdir: str, args: dict) -> None:
     hullobj = B.build_object(name, asm, mats)
     L = rec["len"]
     nozzles = rec["nozzles"]
-    for i, n in enumerate(nozzles):
+    for i, n in enumerate(nozzles if args.get("jets", True) else []):
         col = KIND_COL.get(n["k"], (1, 1, 1))
         jet_object(f"jet{i}", np.array(n["p"]), np.array(n["d"]), L * 0.03, L * 0.0032, col, 7.0)
     w, h = args["size"]
@@ -336,10 +336,18 @@ def preview(name: str, spec: dict, rec: dict, outdir: str, args: dict) -> None:
         "stern": (V[V[:, 0] < x0 + 0.34 * L], (-0.8, 0.62, 0.42)),
         "bow": (V[V[:, 0] > x1 - 0.34 * L], (0.8, 0.62, 0.42)),
     }
+    quads = [n for n in nozzles if n["k"] == "quad"]
+    if quads:
+        # a thruster block close up: the hull's vertices within a few block-widths of the first quad, seen from outside and a little aft
+        c0 = np.array(quads[0]["p"])
+        cb = np.array([c0[0], -c0[1], c0[2]])
+        near = V[np.linalg.norm(V - cb, axis=1) < max(9.0 * float(quads[0]["r"]) * 3.0, 12.0)]
+        if len(near) > 20:
+            views["quad"] = (near, (-0.45, -0.85 * float(np.sign(c0[1]) or 1.0), 0.32))
     for tag, (pts, direction) in views.items():
-        cam, tgt = PV.fit_camera("cam", pts, np.array(direction), lens=40.0, aspect=w / h, margin=0.08, clip_end=200000.0)
+        cam, tgt = PV.fit_camera("cam", pts, np.array(direction), lens=40.0 if tag != "quad" else 55.0, aspect=w / h, margin=0.08 if tag != "quad" else 0.2, clip_end=200000.0)
         PV.rig(cam.location, tgt, key_az=62.0, key_el=26.0, key=5.0, fill=0.9, rim=0.8)
-        PV.render(cam, os.path.join(outdir, f"thrusters_{cls}_{tag}.jpg"))
+        PV.render(cam, os.path.join(outdir, f"thrusters_{cls}_{tag}{'' if args.get('jets', True) else '_bare'}.jpg"))
         bpy.data.objects.remove(cam, do_unlink=True)
 
 
@@ -367,6 +375,8 @@ def parse_args() -> dict:
         elif k == "--samples":
             a["samples"] = int(argv[i + 1])
             i += 1
+        elif k == "--no-jets":
+            a["jets"] = False                                    # the preview of the hull with its nozzles, without the cones that mark the jets
         i += 1
     return a
 

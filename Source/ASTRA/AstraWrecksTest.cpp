@@ -2,6 +2,7 @@
 // the rescue. Plain C++ on plain records: no world, no engine objects, a second or two (tools/space.py test runs it: the commandlet's -wrecktest).
 
 #include "AstraWrecks.h"
+#include "AstraDerelicts.h"
 #include "ASTRA.h"
 #include "HAL/PlatformTime.h"
 #include "Misc/FileHelper.h"
@@ -443,6 +444,160 @@ namespace AstraSpace
 			}
 			Notes.Add(FString::Printf(TEXT("the rosters agree with the plans: %d classes compared"), Compared));
 		}
+
+		// ---- a piece as a contact of the plot (docs/SPAZIO.md §3bis): its number, its name, its mesh, what an investigation learns by the range, and what the file keeps of what has been looked into
+		{
+			FRandomStream Rng(53);
+			FWrecks W;
+			TSet<FString> Ids;
+			int32 Pieces = 0;
+			for (int32 i = 0; i < 40; ++i)
+			{
+				FLoss L = TestLoss(i + 1, Rng, (EHowLost)(i % 3), (i % 2) == 0);
+				if (i % 7 == 6)
+				{
+					L.Contact = FString();                          // (the odd ship that had no number)
+					L.KnownAs = L.Name;
+				}
+				W.AddLoss(TEXT("Aurelia"), L, TestPieces(L, Rng), 100.0 + i, 500u + i, Frame);
+				const FSite& S = W.Sites().Last();
+				static const TCHAR* const Words[3] = {TEXT("bow section of "), TEXT("middle section of "), TEXT("stern section of ")};
+				static const TCHAR* const Letters[3] = {TEXT("B"), TEXT("M"), TEXT("S")};
+				for (int32 pi = 0; pi < S.Pieces.Num(); ++pi)
+				{
+					const uint8 Sec = S.Pieces[pi].Section;
+					const FString Id = FWrecks::PieceContactId(S, pi), Name = FWrecks::PieceName(S, pi), Mesh = FWrecks::PieceMesh(S, pi);
+					++Pieces;
+					Expect(Id.StartsWith(TEXT("W-")) && Id.Len() >= 3 && !Ids.Contains(Id), FString::Printf(TEXT("the piece number %s of site %d is not a W number of its own"), *Id, S.Id));
+					Ids.Add(Id);
+					Expect(Sec < 3 ? (Id.EndsWith(Letters[Sec]) && Name.StartsWith(Words[Sec]) && Mesh.EndsWith(FString::Printf(TEXT("_Sec%s"), Sec == 0 ? TEXT("Bow") : (Sec == 1 ? TEXT("Mid") : TEXT("Stern")))))
+					           : (Name.StartsWith(TEXT("wreck of ")) && Mesh == S.HullMesh && FChar::IsDigit(Id[Id.Len() - 1])),
+					       FString::Printf(TEXT("a piece of site %d reads badly: %s | %s | %s"), S.Id, *Id, *Name, *Mesh));
+					Expect(Name.Contains(S.Name) && !Name.Contains(TEXT("(T-")), FString::Printf(TEXT("the piece's name %s is not hers (%s) without a number"), *Name, *S.Name));
+					Expect(S.Contact.IsEmpty() || Id.Contains(S.Contact.Mid(2)), FString::Printf(TEXT("%s does not carry the number of %s"), *Id, *S.Contact));
+				}
+			}
+			Notes.Add(FString::Printf(TEXT("%d pieces of 40 losses: each its own W number, name and mesh"), Pieces));
+			// the ranges a look is good for
+			Expect(FWrecks::StageForRange(100.0) == 3 && FWrecks::StageForRange(799.0) == 3 && FWrecks::StageForRange(800.0) == 2 && FWrecks::StageForRange(3999.0) == 2 && FWrecks::StageForRange(4000.0) == 1 && FWrecks::StageForRange(60000.0) == 1,
+			       TEXT("the ranges of an investigation's stages are not 800 m and 4 km"));
+			// what each stage tells: the first look is the account of the piece, her rooms and her dead have her numbers
+			FLoss L = TestLoss(900, Rng, EHowLost::Breakup, true);
+			L.ClassKey = FName(TEXT("vigilant"));
+			L.Aboard.Complement = 118;
+			L.Aboard.Killed = 12;
+			L.Aboard.Alive = 100;
+			for (int32 k = 0; k < 5; ++k)
+			{
+				FAboardRoom R;
+				R.Comp = k;
+				R.bGutted = k < 2;
+				R.Hole = k == 3 ? 0.8f : 0.f;
+				R.Fire = k == 4 ? 0.5f : 0.f;
+				R.Power = k == 1 ? 0.f : 1.f;
+				L.Aboard.Rooms.Add(R);
+			}
+			L.Aboard.SealedDoors = {TEXT("d1"), TEXT("d2"), TEXT("d3")};
+			const FSite& S = W.AddLoss(TEXT("Aurelia"), L, TestPieces(L, Rng), 100.0, 77u, Frame);
+			const FString F1 = W.Findings(S, 2, 1, 400.0), F2 = W.Findings(S, 2, 2, 400.0), F3 = W.Findings(S, 2, 3, 400.0);
+			Expect(F1 == W.Describe(S, 2, 400.0) && F1.Contains(TEXT("stern section")), FString::Printf(TEXT("the first look is not the account of the piece: %s"), *F1));
+			Expect(F2.Contains(TEXT("open to space")) && F2.Contains(TEXT("2 gutted")) && F2.Contains(TEXT("1 burning")) && F2.Contains(TEXT("3 pressure bulkheads")) && F2.Contains(TEXT("30%")), FString::Printf(TEXT("her rooms are told badly: %s"), *F2));
+			Expect(F3.Contains(TEXT("no life signs")) && F3.Contains(TEXT("12 lie dead")) && F3.Contains(FString::Printf(TEXT("%d got away"), S.Aboard.Escaped)) && F3.Contains(FString::Printf(TEXT("%d more were lost"), S.Aboard.Lost)), FString::Printf(TEXT("her dead are told badly: %s"), *F3));
+			Expect(W.Status(S, 2, 400.0).StartsWith(TEXT("wreck: lost")) && W.Status(S, 2, 400.0).Contains(TEXT("no life signs")), TEXT("the status line of a piece is not a wreck's"));
+			// a piece whose inside no sensor saw says so, and a whole hull has no torn end
+			const FSite& Bare = W.AddLoss(TEXT("Aurelia"), TestLoss(901, Rng, EHowLost::Destroyed, false), TArray<FPieceIn>(), 100.0, 78u, Frame);
+			Expect(W.Findings(Bare, 0, 2, 400.0).Contains(TEXT("burnt through")) && W.Findings(Bare, 0, 2, 400.0).Contains(TEXT("no sensor")), FString::Printf(TEXT("a hull with no inside is told badly: %s"), *W.Findings(Bare, 0, 2, 400.0)));
+			// the table of shares agrees with the war's classes
+			{
+				const FString Path = FPaths::ProjectDir() / TEXT("data/war/classes.json");
+				FString Text;
+				TSharedPtr<FJsonObject> Root;
+				const TArray<TSharedPtr<FJsonValue>>* List = nullptr;
+				if (FFileHelper::LoadFileToString(Text, *Path) && FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), Root) && Root.IsValid() && Root->TryGetArrayField(TEXT("classes"), List))
+				{
+					int32 Compared = 0;
+					for (const TSharedPtr<FJsonValue>& V : *List)
+					{
+						const TSharedPtr<FJsonObject> O = V->AsObject();
+						FString Key;
+						const TArray<TSharedPtr<FJsonValue>>* Sec = nullptr;
+						if (!O.IsValid() || !O->TryGetStringField(TEXT("key"), Key) || Key == TEXT("aquila") || !O->TryGetArrayField(TEXT("sections"), Sec) || Sec->Num() < 3)
+						{
+							continue;
+						}
+						++Compared;
+						for (int32 k = 0; k < 3; ++k)
+						{
+							Expect(FMath::Abs(FWrecks::SectionShare(FName(*Key), (uint8)k) - (float)(*Sec)[k]->AsNumber()) < 1e-4f, FString::Printf(TEXT("the %s's section %d is %.2f of her in classes.json and %.2f in AstraWrecks.cpp"), *Key, k, (float)(*Sec)[k]->AsNumber(), FWrecks::SectionShare(FName(*Key), (uint8)k)));
+						}
+					}
+					Notes.Add(FString::Printf(TEXT("the sections' shares agree with the war's classes: %d compared"), Compared));
+				}
+			}
+			// a close look marks the piece as looked at; the file keeps it (and not the plot's id); a save from before the pieces were contacts reads with nothing looked at
+			{
+				FWrecks C;
+				FLoss M = TestLoss(902, Rng, EHowLost::Breakup, true);
+				M.Pos = FVector(1000.0, 0.0, 0.0);
+				M.Vel = FVector::ZeroVector;
+				const FSite& Cs = C.AddLoss(TEXT("Aurelia"), M, TestPieces(M, Rng), 100.0, 79u, Frame);
+				const FVector Near = Frame.ToSystem(FWrecks::PosAt(Cs.Pieces[1], 200.0)) + FVector(500.0, 0.0, 0.0);
+				TArray<FEvent> Ev;
+				C.Think(TEXT("Aurelia"), 200.0, Frame, Near, nullptr, false, Ev);
+				int32 Looked = 0;
+				for (const FPieceRec& P : Cs.Pieces)
+				{
+					Looked += P.Seen >= 1 ? 1 : 0;
+				}
+				Expect(Looked == 1, FString::Printf(TEXT("%d pieces are marked as looked at after one close look, not one"), Looked));
+				FSite& Mut = C.SitesMutable()[0];
+				Mut.Pieces[0].Seen = 3;
+				Mut.Pieces[1].Seen = 2;
+				Mut.Pieces[2].Seen = 0;
+				Mut.Pieces[2].PlotId = 42;
+				Mut.bDirty = true;
+				const FString Saved = TestJsonText(C, 200.0);
+				TSharedPtr<FJsonObject> Back;
+				FWrecks C2;
+				double Clock = 0.0;
+				Expect(FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Saved), Back) && C2.FromJson(Back, Clock), TEXT("the save with the pieces' marks does not read back"));
+				if (C2.Sites().Num() == 1 && C2.Sites()[0].Pieces.Num() == 3)
+				{
+					const FSite& B2 = C2.Sites()[0];
+					Expect(B2.Pieces[0].Seen == 3 && B2.Pieces[1].Seen == 2 && B2.Pieces[2].Seen == 0 && B2.Pieces[2].PlotId == -1, FString::Printf(TEXT("the marks came back as %d %d %d, plot id %d"), B2.Pieces[0].Seen, B2.Pieces[1].Seen, B2.Pieces[2].Seen, B2.Pieces[2].PlotId));
+				}
+				else
+				{
+					Expect(false, TEXT("the save of the pieces' marks has not got the site and its three pieces"));
+				}
+				// the old form: a piece's array without the mark
+				TSharedPtr<FJsonObject> Old;
+				Expect(FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Saved), Old), TEXT("the save does not parse"));
+				if (Old.IsValid())
+				{
+					TArray<TSharedPtr<FJsonValue>> NewSites;
+					for (const TSharedPtr<FJsonValue>& SV : Old->GetArrayField(TEXT("sites")))
+					{
+						const TSharedPtr<FJsonObject> SO = SV->AsObject();
+						TArray<TSharedPtr<FJsonValue>> NewPieces;
+						for (const TSharedPtr<FJsonValue>& PV : SO->GetArrayField(TEXT("pc")))
+						{
+							TArray<TSharedPtr<FJsonValue>> A = PV->AsArray();
+							A.RemoveAt(A.Num() - 1);
+							NewPieces.Add(MakeShared<FJsonValueArray>(A));
+						}
+						SO->SetArrayField(TEXT("pc"), NewPieces);
+						NewSites.Add(MakeShared<FJsonValueObject>(SO));
+					}
+					Old->SetArrayField(TEXT("sites"), NewSites);
+					FWrecks C3;
+					Expect(C3.FromJson(Old, Clock) && C3.Sites().Num() == 1 && C3.Sites()[0].Pieces.Num() == 3 && C3.Sites()[0].Pieces[0].Seen == 0, TEXT("a save from before the pieces were contacts does not read"));
+				}
+			}
+		}
+
+		// ---- the hulks left behind (AstraDerelicts.h): the braking arithmetic, the records, the file
+		RunDerelictTests(Fails, Notes);
 		return Fails.Num() == 0;
 	}
 }

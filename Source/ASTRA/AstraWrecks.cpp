@@ -529,6 +529,7 @@ namespace AstraSpace
 				if (Close != INDEX_NONE && Now - S.DiedAt > 20.0)
 				{
 					S.bToldClose = true;
+					S.Pieces[Close].Seen = FMath::Max<uint8>(S.Pieces[Close].Seen, 1);      // (the first look is the one thing a piece's investigation has told)
 					S.bDirty = true;
 					++Told;
 					FEvent E;
@@ -593,7 +594,17 @@ namespace AstraSpace
 		{
 			What = FString::Printf(TEXT("wreck of %s"), *S.Name);
 		}
-		FString Text = FString::Printf(TEXT("%s (%s%s)"), *What, S.Contact.IsEmpty() ? TEXT("") : *FString::Printf(TEXT("%s, "), *S.Contact), *S.Class);
+		// a piece is a contact of its own (W-02S): the number the ship had is said once, as what she was
+		FString Numbers;
+		if (Piece >= 0 && S.Pieces.IsValidIndex(Piece))
+		{
+			Numbers = S.Contact.IsEmpty() ? PieceContactId(S, Piece) + TEXT(", ") : FString::Printf(TEXT("%s, ex %s, "), *PieceContactId(S, Piece), *S.Contact);
+		}
+		else if (!S.Contact.IsEmpty())
+		{
+			Numbers = S.Contact + TEXT(", ");
+		}
+		FString Text = FString::Printf(TEXT("%s (%s%s)"), *What, *Numbers, *S.Class);
 		Text += FString::Printf(TEXT(", lost %s ago when %s"), *WkSpan(Ago),
 		                        S.How == EHowLost::Reactor ? TEXT("her reactor breached") : (S.How == EHowLost::Breakup ? TEXT("her hull broke apart") : TEXT("she was destroyed")));
 		if (Piece >= 0 && S.Pieces.IsValidIndex(Piece))
@@ -615,6 +626,134 @@ namespace AstraSpace
 			Text += FString::Printf(TEXT("; some %d pieces of wreckage spread over %.1f km"), S.Field.Count, 2.0 * FieldRadiusAt(S.Field, Now) / OneKm);
 		}
 		return Text;
+	}
+
+	// ------------------------------------------------------------------------------------------------------------------ a piece as a contact of the plot
+	FString FWrecks::PieceName(const FSite& S, int32 Piece)
+	{
+		FString Who = S.KnownAs.IsEmpty() ? S.Name : S.KnownAs;
+		// "ASN Vigilant (T-02)" is how the sensors called her at the end: the number is the contact's own (W-02S), the name is what the crew says
+		int32 Open = INDEX_NONE;
+		if (Who.EndsWith(TEXT(")")) && Who.FindLastChar(TEXT('('), Open) && Open > 0 && Who.Mid(Open + 1).StartsWith(TEXT("T-")))
+		{
+			Who = Who.Left(Open).TrimEnd();
+		}
+		if (Piece >= 0 && S.Pieces.IsValidIndex(Piece) && S.Pieces[Piece].Section < 3)
+		{
+			return FString::Printf(TEXT("%s of %s"), WkSectionWord(S.Pieces[Piece].Section), *Who);
+		}
+		return FString::Printf(TEXT("wreck of %s"), *Who);
+	}
+
+	FString FWrecks::PieceContactId(const FSite& S, int32 Piece)
+	{
+		const FString C = S.Contact.TrimStartAndEnd().ToUpper();
+		bool bNumber = C.Len() > 2 && C.StartsWith(TEXT("T-"));
+		for (int32 i = 2; bNumber && i < C.Len(); ++i)
+		{
+			bNumber = FChar::IsDigit(C[i]);
+		}
+		const FString Num = bNumber ? C.Mid(2) : FString::Printf(TEXT("S%d"), S.Id);
+		static const TCHAR* const Letter[3] = {TEXT("B"), TEXT("M"), TEXT("S")};
+		const bool bSection = Piece >= 0 && S.Pieces.IsValidIndex(Piece) && S.Pieces[Piece].Section < 3;
+		return FString::Printf(TEXT("W-%s%s"), *Num, bSection ? Letter[S.Pieces[Piece].Section] : TEXT(""));
+	}
+
+	FString FWrecks::PieceMesh(const FSite& S, int32 Piece)
+	{
+		static const TCHAR* const Sec[3] = {TEXT("SecBow"), TEXT("SecMid"), TEXT("SecStern")};
+		if (S.HullMesh.IsEmpty())
+		{
+			return FString();
+		}
+		if (Piece >= 0 && S.Pieces.IsValidIndex(Piece) && S.Pieces[Piece].Section < 3)
+		{
+			return FString::Printf(TEXT("%s_%s"), *S.HullMesh, Sec[S.Pieces[Piece].Section]);
+		}
+		return S.HullMesh;
+	}
+
+	FString FWrecks::Span(double Seconds)
+	{
+		return WkSpan(Seconds);
+	}
+
+	int32 FWrecks::StageForRange(double RangeM)
+	{
+		return RangeM < 800.0 ? 3 : (RangeM < 4000.0 ? 2 : 1);
+	}
+
+	float FWrecks::SectionShare(FName ClassKey, uint8 Section)
+	{
+		// data/war/classes.json, "sections": the share of her structure in the bow, the middle and the stern (the wreck tests check that the table still agrees)
+		static const struct { const TCHAR* Key; float Share[3]; } Table[] = {{TEXT("praetorian"), {0.30f, 0.40f, 0.30f}}, {TEXT("vigilant"), {0.32f, 0.38f, 0.30f}}, {TEXT("acheron"), {0.32f, 0.42f, 0.26f}},
+		                                                                      {TEXT("styx"), {0.34f, 0.36f, 0.30f}}, {TEXT("lethe"), {0.34f, 0.36f, 0.30f}}, {TEXT("freighter"), {0.25f, 0.50f, 0.25f}},
+		                                                                      {TEXT("station"), {0.33f, 0.34f, 0.33f}}};
+		if (Section >= 3)
+		{
+			return 1.f;
+		}
+		const FString K = ClassKey.ToString().ToLower();
+		for (const auto& T : Table)
+		{
+			if (K == T.Key)
+			{
+				return T.Share[Section];
+			}
+		}
+		return 1.f / 3.f;
+	}
+
+	FString FWrecks::Findings(const FSite& S, int32 Piece, int32 Stage, double Now) const
+	{
+		if (Stage <= 1)
+		{
+			return Describe(S, Piece, Now);
+		}
+		const bool bSection = Piece >= 0 && S.Pieces.IsValidIndex(Piece) && S.Pieces[Piece].Section < 3;
+		const float Share = bSection ? SectionShare(S.ClassKey, S.Pieces[Piece].Section) : 1.f;
+		const FAboard& Ab = S.Aboard;
+		if (Stage == 2)
+		{
+			// her rooms: the plan's compartments that were not as built when she went (her whole hull's: a piece is about its share of them)
+			int32 Gutted = 0, Vented = 0, Burning = 0, Dark = 0;
+			for (const FAboardRoom& R : Ab.Rooms)
+			{
+				Gutted += R.bGutted ? 1 : 0;
+				Vented += (R.Hole > 0.3f || R.Air < 0.4f) ? 1 : 0;
+				Burning += R.Fire > 0.15f ? 1 : 0;
+				Dark += R.Power < 0.2f ? 1 : 0;
+			}
+			const int32 Ends = bSection ? (S.Pieces[Piece].Section == 1 ? 2 : 1) : 0;
+			const FString Hull = Ends == 0 ? FString(TEXT("the hull is burnt through in places")) : FString::Printf(TEXT("the hull is open to space at the torn end%s"), Ends > 1 ? TEXT("s") : TEXT(""));
+			if (Ab.Rooms.Num() == 0)
+			{
+				return FString::Printf(TEXT("%s; nothing is known of her rooms: her inside was on no sensor when she went"), *Hull);
+			}
+			return FString::Printf(TEXT("%s. Her rooms as they were when she went (all of her; this piece is about %d%% of her): %d gutted, %d open to space or without air, %d burning, %d without power%s"),
+			                       *Hull, FMath::RoundToInt(Share * 100.f), Gutted, Vented, Burning, Dark,
+			                       Ab.SealedDoors.Num() ? *FString::Printf(TEXT("; %d pressure bulkheads were shut"), Ab.SealedDoors.Num()) : TEXT(""));
+		}
+		// alongside: her dead
+		int32 Recovered = 0;
+		for (const FPodRec& P : S.Pods)
+		{
+			Recovered += P.State == 1 ? P.Survivors : 0;
+		}
+		const int32 Dead = Ab.Killed + Ab.Lost;
+		return FString::Printf(TEXT("no life signs. Of the %d her class carries, %d lie dead where they fell before she went and %d more were lost with her (about %d of them in this piece); %d got away in %d lifepod%s%s"),
+		                       Ab.Complement, Ab.Killed, Ab.Lost, FMath::RoundToInt(Share * (float)Dead), Ab.Escaped, S.Pods.Num(), S.Pods.Num() == 1 ? TEXT("") : TEXT("s"),
+		                       Recovered > 0 ? *FString::Printf(TEXT(" (%d taken aboard since)"), Recovered) : TEXT(""));
+	}
+
+	FString FWrecks::Status(const FSite& S, int32 Piece, double Now) const
+	{
+		static const TCHAR* const Seen[4] = {TEXT(""), TEXT("; looked at"), TEXT("; her rooms scanned"), TEXT("; her dead counted")};
+		const bool bHas = Piece >= 0 && S.Pieces.IsValidIndex(Piece);
+		const uint8 Looked = bHas ? FMath::Min<uint8>(S.Pieces[Piece].Seen, 3) : 0;
+		return FString::Printf(TEXT("wreck: lost %s ago when %s; no power, no transponder, no life signs%s%s"), *WkSpan(Now - S.DiedAt),
+		                       S.How == EHowLost::Reactor ? TEXT("her reactor breached") : (S.How == EHowLost::Breakup ? TEXT("her hull broke apart") : TEXT("she was destroyed")),
+		                       bHas ? *FString::Printf(TEXT(", tumbling at %.1f deg/s"), FMath::RadiansToDegrees(S.Pieces[Piece].SpinRate)) : TEXT(""), Seen[Looked]);
 	}
 
 	// ------------------------------------------------------------------------------------------------------------------ queries
@@ -815,6 +954,90 @@ namespace AstraSpace
 	}
 
 	// ------------------------------------------------------------------------------------------------------------------ the file
+	TSharedRef<FJsonObject> FWrecks::AboardToJson(const FAboard& Ab, bool bRooms)
+	{
+		TSharedRef<FJsonObject> O = MakeShared<FJsonObject>();
+		O->SetNumberField(TEXT("n"), Ab.Complement);
+		O->SetNumberField(TEXT("alive"), Ab.Alive);
+		O->SetNumberField(TEXT("killed"), Ab.Killed);
+		O->SetNumberField(TEXT("lost"), Ab.Lost);
+		O->SetNumberField(TEXT("escaped"), Ab.Escaped);
+		O->SetBoolField(TEXT("inside"), Ab.bInside);
+		if (bRooms && Ab.Rooms.Num())
+		{
+			TArray<TSharedPtr<FJsonValue>> Rooms;
+			for (const FAboardRoom& R : Ab.Rooms)
+			{
+				TArray<TSharedPtr<FJsonValue>> A;
+				A.Add(MakeShared<FJsonValueNumber>(R.Comp));
+				for (const float V : {R.Air, R.Hole, R.Fire, R.Smoke, R.Heat, R.Power, R.Wreck})
+				{
+					A.Add(MakeShared<FJsonValueNumber>(FMath::RoundToInt(V * 100.f)));
+				}
+				A.Add(MakeShared<FJsonValueNumber>((R.bGutted ? 1 : 0) | (R.bLocked ? 2 : 0)));
+				Rooms.Add(MakeShared<FJsonValueArray>(A));
+			}
+			O->SetArrayField(TEXT("rooms"), Rooms);
+		}
+		if (bRooms && Ab.SealedDoors.Num())
+		{
+			TArray<TSharedPtr<FJsonValue>> D;
+			for (const FString& Id : Ab.SealedDoors)
+			{
+				D.Add(MakeShared<FJsonValueString>(Id));
+			}
+			O->SetArrayField(TEXT("doors"), D);
+		}
+		return O;
+	}
+
+	void FWrecks::AboardFromJson(const TSharedPtr<FJsonObject>& O, FAboard& Ab)
+	{
+		if (!O.IsValid())
+		{
+			return;
+		}
+		double D = 0.0;
+		Ab.Complement = O->TryGetNumberField(TEXT("n"), D) ? (int32)D : 0;
+		Ab.Alive = O->TryGetNumberField(TEXT("alive"), D) ? (int32)D : 0;
+		Ab.Killed = O->TryGetNumberField(TEXT("killed"), D) ? (int32)D : 0;
+		Ab.Lost = O->TryGetNumberField(TEXT("lost"), D) ? (int32)D : 0;
+		Ab.Escaped = O->TryGetNumberField(TEXT("escaped"), D) ? (int32)D : 0;
+		O->TryGetBoolField(TEXT("inside"), Ab.bInside);
+		const TArray<TSharedPtr<FJsonValue>>* Rooms = nullptr;
+		if (O->TryGetArrayField(TEXT("rooms"), Rooms))
+		{
+			for (const TSharedPtr<FJsonValue>& V : *Rooms)
+			{
+				const TArray<TSharedPtr<FJsonValue>>* R = nullptr;
+				if (V.IsValid() && V->TryGetArray(R) && R->Num() >= 9)
+				{
+					FAboardRoom Room;
+					Room.Comp = (int32)(*R)[0]->AsNumber();
+					Room.Air = (float)(*R)[1]->AsNumber() * 0.01f;
+					Room.Hole = (float)(*R)[2]->AsNumber() * 0.01f;
+					Room.Fire = (float)(*R)[3]->AsNumber() * 0.01f;
+					Room.Smoke = (float)(*R)[4]->AsNumber() * 0.01f;
+					Room.Heat = (float)(*R)[5]->AsNumber() * 0.01f;
+					Room.Power = (float)(*R)[6]->AsNumber() * 0.01f;
+					Room.Wreck = (float)(*R)[7]->AsNumber() * 0.01f;
+					const int32 Fl = (int32)(*R)[8]->AsNumber();
+					Room.bGutted = (Fl & 1) != 0;
+					Room.bLocked = (Fl & 2) != 0;
+					Ab.Rooms.Add(Room);
+				}
+			}
+		}
+		const TArray<TSharedPtr<FJsonValue>>* Doors = nullptr;
+		if (O->TryGetArrayField(TEXT("doors"), Doors))
+		{
+			for (const TSharedPtr<FJsonValue>& V : *Doors)
+			{
+				Ab.SealedDoors.Add(V->AsString());
+			}
+		}
+	}
+
 	TSharedRef<FJsonObject> FWrecks::SiteJson(FSite& S, bool bRooms) const
 	{
 		TSharedRef<FJsonObject> J = MakeShared<FJsonObject>();
@@ -838,42 +1061,7 @@ namespace AstraSpace
 			WkPutVec(A, S.Vel, KVel);
 			J->SetArrayField(TEXT("pv"), A);
 		}
-		{
-			const FAboard& Ab = S.Aboard;
-			TSharedRef<FJsonObject> O = MakeShared<FJsonObject>();
-			O->SetNumberField(TEXT("n"), Ab.Complement);
-			O->SetNumberField(TEXT("alive"), Ab.Alive);
-			O->SetNumberField(TEXT("killed"), Ab.Killed);
-			O->SetNumberField(TEXT("lost"), Ab.Lost);
-			O->SetNumberField(TEXT("escaped"), Ab.Escaped);
-			O->SetBoolField(TEXT("inside"), Ab.bInside);
-			if (bRooms && Ab.Rooms.Num())
-			{
-				TArray<TSharedPtr<FJsonValue>> Rooms;
-				for (const FAboardRoom& R : Ab.Rooms)
-				{
-					TArray<TSharedPtr<FJsonValue>> A;
-					A.Add(MakeShared<FJsonValueNumber>(R.Comp));
-					for (const float V : {R.Air, R.Hole, R.Fire, R.Smoke, R.Heat, R.Power, R.Wreck})
-					{
-						A.Add(MakeShared<FJsonValueNumber>(FMath::RoundToInt(V * 100.f)));
-					}
-					A.Add(MakeShared<FJsonValueNumber>((R.bGutted ? 1 : 0) | (R.bLocked ? 2 : 0)));
-					Rooms.Add(MakeShared<FJsonValueArray>(A));
-				}
-				O->SetArrayField(TEXT("rooms"), Rooms);
-			}
-			if (bRooms && Ab.SealedDoors.Num())
-			{
-				TArray<TSharedPtr<FJsonValue>> D;
-				for (const FString& Id : Ab.SealedDoors)
-				{
-					D.Add(MakeShared<FJsonValueString>(Id));
-				}
-				O->SetArrayField(TEXT("doors"), D);
-			}
-			J->SetObjectField(TEXT("ab"), O);
-		}
+		J->SetObjectField(TEXT("ab"), AboardToJson(S.Aboard, bRooms));
 		{
 			TArray<TSharedPtr<FJsonValue>> Pcs;
 			for (const FPieceRec& P : S.Pieces)
@@ -889,6 +1077,7 @@ namespace AstraSpace
 				WkPut(A, P.Radius, KLen);
 				WkPut(A, P.bBurnt ? 1.0 : 0.0, 1.0);
 				WkPutVec(A, P.PivotLocal, KLocal);
+				WkPut(A, P.Seen, 1.0);
 				Pcs.Add(MakeShared<FJsonValueArray>(A));
 			}
 			J->SetArrayField(TEXT("pc"), Pcs);
@@ -1008,45 +1197,7 @@ namespace AstraSpace
 		const TSharedPtr<FJsonObject>* O = nullptr;
 		if (J->TryGetObjectField(TEXT("ab"), O))
 		{
-			FAboard& Ab = S.Aboard;
-			Ab.Complement = (*O)->TryGetNumberField(TEXT("n"), D) ? (int32)D : 0;
-			Ab.Alive = (*O)->TryGetNumberField(TEXT("alive"), D) ? (int32)D : 0;
-			Ab.Killed = (*O)->TryGetNumberField(TEXT("killed"), D) ? (int32)D : 0;
-			Ab.Lost = (*O)->TryGetNumberField(TEXT("lost"), D) ? (int32)D : 0;
-			Ab.Escaped = (*O)->TryGetNumberField(TEXT("escaped"), D) ? (int32)D : 0;
-			(*O)->TryGetBoolField(TEXT("inside"), Ab.bInside);
-			const TArray<TSharedPtr<FJsonValue>>* Rooms = nullptr;
-			if ((*O)->TryGetArrayField(TEXT("rooms"), Rooms))
-			{
-				for (const TSharedPtr<FJsonValue>& V : *Rooms)
-				{
-					const TArray<TSharedPtr<FJsonValue>>* R = nullptr;
-					if (V.IsValid() && V->TryGetArray(R) && R->Num() >= 9)
-					{
-						FAboardRoom Room;
-						Room.Comp = (int32)(*R)[0]->AsNumber();
-						Room.Air = (float)(*R)[1]->AsNumber() * 0.01f;
-						Room.Hole = (float)(*R)[2]->AsNumber() * 0.01f;
-						Room.Fire = (float)(*R)[3]->AsNumber() * 0.01f;
-						Room.Smoke = (float)(*R)[4]->AsNumber() * 0.01f;
-						Room.Heat = (float)(*R)[5]->AsNumber() * 0.01f;
-						Room.Power = (float)(*R)[6]->AsNumber() * 0.01f;
-						Room.Wreck = (float)(*R)[7]->AsNumber() * 0.01f;
-						const int32 Fl = (int32)(*R)[8]->AsNumber();
-						Room.bGutted = (Fl & 1) != 0;
-						Room.bLocked = (Fl & 2) != 0;
-						Ab.Rooms.Add(Room);
-					}
-				}
-			}
-			const TArray<TSharedPtr<FJsonValue>>* Doors = nullptr;
-			if ((*O)->TryGetArrayField(TEXT("doors"), Doors))
-			{
-				for (const TSharedPtr<FJsonValue>& V : *Doors)
-				{
-					Ab.SealedDoors.Add(V->AsString());
-				}
-			}
+			AboardFromJson(*O, S.Aboard);
 		}
 		const TArray<TSharedPtr<FJsonValue>>* Pcs = nullptr;
 		if (J->TryGetArrayField(TEXT("pc"), Pcs))
@@ -1067,6 +1218,7 @@ namespace AstraSpace
 					R.Radius = (float)WkGet(*P, 16, KLen);
 					R.bBurnt = (*P)[17]->AsNumber() > 0.5;
 					R.PivotLocal = WkVec(*P, 18, KLocal);
+					R.Seen = P->Num() >= 22 ? (uint8)FMath::Clamp((int32)(*P)[21]->AsNumber(), 0, 3) : 0;       // (a save from before the pieces were contacts has no such number)
 					S.Pieces.Add(R);
 				}
 			}
