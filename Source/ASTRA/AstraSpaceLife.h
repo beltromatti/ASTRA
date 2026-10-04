@@ -1,13 +1,14 @@
 // ASTRA — the living space of a system, in the game (SPAZIO-VIVO, docs/SPAZIO.md): the places of the system as the plot's own contacts (Keeper Station, the Arsenal, the
 // refineries of Tiberius), the civilian traffic that flies between them (AstraSpaceLifeTraffic.*), the Ceres Belt and the route buoys, what the war leaves behind
-// (AstraWrecks.*), and the drawing of all of it as instances, so that the cost grows with what is seen and not with what there is.
+// (AstraWrecks.*), the motion of the capital ships made readable (manoeuvring jets and engine wakes: AstraSpaceLifeMotion.*), and the drawing of all of it as instances, so that the cost
+// grows with what is seen and not with what there is.
 //
 // Owned by the battle subsystem like the war's effects (UAstraWarFX) and the instanced craft (UAstraWarDraw): it reads the battle's state (where the Aquila is, who is
 // hostile, where the Gate stands), calls the battle's hooks for the little it must put in the plot, and is called by the battle's named hooks (Tick, ClearSystem, a
 // system entered, a ship's end). It never changes the rules of the war: places are fixtures nobody fights over, traffic is not in the plot at all.
 //
-// Console: astra.space.stat / where / look <place> [km] / density <x> / skip <s> / alert / reload. Cvars: astra.space.enable, astra.space.draw, astra.space.density,
-// astra.space.rocks.
+// Console: astra.space.stat / where / look <place> [km] / density <x> / skip <s> / alert / reload / lose / jets. Cvars: astra.space.enable, astra.space.draw, astra.space.density,
+// astra.space.rocks, astra.space.motion, astra.space.jets.gain, astra.space.wakes, astra.space.wakes.gain.
 
 #pragma once
 
@@ -16,6 +17,7 @@
 #include "Dom/JsonObject.h"
 #include "AstraSpaceLifeData.h"
 #include "AstraSpaceLifeTraffic.h"
+#include "AstraSpaceLifeMotion.h"
 #include "AstraWrecks.h"
 #include "AstraWarFX.h"
 #include "AstraWarDraw.h"
@@ -37,6 +39,8 @@ namespace AstraSpaceDraw
 	constexpr int32 CapLamps = 3200;               // lamps in the one layer of them
 	constexpr int32 CapPlumes = 200;
 	constexpr int32 CapGlints = 400;
+	constexpr int32 CapJets = 192;                  // manoeuvring jets (a plume each; their glows are lamps)
+	constexpr int32 CapWake = 640;                  // pieces of engine wakes
 	constexpr int32 PageSize = AstraDraw::PageSize;   // instances in one component of a hull layer (a busier system grows another page)
 
 	/** The instances of one mesh whose objects keep their slots (the temporal upscaler needs true motion vectors for a hull that moves): a key (a vessel's id) holds its
@@ -135,6 +139,14 @@ public:
 	 *  (the Unreal frame, metres): what art/blender/space3_wreck_scene.py renders (astra.space.wrecks.dump). */
 	bool DebugDump(const FString& Path, int32 SiteId, double AfterS, FString& OutDetail);
 
+	// ---- the motion of the capital ships (AstraSpaceLifeMotionDraw.cpp; the rules: AstraSpaceLifeMotion.h)
+	/** What the jets and the wakes hold and what they cost, in a line; and, ship by ship, what her motion asks of her jets now. */
+	FString MotionStat() const;
+	FString MotionTable() const;
+	/** Testing: fires a ship's jets by hand to see where they are and what they look like (astra.space.jets): Which a contact id, a class key or "nearest" (the nearest warship but the Aquila, or the
+	 *  Aquila when she is alone); What yaw+ yaw- pitch+ pitch- roll+ roll- brake left right up down all; Seconds how long it is held. */
+	bool DebugJets(const FString& Which, const FString& What, float Seconds, FString& OutDetail);
+
 	const AstraSpace::FLayout& GetLayout() const { return Layout; }
 	const AstraSpace::FTraffic& GetTraffic() const { return Traffic; }
 	const FString& GetSystem() const { return SystemName; }
@@ -150,6 +162,7 @@ private:
 	UPROPERTY() TObjectPtr<UStaticMesh> CylinderMesh;
 	UPROPERTY() TObjectPtr<UMaterialInterface> MatGlow;
 	UPROPERTY() TObjectPtr<UMaterialInterface> MatPlume;
+	UPROPERTY() TObjectPtr<UMaterialInterface> MatDart;
 	UPROPERTY() TArray<TObjectPtr<UStaticMesh>> KeepMeshes;
 	TArray<FSpaceLifePlace> Places;
 
@@ -187,7 +200,7 @@ private:
 	float LampGain = 1.f;
 
 	// ---- the layers: lamps, plumes and glints are written afresh every frame; hulls keep their slots
-	AstraFx::FLayer Lamps, Plumes, Glints;
+	AstraFx::FLayer Lamps, Plumes, Glints, Jets, Wakes;
 	TArray<AstraSpaceDraw::FInstSet> Sets;
 	TMap<FString, int32> SetByMesh;
 	TMap<FString, TArray<AstraSpace::FLamp>> NavLampCache;       // the ships' own lamp tables (data/ship/nav_lights.json) in this module's units, by mesh
@@ -210,6 +223,14 @@ private:
 	bool bResumeProbe = false;                    // a resume is under way (DebugResume): the wrecks as they were, in the Gate's frame, to be compared once the system is laid out again
 	TArray<TPair<int32, FVector>> ResumeProbe;    // (site id and piece index folded in: one entry for each piece and pod)
 	double ResumeClock = 0.0;
+
+	// ---- the motion of the capitals: what is read of each (by ship id; a ship that is gone keeps its wake until it has faded), what it costs
+	TMap<int32, AstraSpace::FMotion> Motions;
+	double MotionClock = 0.0;                      // the battle's own time, summed here (s): the wakes' clock
+	float MotionSweepT = 0.f;
+	int32 MotionShips = 0, JetsNow = 0, JetsPeak = 0, JetsLitNow = 0, WakeNow = 0, WakePeak = 0, JetsDropped = 0, WakeDropped = 0;
+	double MotionMs = 0.0;
+	int32 MotionTicks = 0;
 
 	// ---- cost
 	double TickMs = 0.0, TickMsMax = 0.0;
@@ -244,6 +265,10 @@ private:
 	int32 RigidFor(const FString& Mesh);
 	/** A wreck's look for the instances of a mesh (dark windows, cold cut faces, no running lights; charred for a reactor's): a dynamic material on each slot of the component. */
 	void ApplyWreckLook(UInstancedStaticMeshComponent* C, uint8 Variant);
+	// ---- the motion of the capitals (AstraSpaceLifeMotionDraw.cpp)
+	void TickMotion(float SimDt);
+	void DrawMotion();
+	void AddJet(const AstraSpace::FMotion& M, const AstraSpace::FJet& J, float Level, float Len, float Km);
 	// ---- what the war leaves (AstraSpaceLifeWrecks.cpp)
 	void TickWrecks(float SimDt);
 	void HandOver(double Now);

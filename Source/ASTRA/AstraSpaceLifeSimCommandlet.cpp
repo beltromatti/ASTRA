@@ -215,6 +215,23 @@ int32 UAstraSpaceSimCommandlet::Main(const FString& Params)
 		UE_LOG(LogASTRA, Display, TEXT("%s (%d failures, %.2f s)"), bOk ? TEXT("WRECKS_SELFTEST_OK") : TEXT("WRECKS_SELFTEST_FAILED"), TestFails.Num(), FPlatformTime::Seconds() - W0);
 		return bOk ? 0 : 1;
 	}
+	if (FParse::Param(*Params, TEXT("motiontest")))
+	{
+		// the jets and the wakes of the capital ships, on their own (no world): AstraSpaceLifeMotionTest.cpp
+		TArray<FString> TestFails, TestNotes;
+		const double M0 = FPlatformTime::Seconds();
+		const bool bOk = AstraSpace::RunMotionTests(TestFails, TestNotes);
+		for (const FString& N : TestNotes)
+		{
+			UE_LOG(LogASTRA, Display, TEXT("[MotionTest] %s"), *N);
+		}
+		for (const FString& F : TestFails)
+		{
+			UE_LOG(LogASTRA, Display, TEXT("[MotionTest] FAIL %s"), *F);
+		}
+		UE_LOG(LogASTRA, Display, TEXT("%s (%d failures, %.2f s)"), bOk ? TEXT("MOTION_SELFTEST_OK") : TEXT("MOTION_SELFTEST_FAILED"), TestFails.Num(), FPlatformTime::Seconds() - M0);
+		return bOk ? 0 : 1;
+	}
 	Step = FMath::Clamp(Step, 0.02f, 0.25f);
 	FMath::RandInit(Seed);
 	FMath::SRandInit(Seed);

@@ -56,6 +56,7 @@ bool UAstraSpaceLife::LoadAssets()
 	CylinderMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
 	MatGlow = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/ASTRA/Materials/M_WAR_Glow.M_WAR_Glow"));
 	MatPlume = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/ASTRA/Materials/M_WAR_Plume.M_WAR_Plume"));
+	MatDart = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/ASTRA/Materials/M_WAR_Dart.M_WAR_Dart"));            // (the engine wakes: optional, the rest does not need it)
 	if (!SphereMesh || !MatGlow)
 	{
 		UE_LOG(LogASTRA, Warning, TEXT("[Space] M_WAR_Glow missing (tools/ue_scripts/make_war_fx.py): the living space stays out of the sky"));
@@ -75,6 +76,8 @@ void UAstraSpaceLife::Init(UAstraBattleSubsystem* InOwner)
 	Lamps.Init(0);
 	Plumes.Init(0);
 	Glints.Init(0);
+	Jets.Init(0);
+	Wakes.Init(0);
 	if (!FApp::CanEverRender())
 	{
 		// the bench: the same traffic and the same staging, nothing drawn (its cost is part of the world's)
@@ -82,6 +85,8 @@ void UAstraSpaceLife::Init(UAstraBattleSubsystem* InOwner)
 		Lamps.Init(AstraSpaceDraw::CapLamps);
 		Plumes.Init(AstraSpaceDraw::CapPlumes);
 		Glints.Init(AstraSpaceDraw::CapGlints);
+		Jets.Init(AstraSpaceDraw::CapJets);
+		Wakes.Init(AstraSpaceDraw::CapWake);
 		return;
 	}
 	if (!LoadAssets())
@@ -108,8 +113,16 @@ void UAstraSpaceLife::Init(UAstraBattleSubsystem* InOwner)
 	MakeLayer(Plumes, TEXT("SpacePlumes"), CylinderMesh, MatPlume, AstraSpaceDraw::CapPlumes, 1);
 	MakeLayer(Lamps, TEXT("SpaceLamps"), SphereMesh, MatGlow, AstraSpaceDraw::CapLamps, 4);
 	MakeLayer(Glints, TEXT("SpaceGlints"), SphereMesh, MatGlow, AstraSpaceDraw::CapGlints, 4);
+	if (MatPlume)
+	{
+		MakeLayer(Jets, TEXT("SpaceJets"), CylinderMesh, MatPlume, AstraSpaceDraw::CapJets, 1);        // (the manoeuvring jets: short plumes; their glows are lamps)
+	}
+	if (MatDart)
+	{
+		MakeLayer(Wakes, TEXT("SpaceWakes"), SphereMesh, MatDart, AstraSpaceDraw::CapWake, 3);          // (the engine wakes: beads of a ribbon, as the war's missile trails are)
+	}
 	bLive = true;
-	UE_LOG(LogASTRA, Log, TEXT("[Space] ready: %d lamps, %d plumes, %d glints; hulls in pages of %d"), AstraSpaceDraw::CapLamps, AstraSpaceDraw::CapPlumes, AstraSpaceDraw::CapGlints, AstraSpaceDraw::PageSize);
+	UE_LOG(LogASTRA, Log, TEXT("[Space] ready: %d lamps, %d plumes, %d glints, %d jets, %d wake pieces; hulls in pages of %d"), AstraSpaceDraw::CapLamps, AstraSpaceDraw::CapPlumes, AstraSpaceDraw::CapGlints, AstraSpaceDraw::CapJets, AstraSpaceDraw::CapWake, AstraSpaceDraw::PageSize);
 }
 
 // ------------------------------------------------------------------------------------------------------------------ arriving and leaving
@@ -159,12 +172,18 @@ void UAstraSpaceLife::ClearScene()
 			P.bInFx = false;                         // (the war's effects have cleared their actors with the system: what is left of a wreck is its own record)
 		}
 	}
+	Motions.Reset();
+	MotionClock = 0.0;
 	Lamps.Begin();
 	Plumes.Begin();
 	Glints.Begin();
+	Jets.Begin();
+	Wakes.Begin();
 	Lamps.Flush();
 	Plumes.Flush();
 	Glints.Flush();
+	Jets.Flush();
+	Wakes.Flush();
 }
 
 AstraSpace::FAnchors UAstraSpaceLife::ReadAnchors() const
@@ -578,6 +597,7 @@ void UAstraSpaceLife::Tick(float SimDt, float RealDt)
 	const double T1 = FPlatformTime::Seconds();
 	Traffic.Tick(Owner->GetBattleTime() + 0.0, SimDt, View, Events);
 	TickWrecks(SimDt);                              // what the war left: the effects' pieces handed over, the beacons heard, a close look (their events join the traffic's)
+	TickMotion(SimDt);                              // the capital ships' motion read: what asks for jets, where the wakes are noted
 	FlushEvents();
 	const double T2 = FPlatformTime::Seconds();
 	if (CVarSpaceDraw.GetValueOnGameThread() != 0)
@@ -585,6 +605,9 @@ void UAstraSpaceLife::Tick(float SimDt, float RealDt)
 		Lamps.Begin();
 		Plumes.Begin();
 		Glints.Begin();
+		Jets.Begin();
+		Wakes.Begin();
+		JetsLitNow = 0;
 		float Fx = 1.f;
 		if (const TConsoleVariableData<float>* V = IConsoleManager::Get().FindTConsoleVariableDataFloat(TEXT("astra.fx.intensity")))
 		{
@@ -600,12 +623,23 @@ void UAstraSpaceLife::Tick(float SimDt, float RealDt)
 			DrawWrecks(WreckClock());
 			WrecksMs += (FPlatformTime::Seconds() - W0) * 1000.0;
 		}
+		{
+			const double M0 = FPlatformTime::Seconds();
+			DrawMotion();
+			MotionMs += (FPlatformTime::Seconds() - M0) * 1000.0;
+		}
 		FlushSets();
 		Lamps.Flush();
 		Plumes.Flush();
 		Glints.Flush();
+		Jets.Flush();
+		Wakes.Flush();
 		LampsNow = Lamps.Prev;
 		PlumesNow = Plumes.Prev;
+		JetsNow = Jets.Prev;
+		WakeNow = Wakes.Prev;
+		JetsPeak = FMath::Max(JetsPeak, JetsNow);
+		WakePeak = FMath::Max(WakePeak, WakeNow);
 		LampsPeak = FMath::Max(LampsPeak, LampsNow);
 		HullsPeak = FMath::Max(HullsPeak, HullsNow);
 		if (SystemRoot)
@@ -647,10 +681,10 @@ FString UAstraSpaceLife::Stat() const
 	{
 		Buoys += L.Buoys.Num();
 	}
-	return FString::Printf(TEXT("%s | %s | tick %.4f ms avg (max %.3f): traffic %.4f, drawing %.4f | drawn: hulls %d now / %d peak, lamps %d now / %d peak (%d dropped), plumes %d | places %d, lanes %d, buoys %d, rocks %d | %s"),
+	return FString::Printf(TEXT("%s | %s | tick %.4f ms avg (max %.3f): traffic %.4f, drawing %.4f | drawn: hulls %d now / %d peak, lamps %d now / %d peak (%d dropped), plumes %d | places %d, lanes %d, buoys %d, rocks %d | %s | %s"),
 	                       bLive ? TEXT("drawing") : (bSim ? TEXT("bench (not drawn)") : TEXT("off")), *Traffic.Describe(), TickCount ? TickMs / TickCount : 0.0, TickMsMax,
 	                       TickCount ? TrafficMs / TickCount : 0.0, TickCount ? DrawMs / TickCount : 0.0, HullsNow, HullsPeak, LampsNow, LampsPeak, LampsDropped, PlumesNow, Places.Num(), Layout.Lanes.Num(),
-	                       Buoys, Layout.Rocks.Num(), *WreckStat());
+	                       Buoys, Layout.Rocks.Num(), *WreckStat(), *MotionStat());
 }
 
 FString UAstraSpaceLife::WhereText() const
@@ -780,6 +814,12 @@ TSharedRef<FJsonObject> UAstraSpaceLife::BenchJson() const
 	O->SetNumberField(TEXT("space_ms_max"), TickMsMax);
 	O->SetNumberField(TEXT("lamps_peak"), LampsPeak);
 	O->SetNumberField(TEXT("hulls_peak"), HullsPeak);
+	O->SetNumberField(TEXT("motion_ships"), MotionShips);
+	O->SetNumberField(TEXT("jets_peak"), JetsPeak);
+	O->SetNumberField(TEXT("jets_dropped"), JetsDropped);
+	O->SetNumberField(TEXT("wake_peak"), WakePeak);
+	O->SetNumberField(TEXT("wake_dropped"), WakeDropped);
+	O->SetNumberField(TEXT("motion_ms_avg"), MotionTicks ? MotionMs / MotionTicks : 0.0);
 	{
 		const AstraSpace::FWreckStats Ws = Wrecks.Stats(SystemName, WreckClock());
 		O->SetNumberField(TEXT("wreck_sites"), Ws.Sites);
