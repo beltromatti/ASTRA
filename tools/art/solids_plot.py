@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The solid parts of the places' hulls (data/space/solids.json, art/blender/space3_solids.py) drawn as the game tests them: each mesh seen from above (x to the right, y up), from the side (x to
+"""The solid parts of the hulls (the places, and the ships' wrecks: data/space/solids.json, art/blender/space3_solids.py) drawn as the game tests them: each mesh seen from above (x to the right, y up), from the side (x to
 the right, z up) and from the front (y to the right, z up), as the shadow its boxes cast, with the Captain's Falcon to scale (the orange mark, 12 m) and the boxes' count. A picture to check that
 a ring has its hole, that bays are open, that a hull is whole.
 
@@ -82,7 +82,7 @@ def main() -> None:
     H = sum(max(im.height for _, im in r) + 30 for r in rows) + 30
     sheet = Image.new("RGB", (colw * 2, H), (8, 10, 18))
     dr = ImageDraw.Draw(sheet)
-    dr.text((12, 6), "the solid parts of the places' hulls, as the game tests them for the Captain's Falcon (the orange mark is the Falcon, 12 m)", fill=(230, 235, 245), font=big)
+    dr.text((12, 6), "the solid parts of the hulls (the places, the wrecks of the war: a ship's whole hull and her three pieces), as the game tests them for the Captain's Falcon (the orange mark is the Falcon, 12 m)", fill=(230, 235, 245), font=big)
     y = 30
     for r in rows:
         for c, (cap, im) in enumerate(r):
