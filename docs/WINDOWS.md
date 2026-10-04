@@ -191,7 +191,9 @@ producibile se la scrittura non è latina (come sempre).
 - Clonare in un percorso **corto** (`C:\ASTRA`): i percorsi dei contenuti sono lunghi e Windows ferma i 260 caratteri (se serve, abilitare i percorsi lunghi è una scelta del PC, non di questo progetto).
 
 ### 6.2 Passi (in ordine)
-1. `git clone` del repository in `C:\ASTRA`, poi `git lfs pull`; sul ramo che include `worktree-agent-a77d0ce415fad4f4a` (o `main` dopo l'unione).
+1. `git clone -c core.autocrlf=false` del repository in `C:\ASTRA`, poi `git lfs pull`; sul ramo che include `worktree-agent-a77d0ce415fad4f4a` (o `main` dopo l'unione). Il `-c core.autocrlf=false` tiene i sorgenti
+   a fine riga LF come sul Mac: UBT raggruppa i file nei blocchi di unità per dimensione in byte, e con i CRLF (l'impostazione di Git per Windows) i gruppi cambiano e possono incontrarsi nomi in conflitto che
+   il Mac non ha mai messo insieme (se il repository avrà un `.gitattributes` con `eol=lf` per i sorgenti, non serve).
 2. **I manichini di Epic**: `powershell -NoProfile -ExecutionPolicy Bypass -File tools\windows\Setup-EpicContent.ps1` copia `Content\Characters` (125 MB) dal motore. Non sta in git, e senza di lui il gioco
    parte con un equipaggio senza corpi, in silenzio. Il pacchetto (passo 5) lo fa da solo se manca; la compilazione e l'editor no.
    Poi, prima di compilare, i controlli che non servono Unreal: `python tools\portability.py` (zero risultati attesi), `python tools\portability.py --lock` (se c'è uv).
