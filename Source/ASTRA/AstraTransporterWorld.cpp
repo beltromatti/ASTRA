@@ -1225,6 +1225,12 @@ bool UAstraTransporterSubsystem::ResolveEnd(const FString& Text, bool bDest, con
 			TArray<FString> Same;
 			for (const UAstraBattleSubsystem::FContactView& C : B->Contacts())
 			{
+				if (C.ContactId.Equals(Text.TrimStartAndEnd(), ESearchCase::IgnoreCase))
+				{
+					Best = &C;                           // the contact's own id, as the plot writes it (also one without a number: the test scene's FX-T)
+					Same.Reset();
+					break;
+				}
 				if (!Want.IsEmpty())
 				{
 					if (XpContactKey(C.ContactId) == Want)
