@@ -218,7 +218,74 @@ def finish(obj: bpy.types.Object, bevel: float = 0.008, segments: int = 2) -> bp
     return obj
 
 
+# The same mesh must make the same FBX file: the importers hash the files to re-import only what changed (build_ship_interior.py's
+# stamp), and every export re-imported all 446 meshes of the kit (3 Oct). The exporter stamps each file with the time of writing and
+# numbers its objects with Python's hash() of their names, which changes from one Blender process to the next: a fixed time and a
+# stable hash, inside the exporter only.
+class _FixedClock:
+    class datetime:
+        @staticmethod
+        def now():
+            import datetime as dt
+            return dt.datetime(2026, 1, 1)
+
+
+def _stable_hash(key) -> int:
+    import hashlib
+    return int.from_bytes(hashlib.blake2b(repr(key).encode("utf-8"), digest_size=8).digest(), "little", signed=True)
+
+
+def geometry_signature(obj: bpy.types.Object) -> str:
+    """An order-free fingerprint of what obj's FBX holds: its triangles with their positions (0.1 mm), UVs, normals and material slot names,
+    each triangle started at the same corner, all of them sorted. The room generators lay their vertices and faces down in a different order
+    from one run to the next with the same shapes, so the FBX files' bytes always differ: this is what says whether a mesh changed."""
+    import hashlib
+    import numpy as np
+    dg = bpy.context.evaluated_depsgraph_get()
+    ev = obj.evaluated_get(dg)
+    me = ev.to_mesh()
+    try:
+        me.calc_loop_triangles()
+        n = len(me.loop_triangles)
+        if n == 0:
+            return "empty"
+        co = np.empty(len(me.vertices) * 3)
+        me.vertices.foreach_get("co", co)
+        tv = np.empty(n * 3, dtype=np.int64)
+        me.loop_triangles.foreach_get("vertices", tv)
+        tv = tv.reshape(n, 3)
+        tl = np.empty(n * 3, dtype=np.int64)
+        me.loop_triangles.foreach_get("loops", tl)
+        tl = tl.reshape(n, 3)
+        mi = np.empty(n, dtype=np.int64)
+        me.loop_triangles.foreach_get("material_index", mi)
+        corners = [np.round(co.reshape(-1, 3)[tv] * 1e4)]                                   # (n, 3 corners, xyz)
+        if me.uv_layers.active:
+            uv = np.empty(len(me.loops) * 2)
+            me.uv_layers.active.data.foreach_get("uv", uv)
+            corners.append(np.round(uv.reshape(-1, 2)[tl] * 1e4))
+        nr = np.empty(len(me.loops) * 3)
+        me.corner_normals.foreach_get("vector", nr)
+        corners.append(np.round(nr.reshape(-1, 3)[tl] * 10.0))           # (a tenth: the hundredths flipped between two runs of the same mesh)
+        c = np.concatenate(corners, axis=2).astype(np.int64)                                # (n, 3, k)
+        # each triangle from its corner of least position (the winding kept): a mix of x, y, z that only a degenerate triangle ties
+        key = c[:, :, 0] * 73856093 ^ c[:, :, 1] * 19349663 ^ c[:, :, 2] * 83492791
+        first = np.argmin(key, axis=1)
+        rot = (first[:, None] + np.arange(3)[None, :]) % 3
+        c = np.take_along_axis(c, rot[:, :, None], axis=1).reshape(n, -1)
+        names = [s.material.name if s.material else s.name for s in obj.material_slots] or [""]
+        ids = np.array([int.from_bytes(hashlib.blake2b(nm.encode("utf-8"), digest_size=8).digest(), "little", signed=True) for nm in names])
+        rows = np.concatenate([ids[np.clip(mi, 0, len(ids) - 1)][:, None], c], axis=1)
+        rows = rows[np.lexsort(rows.T[::-1])]
+        return hashlib.blake2b(rows.tobytes(), digest_size=12).hexdigest()
+    finally:
+        ev.to_mesh_clear()
+
+
 def export_fbx(obj: bpy.types.Object, path: str) -> None:
+    from io_scene_fbx import export_fbx_bin, fbx_utils
+    export_fbx_bin.datetime = _FixedClock
+    fbx_utils.hash = _stable_hash
     os.makedirs(os.path.dirname(path), exist_ok=True)
     bpy.ops.object.select_all(action="DESELECT")
     obj.select_set(True)

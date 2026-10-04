@@ -25,6 +25,9 @@ Set globals before running to change the defaults:
                               "CorrPort_EndCap"), the old lift's static leaves and sign (folder "Hangar/Lift", labels "Lift_Bridge_*") are destroyed in L_Bridge, and the block
                               outside the housing (label "Aquila_BridgeBlock": a closed shell on a pedestal whose top is a floor 0.3 m under Deck 1) loses its collision: the housing's
                               own mesh has the walls, the floor and the shafts' tubes. Run this script after build_bridge_v3.py and build_hangar.py / build_quarters.py (which place them again)
+  BUILD_MAPS = True           False: the decks' maps are left as they are (built by an earlier run) and only L_Bridge is put right around them: the entrances
+                              and the ready room opened, the bridge lift's housing cleared. For a run after the existing rooms' builders (build_messhall.py,
+                              build_berths.py, build_medbay.py, build_hangar.py), which place their old lift leaves again
   SAVE_LEVEL = True
   ROOT, LEVEL, DECK_DIR       the checkout, the persistent level and the folder of the decks' sub-levels (the tests of the support agents point them at a copy)
 
@@ -75,6 +78,7 @@ LOCK_STAIRS = globals().get("LOCK_STAIRS", True)
 REMOVE_LIFT_LEAVES = globals().get("REMOVE_LIFT_LEAVES", True)
 OPEN_READY_ROOM = globals().get("OPEN_READY_ROOM", True)
 OPEN_BRIDGE_LIFT = globals().get("OPEN_BRIDGE_LIFT", True)
+BUILD_MAPS = globals().get("BUILD_MAPS", True)
 SAVE_LEVEL = globals().get("SAVE_LEVEL", True)
 
 eal = unreal.EditorAssetLibrary
@@ -216,7 +220,10 @@ def import_kit():
         for path in eal.list_assets(KIT, recursive=False, include_folder=False):
             if not eal.delete_asset(path):
                 log.append(f"could not delete {path}")
-    hashes = {n: _md5(p) for n, p in fbx.items()}
+    # a mesh is its geometry's signature in the manifest (art/blender/astra_bpy.geometry_signature: the room generators lay the same
+    # shapes down in another order at every run, and the FBX's bytes always differ), or the file's bytes for an FBX without one
+    sigs = {n: MANIFEST["meshes"].get(n, {}).get("sig") for n in fbx}
+    hashes = {n: "sig:" + sigs[n] if sigs[n] else _md5(p) for n, p in fbx.items()}
     if REBUILD_KIT == "none":
         todo = []
     else:
@@ -478,19 +485,21 @@ bad = check_bounds()
 log.append(f"kit: {len(MANIFEST['meshes'])} meshes in the manifest; {len(bad)} bounds problems")
 copy_plan()
 report = {}
-for d in DECKS:                                                            # the decks' maps first (each one replaces the editor's map)
+for d in DECKS if BUILD_MAPS else []:                                      # the decks' maps first (each one replaces the editor's map)
     report[d] = build_deck_map(d)
     log.append(f"deck {d}: {report[d]['instances']} instances in {report[d]['components']} components, {report[d]['doors']} doors ({report[d]['seconds']} s)")
 world = unreal.EditorLoadingAndSavingUtils.load_map(LEVEL)
-cleared = clear_deck_folders(world, DECKS)
-log.append(f"{cleared} old actors of the decks {DECKS} removed from {LEVEL}")
+if BUILD_MAPS:
+    cleared = clear_deck_folders(world, DECKS)
+    log.append(f"{cleared} old actors of the decks {DECKS} removed from {LEVEL}")
 if REMOVE_LIFT_LEAVES:
     open_existing_entrances()
 if OPEN_READY_ROOM:
     open_ready_room_wall()
 if OPEN_BRIDGE_LIFT:
     open_bridge_lift_housing()
-wire_streaming(world, DECKS)                                              # last: the persistent level is still the current level for the actors above
+if BUILD_MAPS:
+    wire_streaming(world, DECKS)                                          # last: the persistent level is still the current level for the actors above
 if SAVE_LEVEL:
     saved = unreal.EditorLoadingAndSavingUtils.save_map(world, LEVEL)
     saved_rest = unreal.EditorLoadingAndSavingUtils.save_dirty_packages(True, True)     # the actors' own files (one file per actor) and the assets

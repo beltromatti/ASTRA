@@ -232,6 +232,14 @@ void UAstraHarness::Initialize(FSubsystemCollectionBase& Collection)
 		                 (B->HasField(TEXT("z")) ? B->GetNumberField(TEXT("z")) : 0.0) * 100.0 + Half + 2.0);
 		C->SetActorLocation(At, false, nullptr, ETeleportType::TeleportPhysics);
 		P->SetControlRotation(FRotator(B->HasField(TEXT("pitch")) ? B->GetNumberField(TEXT("pitch")) : 0.0, B->HasField(TEXT("yaw")) ? B->GetNumberField(TEXT("yaw")) : 0.0, 0.0));
+		// put on another deck, he would fall through it before its sub-level streamed in (and the fall guard took him back to the bridge, 3 Oct):
+		// he floats there until there is a floor under his feet (Tick)
+		if (UCharacterMovementComponent* M = C->GetCharacterMovement())
+		{
+			M->Velocity = FVector::ZeroVector;
+			M->SetMovementMode(MOVE_Flying);
+			HoverUntil = FPlatformTime::Seconds() + 20.0;
+		}
 		FAstraTimeline::Record(TEXT("input"), FString::Printf(TEXT("teleport %.1f %.1f %.1f"), At.X / 100.0, At.Y / 100.0, At.Z / 100.0));
 		return FString(TEXT("{\"ok\":true}"));
 	});
@@ -358,6 +366,30 @@ bool UAstraHarness::Tick(float DeltaTime)
 	}
 	// keys held by /key … hold=N come back up on time
 	const double Now = FPlatformTime::Seconds();
+	if (HoverUntil > 0.0)
+	{
+		APlayerController* P = PC();
+		ACharacter* C = P ? Cast<ACharacter>(P->GetPawn()) : nullptr;
+		UCharacterMovementComponent* M = C ? C->GetCharacterMovement() : nullptr;
+		if (!M || M->MovementMode != MOVE_Flying)
+		{
+			HoverUntil = 0.0;                                   // seated, or moved by something else meanwhile
+		}
+		else
+		{
+			M->Velocity = FVector::ZeroVector;
+			const FVector Feet = C->GetActorLocation() - FVector(0.f, 0.f, C->GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
+			FHitResult Hit;
+			const bool bFloor = C->GetWorld()->LineTraceSingleByChannel(Hit, Feet + FVector(0.f, 0.f, 20.f), Feet - FVector(0.f, 0.f, 300.f), ECC_Visibility,
+			                                                           FCollisionQueryParams(TEXT("HarnessFloor"), false, C));
+			if (bFloor || Now >= HoverUntil)
+			{
+				M->SetMovementMode(MOVE_Walking);
+				HoverUntil = 0.0;
+				UE_LOG(LogASTRA, Log, TEXT("[Harness] teleport: %s"), bFloor ? TEXT("a floor under the Captain, walking") : TEXT("no floor after 20 s, let go"));
+			}
+		}
+	}
 	for (int32 i = Releases.Num() - 1; i >= 0; --i)
 	{
 		if (Now >= Releases[i].At)
