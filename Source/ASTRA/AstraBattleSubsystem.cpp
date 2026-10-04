@@ -5,6 +5,7 @@
 #include "AstraHullName.h"
 #include "AstraWarFX.h"
 #include "AstraWarDraw.h"
+#include "AstraSpaceLife.h"
 #include "Misc/Crc.h"
 #include "EngineUtils.h"
 #include "Components/DecalComponent.h"
@@ -25,6 +26,7 @@
 DECLARE_CYCLE_STAT(TEXT("Battle tick"), STAT_AstraBattle, STATGROUP_Astra);
 DECLARE_CYCLE_STAT(TEXT("War draw"), STAT_AstraWarDraw, STATGROUP_Astra);
 DECLARE_CYCLE_STAT(TEXT("War FX"), STAT_AstraWarFx, STATGROUP_Astra);
+DECLARE_CYCLE_STAT(TEXT("Space life"), STAT_AstraSpaceLife, STATGROUP_Astra);
 
 namespace
 {
@@ -160,6 +162,8 @@ void UAstraBattleSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	WarFX->Init(this);
 	WarDraw = NewObject<UAstraWarDraw>(this);   // the craft and the lamps as instances (SpawnVisual asks it to claim a ship)
 	WarDraw->Init(this);
+	Space = NewObject<UAstraSpaceLife>(this);   // the living space: places, traffic, belt, wrecks (the system is laid out when the sky is up: Arrive)
+	Space->Init(this);
 
 	// the Aquila first (index 0): the player's ship, heading 045 mark 10 like the helm
 	const int32 P = AddShip(TEXT("AQUILA"), TEXT("ASN Aquila"), TEXT("Aquila-class carrier cruiser"), TEXT(""), EAstraSide::Astra,
@@ -225,6 +229,10 @@ void UAstraBattleSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	{
 		const FVector GPos = Ships[0].Pos + Polar(110 * OneKm, 70, 3);
 		SpawnGate(GPos, FRotationMatrix::MakeFromX((Ships[0].Pos - GPos).GetSafeNormal()).ToQuat() * FQuat(FVector::XAxisVector, 0.3f));
+	}
+	if (Space)
+	{
+		Space->Arrive(TEXT("Aurelia"));         // its places, its traffic and its belt, laid out in the first frames (when the sky has told where the world lies)
 	}
 	SyncVisuals();
 	UE_LOG(LogASTRA, Log, TEXT("[Battle] scenario 'Aurelia patrol' ready: %d ships"), Ships.Num());
@@ -367,6 +375,11 @@ void UAstraBattleSubsystem::Tick(float DeltaTime)
 		{
 			SCOPE_CYCLE_COUNTER(STAT_AstraWarDraw);
 			WarDraw->Tick(DeltaTime);
+		}
+		if (Space)
+		{
+			SCOPE_CYCLE_COUNTER(STAT_AstraSpaceLife);
+			Space->Tick(FMath::Min(DeltaTime, 0.1f), DeltaTime);          // the traffic goes on behind the menu
 		}
 		if (WarFX)
 		{
@@ -538,6 +551,10 @@ void UAstraBattleSubsystem::Tick(float DeltaTime)
 			S.DeadT += S.bCraft ? Dt : 0.f;
 			continue;
 		}
+		if (S.bFixture)
+		{
+			continue;                                  // a place of the system: posed once by AstraSpaceLife, run by no AI
+		}
 		if (S.bPiloted)
 		{
 			TickPiloted(S, Dt);
@@ -594,6 +611,11 @@ void UAstraBattleSubsystem::Tick(float DeltaTime)
 		SCOPE_CYCLE_COUNTER(STAT_AstraWarDraw);
 		WarDraw->Tick(DeltaTime);                  // the craft's hulls and every ship's lamps, as instances (AstraWarDraw.cpp)
 	}
+	if (Space)
+	{
+		SCOPE_CYCLE_COUNTER(STAT_AstraSpaceLife);
+		Space->Tick(Dt, DeltaTime);                // the living space: traffic, places, belt, what the war left (AstraSpaceLife.cpp)
+	}
 	const double PerfT3 = FPlatformTime::Seconds();
 	if (WarFX)
 	{
@@ -631,6 +653,11 @@ void UAstraBattleSubsystem::StartCampaign()
 	{
 		WarDraw->Prewarm();                        // the craft's kinds of hull ready before the first wing launches
 	}
+}
+
+TSharedRef<FJsonObject> UAstraBattleSubsystem::SpaceJson() const
+{
+	return Space ? Space->SummaryJson() : MakeShared<FJsonObject>();
 }
 
 FString UAstraBattleSubsystem::DrawStats() const
@@ -2799,6 +2826,10 @@ void UAstraBattleSubsystem::AquilaBreach(const FVector& ReactorW)
 
 void UAstraBattleSubsystem::Destroy(FAstraBattleShip& S, EAstraHitKind Cause, EAstraFate How, uint8 Section)
 {
+	if (S.bFixture)
+	{
+		return;                                       // the places of the system are not the war's to destroy
+	}
 	{
 		const int32 Side = S.Side == EAstraSide::Astra ? 0 : (S.Side == EAstraSide::Mandate ? 1 : -1);
 		if (Side >= 0 && !S.bPlayer)
@@ -3007,7 +3038,7 @@ void UAstraBattleSubsystem::TickProjectiles(float Dt)
 		// swept hit test against the target (and anyone in the way for slugs)
 		for (FAstraBattleShip& S : Ships)
 		{
-			if (!S.bAlive || S.Id == Pr.Owner)
+			if (!S.bAlive || S.bFixture || S.Id == Pr.Owner)
 			{
 				continue;
 			}
@@ -5125,6 +5156,11 @@ void UAstraBattleSubsystem::ResumeFrom(const TSharedPtr<FJsonObject>& Save)
 	// the system's gate, some way off the bow
 	const FVector GPos = P.Pos + Polar(70 * OneKm, P.Att.Rotator().Yaw + 35.0, 2.0);
 	SpawnGate(GPos, FRotationMatrix::MakeFromX((P.Pos - GPos).GetSafeNormal()).ToQuat() * FQuat(FVector::XAxisVector, 0.8f));
+	if (Space)
+	{
+		const UAstraShipSubsystem* ShipSys = GetWorld() ? GetWorld()->GetSubsystem<UAstraShipSubsystem>() : nullptr;
+		Space->Arrive(ShipSys ? ShipSys->GetSystemName() : FString(TEXT("Aurelia")));
+	}
 	SyncVisuals();
 	bStarted = true;
 	Report(TEXT("bridge: the Captain returns to the bridge after the watch change — the XO welcomes them back and sums up in two or "
@@ -5414,6 +5450,10 @@ void UAstraBattleSubsystem::TickGateRun(float Dt)
 
 void UAstraBattleSubsystem::ClearSystem()
 {
+	if (Space)
+	{
+		Space->Leave();                               // the old system's places, traffic, belt and buoys go with the rest
+	}
 	// everything left behind in the old system (our own aircraft come aboard first)
 	for (int32 i = Ships.Num() - 1; i >= 1; --i)
 	{
@@ -5521,6 +5561,10 @@ void UAstraBattleSubsystem::DoTransit(const TSharedPtr<FJsonObject>& Beat)
 		Ship->SetSpeedMps(ExitSpeed);
 		Ship->SetThrottle(40.f);
 		Ship->ApplySystem(L);
+	}
+	if (Space)
+	{
+		Space->Arrive(L.Name.IsEmpty() ? Name : L.Name);   // the new system's places and traffic (laid out once the sky is up)
 	}
 	Name = L.Name;
 	Star = L.StarClass;

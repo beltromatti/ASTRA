@@ -20,6 +20,7 @@ class UStaticMesh;
 class USoundBase;
 class UAstraWarFX;
 class UAstraWarDraw;
+class UAstraSpaceLife;
 class FAstraShipInterior;            // FLOTTA-VIVA: the inside of a ship that is not the Aquila (AstraFleetInterior.h)
 struct FAstraFleetView;
 struct FAstraHullHit;
@@ -125,6 +126,7 @@ struct FAstraBattleShip
 	bool bNegotiated = false;            // holding fire / withdrawing under terms agreed over the channel
 	bool bLeader = false;                // leads its group (the commander on the channel)
 	bool bDerelict = false;              // a dead station or hulk to investigate: no power, tumbling slowly
+	bool bFixture = false;               // a place of the system (Keeper Station, the Arsenal...: AstraSpaceLife.*): in the plot as a neutral contact, posed once and never moved, hit by nothing, run by no AI
 	bool bPiloted = false;               // the Captain flies it (first person): no AI, the stick drives it
 	float SpinDeg = 0.f;
 	// tactical orders by datalink (the Mandate commander's to their ships, the Captain's requests to the fleet)
@@ -401,6 +403,7 @@ class ASTRA_API UAstraBattleSubsystem : public UTickableWorldSubsystem
 
 	friend class UAstraWarFX;            // the war's visual effects read the battle's state (AstraWarFX*.cpp)
 	friend class UAstraWarDraw;          // and so does the instanced drawing of its craft and lamps (AstraWarDraw.cpp)
+	friend class UAstraSpaceLife;        // and the living space of the system: its places, its traffic, what the war leaves (AstraSpaceLife.*)
 	friend struct FAstraWarFXTest;       // and the console that tries them (astra.fx.*)
 
 public:
@@ -482,6 +485,12 @@ public:
 	void AquilaBlasts(const FVector& HullCentreW, const FVector& HullExtentW);
 	/** After the loss, when the story moves on (hours, days): the fight stops where it was, no more reports. */
 	void Freeze() { bFrozen = true; }
+	/** The living space of the system (SPAZIO-VIVO, docs/SPAZIO.md): its places are fixtures of this plot; its traffic and wrecks are its own. Null before the world begins. */
+	UAstraSpaceLife* GetSpace() const { return Space; }
+	/** A vessel went through the Janus ring: the glyphs flare a little (a floor under the ring's heat, never above what a transit gives). */
+	void PulseGate(float Strength) { GateHeat = FMath::Max(GateHeat, FMath::Clamp(Strength, 0.f, 0.5f)); }
+	/** The facts of the living space for the crew (a small object for ship_state.state.space): empty when there is none here. */
+	TSharedRef<FJsonObject> SpaceJson() const;
 	/** What the instanced drawing of the craft and the lamps holds and costs (astra.war.stat), as text and as JSON for the bench's record. */
 	FString DrawStats() const;
 	TSharedRef<FJsonObject> DrawStatsJson() const;
@@ -1077,6 +1086,8 @@ private:
 	bool FxOn() const;
 	/** The craft and the lamps as instances (AstraWarDraw.cpp): a craft it claims at SpawnVisual has no actor, and no ship it draws the lamps of has a running-light component. */
 	UPROPERTY() TObjectPtr<UAstraWarDraw> WarDraw;
+	/** The living space (AstraSpaceLife.cpp): the system's places, its civilian traffic, the Ceres Belt, the buoys, what the war leaves behind. */
+	UPROPERTY() TObjectPtr<UAstraSpaceLife> Space;
 	void Explode(FAstraBattleShip& S);    // secondary blasts, shockwave, debris, and the hulk left behind
 	void TickWrecks(float Dt);
 	/** Our own guns and launchers, felt through the hull (rate-limited per sound). */

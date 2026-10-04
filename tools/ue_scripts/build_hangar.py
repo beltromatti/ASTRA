@@ -25,6 +25,13 @@ import sys
 if ROOT + "/tools/ue_scripts" not in sys.path:
     sys.path.insert(0, ROOT + "/tools/ue_scripts")
 import ship_room_materials as RM
+
+# the actors go into L_Bridge's own persistent level, whatever level the editor had current: after build_ship_interior.py it was a deck's streamed
+# sub-level, and the five existing rooms were saved into L_Deck12, which the game never loads around them (3 Oct: the Mess Hall was not there)
+if unreal.EditorLevelLibrary.get_editor_world().get_outermost().get_name() != "/Game/ASTRA/Maps/L_Bridge":
+    unreal.EditorLoadingAndSavingUtils.load_map("/Game/ASTRA/Maps/L_Bridge")
+if not unreal.get_editor_subsystem(unreal.LevelEditorSubsystem).set_current_level_by_name("L_Bridge"):
+    raise RuntimeError("L_Bridge cannot be made the current level")
 RM.build(log)
 
 # ---- import (Nanite on the hall, the glass stays translucent)
@@ -33,7 +40,15 @@ DST = KIT
 NANITE = True
 exec(open(os.path.join(ROOT, "tools", "ue_scripts", "import_kit.py")).read())
 
-# ---- clear the previous build
+# ---- clear the previous build (what the other rooms' builders wrote on the controller is kept: their lifts' landings tell the game which room the
+#      Captain is in, and a hangar rebuilt after them had lost them: the Mess Hall's lights never came on, 3 Oct)
+KEPT_LANDINGS = {}
+for a in eas.get_all_level_actors():
+    if isinstance(a, unreal.AstraHangar):
+        for prop in ("mess_landing", "berth_landing", "medbay_landing", "engineering_landing"):
+            v = a.get_editor_property(prop)
+            if abs(v.x) + abs(v.y) + abs(v.z) > 1.0:
+                KEPT_LANDINGS[prop] = v
 for a in eas.get_all_level_actors():
     if str(a.get_folder_path()).startswith("Hangar"):
         eas.destroy_actor(a)
@@ -123,6 +138,8 @@ h.set_folder_path("Hangar")
 BRIDGE_LIFT = (-20.55, -3.9)          # the end of the bridge's port corridor (the end cap is at x -20.8 m)
 h.set_editor_property("bridge_landing", unreal.Vector((BRIDGE_LIFT[0] + 1.3) * M, BRIDGE_LIFT[1] * M, 0.0))
 h.set_editor_property("hangar_landing", unreal.Vector(2.6 * M, D["lift"]["y"] * M, 0.0))
+for prop, v in KEPT_LANDINGS.items():
+    h.set_editor_property(prop, v)
 
 # ---- the lift doors (closed: the car comes when called) and their signs, on both decks; the flight deck's name
 leaf = eal.load_asset("/Game/ASTRA/Kit/Interior/Corridor/SM_COR_DoorLeaf")
