@@ -44,6 +44,21 @@ def has_module(name: str) -> bool:
         return False
 
 
+def load_error(name: str) -> str:
+    """Why a library that is installed does not load ("" when it does, or is not installed). The ones with native code fail to load rather than to
+    import: on Windows, the Microsoft Visual C++ runtime that is missing is the usual reason."""
+    if not has_module(name):
+        return ""
+    try:
+        importlib.import_module(name)
+        return ""
+    except Exception as exc:  # noqa: BLE001 - OSError (a DLL), ImportError, anything a native library raises
+        why = f"{type(exc).__name__}: {str(exc)[:160]}"
+        if platform.system() == "Windows":
+            why += " (the Microsoft Visual C++ Redistributable 2015-2022 x64 is probably missing: https://aka.ms/vs/17/release/vc_redist.x64.exe)"
+        return why
+
+
 def input_devices() -> list[str]:
     """The names of the microphones PortAudio sees (empty when there is none, or PortAudio does not load)."""
     try:
@@ -64,6 +79,10 @@ def look() -> list[tuple[str, str]]:
                (FAIL, f"the crew cannot think without its key: put OPENROUTER_API_KEY=... in {HOME / '.env'}"))
     for mod in ("numpy", "scipy", "soundfile", "websockets", "httpx", "lingua", "pocket_tts", "torch"):
         out.append((OK, f"{mod} is installed") if has_module(mod) else (FAIL, f"{mod} is not installed (uv sync --frozen)"))
+    for mod in ("torch", "onnxruntime"):
+        why = load_error(mod)
+        if why:
+            out.append((FAIL, f"{mod} does not load: {why}"))
     devices = input_devices()
     out.append((OK, f"microphone: {', '.join(devices[:3])}{' ...' if len(devices) > 3 else ''}") if devices else
                (WARN, "no microphone found (or PortAudio did not load): the Captain can only type"))

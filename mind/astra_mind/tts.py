@@ -110,7 +110,7 @@ class _MacVoices:
         if self._have is None:
             self._have = set()
             try:
-                out = subprocess.run(["say", "-v", "?"], capture_output=True, text=True, timeout=10).stdout
+                out = subprocess.run(["say", "-v", "?"], capture_output=True, text=True, timeout=10).stdout       # portable-ok: macOS; _WindowsVoices does it on Windows
                 for line in out.splitlines():
                     head = line.split("#")[0].rstrip()
                     parts = head.rsplit(None, 1)
@@ -130,7 +130,7 @@ class _MacVoices:
 
     def render(self, text: str, voice: str, sr: int) -> np.ndarray:
         with tempfile.NamedTemporaryFile(suffix=".wav") as f:
-            r = subprocess.run(["say", "-v", voice, "-o", f.name, f"--data-format=LEI16@{sr}", text], capture_output=True, timeout=60)
+            r = subprocess.run(["say", "-v", voice, "-o", f.name, f"--data-format=LEI16@{sr}", text], capture_output=True, timeout=60)   # portable-ok: macOS; _WindowsVoices does it on Windows
             if r.returncode != 0:
                 raise RuntimeError(f"say failed: {r.stderr.decode(errors='replace')[:120]}")
             x, rate = sf.read(f.name, dtype="float32")
@@ -412,7 +412,7 @@ class TTSEngine:
     @staticmethod
     def _read_gains(path: Path) -> dict[str, dict[str, float]]:
         try:
-            return json.loads(path.read_text())
+            return json.loads(path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             return {}
 
@@ -489,7 +489,7 @@ class TTSEngine:
             self._user[k] = rec
             try:
                 _USER_GAINS.parent.mkdir(parents=True, exist_ok=True)
-                _USER_GAINS.write_text(json.dumps(self._user, indent=1, sort_keys=True))
+                _USER_GAINS.write_text(json.dumps(self._user, indent=1, sort_keys=True), encoding="utf-8")
             except OSError:
                 pass
         p = VoiceProfile(gain_db=self._gain_for(rec["lufs"], rec["peak"]), lufs=rec["lufs"], peak_db=rec["peak"])

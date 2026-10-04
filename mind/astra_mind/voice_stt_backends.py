@@ -113,7 +113,7 @@ class ParakeetBackend(SttBackend):
 
     @staticmethod
     def available() -> bool:
-        return platform.system() == "Darwin" and platform.machine() == "arm64" and find_parakeet_binary() is not None
+        return platform.system() == "Darwin" and platform.machine() == "arm64" and find_parakeet_binary() is not None     # portable-ok: the Neural Engine helper; SherpaParakeetBackend serves the other machines
 
     async def start(self) -> bool:
         async with self._starting:
@@ -459,7 +459,7 @@ def fetch_allowed() -> bool:
     forced = os.environ.get("ASTRA_STT_FETCH", "").strip()
     if forced in ("0", "1"):
         return forced == "1"
-    return platform.system() != "Darwin" or platform.machine() != "arm64"
+    return platform.system() != "Darwin" or platform.machine() != "arm64"      # portable-ok: where the Neural Engine helper cannot do it"
 
 
 def fetch_sherpa_model(root: Path | None = None) -> Path:

@@ -119,7 +119,7 @@ class Recognizer:
     @staticmethod
     def _saved_language() -> str:
         try:
-            return (CACHE / "captain_lang.txt").read_text().strip() or "en"
+            return (CACHE / "captain_lang.txt").read_text(encoding="utf-8").strip() or "en"
         except OSError:
             return "en"
 

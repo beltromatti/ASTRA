@@ -82,7 +82,7 @@ class Params:
     def load(path: Path = CAL_FILE) -> "Params":
         base = Params()
         try:
-            data = json.loads(path.read_text())
+            data = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             return base
         names = {f.name for f in fields(Params)}

@@ -87,7 +87,7 @@ def install_stop_handlers(loop: asyncio.AbstractEventLoop, stop: Callable[[int],
         if sig is None:
             continue
         try:
-            loop.add_signal_handler(sig, stop, sig)
+            loop.add_signal_handler(sig, stop, sig)       # portable-ok: the Windows loops raise NotImplementedError: the signal module's handler follows
         except (NotImplementedError, RuntimeError):
             # the Windows event loops have no add_signal_handler: the signal module's handler runs in the main thread, and hands over to the loop
             try:

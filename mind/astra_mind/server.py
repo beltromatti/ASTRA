@@ -254,7 +254,7 @@ class Mind:
         self.last_activity = time.monotonic()   # the Captain spoke or something was reported
         self.captain_t = 0.0                     # the last time the Captain spoke
         self.lang_file = CACHE / "captain_lang.txt"
-        self.lang = self.lang_file.read_text().strip() if self.lang_file.exists() else "en"   # the Captain's language
+        self.lang = self.lang_file.read_text(encoding="utf-8").strip() if self.lang_file.exists() else "en"   # the Captain's language
 
     async def _sink(self, kind: str, payload: Any) -> None:
         dead = []
@@ -905,7 +905,7 @@ class Mind:
                         asyncio.create_task(self.tts.prepare(lang, [o.voice for o in CREW.values()]))   # the crew will answer in it
                     self.lang = lang
                     self.lang_file.parent.mkdir(parents=True, exist_ok=True)
-                    self.lang_file.write_text(lang)
+                    self.lang_file.write_text(lang, encoding="utf-8")
                 gm = _GM_ADDRESS.match(text)
                 if gm and len(text) > gm.end() + 3 and not self.aftermath.active:
                     # game master mode: the wish goes to the director, who makes it fit the world
@@ -1433,7 +1433,7 @@ def main() -> None:
     args = ap.parse_args()
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO, format="%(asctime)s %(name)s %(message)s")
     if args.say or args.script:
-        lines = [args.say] if args.say else [l.strip() for l in Path(args.script).read_text().splitlines() if l.strip() and not l.startswith("#")]
+        lines = [args.say] if args.say else [l.strip() for l in Path(args.script).read_text(encoding="utf-8").splitlines() if l.strip() and not l.startswith("#")]
         asyncio.run(offline_turns(lines, Path(args.out), args.check_audio))
         return
     asyncio.run(Mind().serve())

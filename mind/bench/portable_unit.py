@@ -389,16 +389,15 @@ class TestPackaging(unittest.TestCase):
     def test_every_locked_package_has_a_windows_wheel(self) -> None:
         # uv resolves the lock for Windows x64 / CPython 3.13 without building anything: a dependency that has no Windows wheel (or is only a
         # source archive that would need a compiler) fails here, the day it is added, not the day somebody installs the game on a PC
-        exported = subprocess.run(["uv", "export", "--frozen", "--no-hashes", "--no-emit-project"], cwd=MIND, capture_output=True, text=True)
-        self.assertEqual(exported.returncode, 0, exported.stderr)
-        with tempfile.TemporaryDirectory() as td:
-            req = Path(td) / "requirements.txt"
-            req.write_text(exported.stdout, encoding="utf-8")
-            r = subprocess.run(["uv", "pip", "install", "--dry-run", "--no-deps", "--only-binary", ":all:", "--python-platform", "x86_64-pc-windows-msvc",
-                                "--python-version", "3.13", "-r", str(req)], cwd=MIND, capture_output=True, text=True)
-        self.assertEqual(r.returncode, 0, r.stderr[-800:])
-        # (what is listed is what differs from this machine's own environment; colorama is the Windows-only package: the markers were read for Windows)
-        self.assertIn("colorama==", r.stdout + r.stderr)
+        r = subprocess.run([sys.executable, str(MIND.parent / "tools" / "portability.py"), "--lock", str(MIND / "astra_mind" / "host.py")], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stdout[-800:] + r.stderr[-400:])
+
+    def test_the_project_passes_its_own_portability_check(self) -> None:
+        tool = str(MIND.parent / "tools" / "portability.py")
+        selftest = subprocess.run([sys.executable, tool, "--selftest"], capture_output=True, text=True)
+        self.assertEqual(selftest.returncode, 0, selftest.stdout[-800:])
+        r = subprocess.run([sys.executable, tool], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, "new Mac-only code (tools/portability.py says where):\n" + r.stdout[-2500:])
 
 
 class TestFirstRun(unittest.TestCase):
@@ -411,6 +410,24 @@ class TestFirstRun(unittest.TestCase):
         self.assertTrue(all(level in (firstrun.OK, firstrun.WARN, firstrun.FAIL) for level, _ in lines))
         self.assertTrue(any("Python" in text for _, text in lines))
         self.assertFalse(any("sk-or" in text for _, text in lines), "a key's value is never printed")
+
+    def test_a_library_that_does_not_load_is_said_with_the_windows_hint(self) -> None:
+        from astra_mind import firstrun
+        with tempfile.TemporaryDirectory() as td:
+            (Path(td) / "astra_fake_native.py").write_text("raise OSError('[WinError 126] The specified module could not be found')\n", encoding="utf-8")
+            sys.path.insert(0, td)
+            try:
+                with mock.patch.object(platform, "system", return_value="Windows"):
+                    why = firstrun.load_error("astra_fake_native")
+                self.assertIn("WinError 126", why)
+                self.assertIn("Visual C++ Redistributable", why)
+                with mock.patch.object(platform, "system", return_value="Darwin"):
+                    self.assertNotIn("Visual C++", firstrun.load_error("astra_fake_native"))
+            finally:
+                sys.path.remove(td)
+                sys.modules.pop("astra_fake_native", None)
+        self.assertEqual(firstrun.load_error("json"), "")
+        self.assertEqual(firstrun.load_error("astra_no_such_library"), "")        # (not installed is another line of the check)
 
 
 @unittest.skipUnless(os.environ.get("ASTRA_TEST_BOOT") == "1", "ASTRA_TEST_BOOT=1 starts the real mind")

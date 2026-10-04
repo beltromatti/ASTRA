@@ -34,7 +34,11 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-ENGINE = Path("/Users/Shared/Epic Games/UE_5.8/Engine/Binaries/Mac/UnrealEditor.app/Contents/MacOS/UnrealEditor")
+WINDOWS = sys.platform == "win32"
+# the editor binary that runs the game (-game): UE_ROOT is the engine's folder (the default is where the Epic Launcher puts it)
+_UE = Path(os.environ["UE_ROOT"]) if os.environ.get("UE_ROOT") else Path("C:/Program Files/Epic Games/UE_5.8" if WINDOWS else "/Users/Shared/Epic Games/UE_5.8")
+ENGINE = (_UE / "Engine/Binaries/Win64/UnrealEditor.exe" if WINDOWS else
+          _UE / "Engine/Binaries/Mac/UnrealEditor.app/Contents/MacOS/UnrealEditor" if sys.platform == "darwin" else _UE / "Engine/Binaries/Linux/UnrealEditor")
 PLAY_DIR = ROOT / "Saved" / "Play"
 PORT = int(os.environ.get("ASTRA_HARNESS_PORT", "8770"))
 BASE = f"http://127.0.0.1:{PORT}"
@@ -81,8 +85,29 @@ def port_free() -> bool:
         s.close()
 
 
+def game_pids() -> list[int]:
+    """The processes of the harness game on this port (their command line carries -astra_harness_port=PORT)."""
+    needle = f"astra_harness_port={PORT}"
+    if WINDOWS:
+        # (the query's own PowerShell has the needle in its command line: it is left out)
+        query = f"Get-CimInstance Win32_Process | Where-Object {{ $_.CommandLine -like '*{needle}*' -and $_.ProcessId -ne $PID }} | ForEach-Object {{ $_.ProcessId }}"
+        out = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", query], capture_output=True, text=True).stdout
+    else:
+        out = subprocess.run(["pgrep", "-f", needle], capture_output=True, text=True).stdout
+    return [int(w) for w in out.split() if w.isdigit()]
+
+
 def game_process() -> bool:
-    return subprocess.run(["pgrep", "-f", f"astra_harness_port={PORT}"], capture_output=True).returncode == 0
+    return bool(game_pids())
+
+
+def kill_game() -> None:
+    """A harness game is always ours: end it, and what it started."""
+    if WINDOWS:
+        for pid in game_pids():
+            subprocess.run(["taskkill", "/PID", str(pid), "/F", "/T"], capture_output=True)
+    else:
+        subprocess.run(["pkill", "-f", f"astra_harness_port={PORT}"], check=False)
 
 
 def cmd_launch(a: argparse.Namespace) -> None:
@@ -95,7 +120,7 @@ def cmd_launch(a: argparse.Namespace) -> None:
             break
         time.sleep(0.5)
     else:
-        subprocess.run(["pkill", "-f", f"astra_harness_port={PORT}"], check=False)
+        kill_game()
         time.sleep(2.0)
     # the last game's connections linger a while in TIME_WAIT and the engine's listener cannot bind until they go
     for _ in range(120):
@@ -108,7 +133,10 @@ def cmd_launch(a: argparse.Namespace) -> None:
         # the packaged app as the player gets it (full screen on the Mac's own display, Retina, its own settings): a Development build has the
         # harness. No -ResX/-ResY here: the engine would keep them in the player's own GameUserSettings.ini
         app = Path(a.app).expanduser()
-        exe = next(iter(sorted((app / "Contents" / "MacOS").glob("*"))), None) if app.suffix == ".app" else app
+        if app.suffix == ".app":
+            exe = next(iter(sorted((app / "Contents" / "MacOS").glob("*"))), None)
+        else:
+            exe = app / "ASTRA.exe" if app.is_dir() and WINDOWS else app          # (Windows: the package's folder, or ASTRA.exe itself)
         if exe is None or not exe.exists():
             print(f"no app at {app}")
             sys.exit(1)
@@ -125,7 +153,9 @@ def cmd_launch(a: argparse.Namespace) -> None:
     if a.args:
         args += shlex.split(a.args)                     # (quoted values keep their spaces: --args '-ExecCmds="t.IdleWhenNotForeground 0"')
     log = open(PLAY_DIR / "game_stdout.log", "w")
-    subprocess.Popen(args, stdout=log, stderr=subprocess.STDOUT, cwd=str(ROOT), start_new_session=True)
+    # (the game outlives this command: its own session on the Mac and Linux, detached with its own process group on Windows)
+    detach = {"creationflags": subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP} if WINDOWS else {"start_new_session": True}
+    subprocess.Popen(args, stdout=log, stderr=subprocess.STDOUT, cwd=str(ROOT), **detach)
     t0 = time.time()
     while time.time() - t0 < 240:
         time.sleep(1.0)
@@ -265,7 +295,7 @@ def cmd_quit(_: argparse.Namespace) -> None:
         if not alive() and not game_process():
             print("game closed")
             return
-    subprocess.run(["pkill", "-f", f"astra_harness_port={PORT}"], check=False)
+    kill_game()
     print("game killed (it did not close by itself)")
 
 

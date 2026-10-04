@@ -29,7 +29,7 @@ namespace
 
 	// RETINA (the 3D view at the display's own pixels instead of half of them, upscaled) is the Mac's: that is what the engine does on a Retina screen by
 	// default. A game on Windows or Linux renders at its window's pixels, and has neither the row nor the setting.
-	constexpr bool bMac = PLATFORM_MAC;
+	constexpr bool bMac = PLATFORM_MAC;   // portable-ok: the page and the settings of the other systems are the ones without RETINA
 
 	/** The rows this system shows, in order (every one on the Mac). */
 	const TArray<int32>& VisibleRows()

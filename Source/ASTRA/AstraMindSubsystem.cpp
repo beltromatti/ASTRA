@@ -583,6 +583,7 @@ void UAstraMindSubsystem::OnText(const FString& Text)
 		FString Mic;
 		if (Msg->TryGetStringField(TEXT("mic"), Mic))
 		{
+// portable-ok: the hint names each system's own settings page; the others follow
 #if PLATFORM_MAC
 			const TCHAR* Where = TEXT(" (allow microphone access for the game in System Settings)");
 #elif PLATFORM_WINDOWS
