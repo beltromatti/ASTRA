@@ -360,6 +360,15 @@ void UAstraBattleSubsystem::Report(const FString& Text, bool bReport)
 	}
 }
 
+void UAstraBattleSubsystem::Cue(const FString& Text)
+{
+	UE_LOG(LogASTRA, Log, TEXT("[Battle] (cue) %s"), *Text);
+	if (UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>())
+	{
+		Ship->PublishCue(Text, true);
+	}
+}
+
 // ------------------------------------------------------------------------------------------------------ tick
 void UAstraBattleSubsystem::Tick(float DeltaTime)
 {
@@ -1087,7 +1096,7 @@ void UAstraBattleSubsystem::TickScenario(float Dt)
 	if (!bBriefed && Time > 6.f)
 	{
 		bBriefed = true;
-		Report(TEXT("bridge: the Captain has just come onto the bridge — the XO greets them and briefs the situation in two or "
+		Cue(TEXT("bridge: the Captain has just come onto the bridge — the XO greets them and briefs the situation in two or "
 		            "three short lines (where we are, the patrol with the 7th Fleet, anything on the sensors worth their attention)"));
 	}
 	// stage 1: the drifting contact wakes up and goes for the freighter (earlier if we poked it with an active scan)
@@ -5208,7 +5217,7 @@ void UAstraBattleSubsystem::ResumeFrom(const TSharedPtr<FJsonObject>& Save)
 	}
 	SyncVisuals();
 	bStarted = true;
-	Report(TEXT("bridge: the Captain returns to the bridge after the watch change — the XO welcomes them back and sums up in two or "
+	Cue(TEXT("bridge: the Captain returns to the bridge after the watch change — the XO welcomes them back and sums up in two or "
 	            "three short lines where the Aquila is, her state, and what the war needs from her now"));
 }
 

@@ -1118,6 +1118,8 @@ private:
 	FVector ToWorld(const FVector& SystemPos) const;      // system frame (m) -> world (cm)
 	FQuat ToWorldRot(const FQuat& SystemRot) const;
 	void Report(const FString& Text, bool bReport = true);
+	/** A cue for the crew's minds (the Captain came onto the bridge: the XO briefs), kept off the consoles' logs. */
+	void Cue(const FString& Text);
 	FString SideName(EAstraSide S) const;
 	double BearingDeg(const FVector& From, const FVector& To) const;
 	double MarkDeg(const FVector& From, const FVector& To) const;

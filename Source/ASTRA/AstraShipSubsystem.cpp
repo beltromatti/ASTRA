@@ -1988,7 +1988,7 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::CaptainContext() const
 	return C;
 }
 
-void UAstraShipSubsystem::Event(const FString& Text, bool bReport)
+void UAstraShipSubsystem::Event(const FString& Text, bool bReport, bool bLog)
 {
 	UE_LOG(LogASTRA, Log, TEXT("[Event]%s %s"), bReport ? TEXT(" (report)") : TEXT(""), *Text);
 	// the comms channel: a hail opens it ("transmission: T-21 — …"), closing it ends it
@@ -2001,10 +2001,13 @@ void UAstraShipSubsystem::Event(const FString& Text, bool bReport)
 	{
 		ChannelParty.Reset();
 	}
-	RecentEvents.Add(Text);
-	if (RecentEvents.Num() > 16)
+	if (bLog)
 	{
-		RecentEvents.RemoveAt(0);
+		RecentEvents.Add(Text);
+		if (RecentEvents.Num() > 16)
+		{
+			RecentEvents.RemoveAt(0);
+		}
 	}
 	OnShipEvent.Broadcast(Text, bReport);
 }

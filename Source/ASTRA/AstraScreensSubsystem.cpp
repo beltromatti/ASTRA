@@ -53,6 +53,20 @@ namespace
 			}
 		}));
 	TAutoConsoleVariable<FString> CVarScreensSkip(TEXT("astra.screens.skip"), TEXT(""), TEXT("Diagnostics: pages never redrawn (comma-separated names, e.g. Master,Tactical)"));
+	// the screens' brightness against the bridge's fixed exposure (EV100 6.6), a multiplier on the Intensity their materials set: at 1 a
+	// wall display was ~22 nits, a tenth of a real one, and a console's touch screen in the sun read as bare glass; x8 (x4 for the hover
+	// panels, which also darken what is behind them) they read like displays in shade and in the sun (seen on the bridge, 4/10)
+	TAutoConsoleVariable<float> CVarScreensGain(TEXT("astra.screens.gain"), 8.f, TEXT("The live screens' brightness: x the Intensity of their material (1 = as the materials set it)"));
+	TAutoConsoleVariable<float> CVarHoloGain(TEXT("astra.screens.hologain"), 4.f, TEXT("The hover panels' brightness: x the Intensity of their material (1 = as the materials set it)"));
+	FAutoConsoleCommandWithWorldAndArgs CmdScreensWhere(TEXT("astra.screens.where"),
+		TEXT("Testing: astra.screens.where [Page] - the surfaces each live page is on (actor, mesh, material slot, where)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* World)
+		{
+			if (UAstraScreensSubsystem* S = World ? World->GetSubsystem<UAstraScreensSubsystem>() : nullptr)
+			{
+				S->LogSurfaces(A.Num() ? A[0] : FString());
+			}
+		}));
 	FLinearColor RGB(uint8 R, uint8 G, uint8 B, float A = 1.f)
 	{
 		FLinearColor C(FColor(R, G, B));
@@ -330,6 +344,9 @@ void UAstraScreensSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 				if (UMaterialInstanceDynamic* MID = SMC->CreateDynamicMaterialInstance(i, M))
 				{
 					MID->SetTextureParameterValue(TEXT("ScreenTexture"), P->Target);
+					float Base = 0.f;
+					MID->GetScalarParameterValue(FMaterialParameterInfo(TEXT("Intensity")), Base);
+					Bound_.Add({MID, Base, MID->GetBlendMode() != BLEND_Opaque, SMC, i, Page});
 					++Bound;
 				}
 			}
@@ -362,6 +379,20 @@ void UAstraScreensSubsystem::Tick(float DeltaTime)
 		if (P->Wait <= 0.f && (!Due || P->Wait < Due->Wait))
 		{
 			Due = P;
+		}
+	}
+	// the brightness the console asks for, when it changes
+	const float Gain = CVarScreensGain.GetValueOnGameThread(), HoloGain = CVarHoloGain.GetValueOnGameThread();
+	if (Gain != AppliedGain || HoloGain != AppliedHoloGain)
+	{
+		AppliedGain = Gain;
+		AppliedHoloGain = HoloGain;
+		for (const FBoundSurface& B : Bound_)
+		{
+			if (UMaterialInstanceDynamic* MID = B.Mid.Get())
+			{
+				MID->SetScalarParameterValue(TEXT("Intensity"), B.BaseIntensity * (B.bHolo ? HoloGain : Gain));
+			}
 		}
 	}
 	TickerWait -= DeltaTime;
@@ -1409,6 +1440,21 @@ void UAstraScreensSubsystem::DrawControls(UCanvas* C, int32 W, int32 H, const FS
 	for (int32 k = 0; k < 2 && k < S->Actions.Num(); ++k)
 	{
 		P.Text(32, Bottom + 60 + k * 22, (TEXT("› ") + S->Actions[S->Actions.Num() - 1 - k]).Left(int32((W - 64) / 8.4f)), true, 14, k == 0 ? CYAN : DIM);
+	}
+}
+
+void UAstraScreensSubsystem::LogSurfaces(const FString& Only) const
+{
+	for (const FBoundSurface& B : Bound_)
+	{
+		const UStaticMeshComponent* SMC = B.Component.Get();
+		if (!SMC || (!Only.IsEmpty() && B.Page != Only))
+		{
+			continue;
+		}
+		UE_LOG(LogASTRA, Display, TEXT("[Screens] %s on %s (%s) slot %d '%s' at %s m, intensity %.0f x %.1f"), *B.Page, *GetNameSafe(SMC->GetOwner()),
+		       *GetNameSafe(SMC->GetStaticMesh()), B.Slot, SMC->GetMaterialSlotNames().IsValidIndex(B.Slot) ? *SMC->GetMaterialSlotNames()[B.Slot].ToString() : TEXT("?"),
+		       *(SMC->GetComponentLocation() / 100.0).ToString(), B.BaseIntensity, B.bHolo ? AppliedHoloGain : AppliedGain);
 	}
 }
 

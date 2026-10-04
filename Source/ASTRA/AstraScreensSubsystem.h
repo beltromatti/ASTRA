@@ -98,4 +98,20 @@ private:
 	void DrawTicker(UCanvas* C, int32 W, int32 H);
 	UPROPERTY() TObjectPtr<UTextureRenderTarget2D> TickerTarget;
 	float TickerWait = 0.f;
+
+	/** Every screen surface bound to a page, with the Intensity its material gave it (astra.screens.gain / hologain scale it). */
+	struct FBoundSurface
+	{
+		TWeakObjectPtr<class UMaterialInstanceDynamic> Mid;
+		float BaseIntensity = 0.f;
+		bool bHolo = false;                       // a hover panel (translucent)
+		TWeakObjectPtr<class UStaticMeshComponent> Component;
+		int32 Slot = INDEX_NONE;
+		FString Page;
+	};
+	TArray<FBoundSurface> Bound_;
+	float AppliedGain = 1.f, AppliedHoloGain = 1.f;     // (the materials' own: the console's gains are applied on the first tick)
+public:
+	/** Testing: the surfaces a page is on (astra.screens.where [Page]). */
+	void LogSurfaces(const FString& Only) const;
 };
