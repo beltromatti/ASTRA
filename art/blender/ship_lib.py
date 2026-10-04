@@ -215,6 +215,17 @@ class SFB(FB):
     def swatch_box(self, lo, hi, color):
         return self.paint(self.box(lo, hi, SWATCH), color)
 
+    def swatch_slab(self, lo, hi, color, sides: bool = True):
+        """The faces of a box that a person can see when it stands on a shelf with its +x face to the room: the front, the top and (`sides`) the two flanks along y; the back, the underside and
+        the ends are never seen. A book or a box of the colour swatch for 4 to 8 triangles instead of 12 (a library has five thousand)."""
+        (x0, y0, z0), (x1, y1, z1) = lo, hi
+        faces = [self.face([(x1, y0, z0), (x1, y1, z0), (x1, y1, z1), (x1, y0, z1)], SWATCH, (1, 0, 0)),
+                 self.face([(x0, y0, z1), (x1, y0, z1), (x1, y1, z1), (x0, y1, z1)], SWATCH, (0, 0, 1))]
+        if sides:
+            faces.append(self.face([(x0, y0, z0), (x1, y0, z0), (x1, y0, z1), (x0, y0, z1)], SWATCH, (0, -1, 0)))
+            faces.append(self.face([(x0, y1, z0), (x1, y1, z0), (x1, y1, z1), (x0, y1, z1)], SWATCH, (0, 1, 0)))
+        return self.paint(faces, color)
+
     def swatch_cyl(self, p0, p1, r: float, color, seg: int = 12, r2: float | None = None):
         return self.paint(self.cyl(p0, p1, r, SWATCH, seg=seg, r2=r2), color)
 

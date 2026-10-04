@@ -11,11 +11,13 @@ import ship_furn3 as N3
 import ship_furniture as F
 import ship_decor as DC
 import ship_plants as PL
+import ship_decor2 as D2
+import ship_surfaces as SU
 import ship_themes as TH
 import ship_furniture2 as G
 import ship_spec as SPEC
 from bridge3_lib import T, frame
-from ship_lib import (CARPET_RUST, CARPET_SAND, CARPET_SLATE, CERAMIC, LEATHER_NAVY, LEATHER_OX, LEATHER_TAN, OAK, TUFT_SAND, WALNUT, WEAVE_RUST, WEAVE_SAND, WEAVE_TEAL, BEDDING, COMPOSITE, CRATE_BLUE, CRATE_GREY, CRATE_OLIVE, CRATE_ORANGE, DECK, DGLASS, FABRIC_GREY, FABRIC_NAVY, FABRIC_RUST,
+from ship_lib import (BRASS, PLASTER_IVORY, CARPET_RUST, CARPET_SAND, CARPET_SLATE, CERAMIC, LEATHER_NAVY, LEATHER_OX, LEATHER_TAN, OAK, TUFT_SAND, WALNUT, WEAVE_RUST, WEAVE_SAND, WEAVE_TEAL, BEDDING, COMPOSITE, CRATE_BLUE, CRATE_GREY, CRATE_OLIVE, CRATE_ORANGE, DECK, DGLASS, FABRIC_GREY, FABRIC_NAVY, FABRIC_RUST,
                       FABRIC_SAND, GLASS, IVORY, LAMINATE, LAMP, LAMP_DIM, LAMP_HOT, LEAF, PAINT_RED, RUBBER, SOIL, STEEL, STRUCT, TILE, TRIM, WOOD,
                       SParts, lamp_strip)
 from ship_rooms import (Style, WF, WS, build_shell, ceiling_panels, luminaire_strips, place, wall_label, window_wall)
@@ -166,11 +168,30 @@ def games(name: str = "SM_SHIP_Games"):
 
 
 # ------------------------------------------------------------------------------------------------------------------ library
+def _library_floor(b: SParts, spec: dict, st, rng) -> None:
+    """The library's floor: oak planks the long way down the room, a brass line round the central hall (the shelves stand outside it)."""
+    L, D = spec["L"], spec["D"]
+    SU.planks(b, 0.0, L, 0.0, D, OAK, 0.17, 2.0, "x", seed=5)
+    SU.border_line(b, 0.95, L - 0.95, 0.95, D - 0.95, 0.02, BRASS)
+    SU.border_line(b, 1.1, L - 1.1, 1.1, D - 1.1, 0.008, BRASS)
+
+
+def _library_ceiling(b: SParts, spec: dict, st, rng) -> None:
+    """The library's ceiling: a plaster soffit with oak beams every 4 m both ways (sixteen coffers, each with its lit panel in a brushed rim), a lit line round the foot of the walls."""
+    L, D, H = spec["L"], spec["D"], spec["h"]
+    zc = H - 0.05
+    b.body.box((WS + WF, WF, zc), (L - WS - WF, D - WS - WF, H), PLASTER_IVORY)
+    SU.coffers(b, spec, (4.0, 8.0, 12.0), (4.0, 8.0, 12.0), zc, OAK, 0.22, 0.24, "white_warm", 0.95)
+    b.emit.lamp_box((WS + WF + 0.02, WF + 0.02, zc - 0.012), (L - WS - WF - 0.02, WF + 0.05, zc - 0.006), "warm_dim", LAMP_DIM)
+
+
 def library(name: str = "SM_SHIP_Library"):
+    """16 x 16 x 3.6: the library — shelves of books on three walls, an oak plank floor with a brass line round the central hall and three rugs (a big one under the reading table, a small
+    one in the armchair nook, a runner from the door), a coffered ceiling, the reading table with its four chairs, its lamps and an open book, the nook with its armchair, a side table and a
+    floor lamp, a second armchair by the door side, the librarian's desk by the door with a terminal. The places are those of ship_spec (the table's chairs, the nook, the desk)."""
     spec, L, D, H = _dims("library")
     b = SParts(bevel=0.005, fine_bevel=0.003)
-    st = Style(floor=FABRIC_GREY, floor_mode="covering", seams=False, wall_lo=WOOD, wall_hi=COMPOSITE, wain_h=0.9, ceil=COMPOSITE, accent="warm_dim",
-               cove="warm_dim", ribs=False, skirt=WOOD)
+    st = TH.living(wall_pattern=("slats", "panel", "cloth", "slats"), floor_fn=_library_floor, ceiling_fn=_library_ceiling)
     build_shell(b, spec, st)
     yf = D - WS - WF
     xl, xr = WS + WF + 0.17, L - WS - WF - 0.17
@@ -180,6 +201,10 @@ def library(name: str = "SM_SHIP_Library"):
         place(b, xr, 1.95 + 2.9 * k, 180, F.shelf, 2.9, 0.34, 2.6, 7, WOOD, True, 21 + k, True)
     for k in range(5):
         place(b, 1.9 + 2.85 * k, yf - 0.17, -90, F.shelf, 2.8, 0.34, 2.6, 7, WOOD, True, 31 + k, True)
+    # the rugs: a big one under the reading table, a small one in the nook, a runner from the door
+    place(b, 6.5, 9.0, 0, SU.rug_ornate, 4.6, 3.1, CARPET_RUST, CARPET_SLATE, ("navy", "cream", "mustard"), 3)
+    place(b, 11.0, 5.5, 0, SU.rug_ornate, 2.8, 2.1, CARPET_SLATE, CARPET_SAND, ("oxblood", "cream", "teal"), 5, 0.16)
+    place(b, 6.0, 3.95, 90, SU.rug_ornate, 7.1, 1.15, CARPET_SLATE, CARPET_SAND, ("oxblood", "cream", "mustard"), 7, 0.14, 0.014, "chain")
     # the reading table: four chairs, a lamp, an open book; a pendant bar above
     place(b, 6.5, 9.0, 0, F.table, 3.0, 0.9, 0.74, WOOD, TRIM, False)
     for x in (5.0, 8.0):
@@ -199,7 +224,23 @@ def library(name: str = "SM_SHIP_Library"):
     place(b, 14.4, 3.0, 0, F.monitor, 0.5, 0.3, "scr_dir", False, z=0.75)
     place(b, 15.4, 4.2, -100, F.chair, FABRIC_GREY)                                                  # the librarian's chair is pushed aside: she stands at the desk (the place at 13.15, 3.0)
     place(b, 10.0, 12.2, 0, F.potted_plant, 1.3, 7)
-    ceiling_panels(b, L, D, H, 3, 3, "white_warm", 2.2, 0.5, 0.5, LAMP)
+    # the table's lamps and what is on it, the globe, the card catalogues, the ladder, the ship's model on its plinth, a second corner for reading
+    for k, (dx, yaw_) in enumerate(((-1.0, 90.0), (1.0, -90.0))):
+        place(b, 6.5 + dx, 9.0, yaw_, D2.banker_lamp, z=0.74)
+    place(b, 7.6, 9.2, 15, DC.book_stack, 3, 11, z=0.74)
+    place(b, 6.2, 8.75, 0, DC.mug, CERAMIC, z=0.74)
+    place(b, 2.6, 9.4, 40, D2.globe, 0.22, 3)
+    place(b, xl + 0.52, 12.3, 0, D2.library_ladder, 2.6, 0.32, 0.42)
+    for k, x in enumerate((1.6, 3.0)):
+        place(b, x, WF + 0.26, 90, D2.card_catalog, 1.2, 0.5, 1.05, 5, 20 + k)
+    top = 0.95
+    place(b, 9.4, 12.9, 90, D2.plinth, 0.7, 0.5, top)
+    place(b, 9.4, 12.9, 90, N3.ship_model, 0.62, z=top)
+    place(b, 12.6, 11.6, 0, DC.rug, 3.0, 2.4, CARPET_SLATE, CARPET_SAND)
+    place(b, 12.0, 11.0, -45, F.armchair, FABRIC_NAVY)
+    place(b, 13.4, 12.4, 135, F.armchair, FABRIC_RUST)
+    place(b, 12.7, 11.8, 0, F.low_table, 0.55, 0.55, 0.45, WOOD)
+    place(b, 14.1, 10.8, 0, F.lamp_standard, 1.5)
     return b.build(name)
 
 

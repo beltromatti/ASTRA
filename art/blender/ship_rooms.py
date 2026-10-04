@@ -28,7 +28,8 @@ class Style:
     ARTE-INTERNI (`v2`, the default; ship_shell.py): `floor2` / `border` / `inlay` = a border of a second finish round the floor with a lit line between; `wall_acc` (cloth) + `wall_slat` + `wall_pattern`
     = the materials and the order of the treatments of the wall bays (panel, cloth, slats, perf); `bay` = the target width of a bay (m); `wall_wash` = a slot of light on every pilaster;
     `ceiling` = bands | cove | grid | exposed | flat; `light_cell` = the colour of the ceiling's luminous parts; `downlights`, `bands` (how many) or `band_ys` (where), `band_w`, `beam_pitch`, `beam_light`, `baseboard_light` (a dim strip of the accent colour at skirting height: the department's colour at your feet), `bay_edges` (a wall's name -> the positions of its pilasters along the wall, when the
-    bays must stand where the room's furniture does: the Medbay's bed bays)."""
+    bays must stand where the room's furniture does: the Medbay's bed bays). ARTE-INTERNI-2: `ceiling` may also be `none` (only the deck above: the room builds its own, ship_surfaces.py),
+    `floor_fn` / `ceiling_fn` = a function (b, spec, st, rng) that builds the whole floor covering / the whole ceiling instead of the modes (a floor of planks or tiles, a coffered or girdered ceiling)."""
 
     def __init__(self, floor: str = DECK, floor_mode: str = "plates", wall_lo: str = COMPOSITE, wall_hi: str = COMPOSITE, trim: str = TRIM,
                  ceil: str = COMPOSITE, accent: str = "cool_dim", strip: str = "white_cool", wain_h: float = 1.05, ribs: bool = True,
@@ -36,7 +37,7 @@ class Style:
                  seams: bool = True, cove_on: bool = True, v2: bool = True, floor2: str | None = None, border: float = 0.0, inlay: str | None = None,
                  wall_acc: str = COMPOSITE, wall_slat: str = "MI_SHIP_Oak", wall_pattern: tuple | None = None, bay: float = 2.0, wall_wash: bool = True, ceiling: str = "bands",
                  light_cell: str | None = None, downlights: bool = True, bands: int = 0, beam_light: bool = True, band_ys: tuple | None = None, band_w: float = 0.42,
-                 beam_pitch: float = 4.0, baseboard_light: bool = False, bay_edges: dict | None = None) -> None:
+                 beam_pitch: float = 4.0, baseboard_light: bool = False, bay_edges: dict | None = None, floor_fn=None, ceiling_fn=None) -> None:
         self.__dict__.update(locals())
         del self.__dict__["self"]
         if self.light_cell is None:

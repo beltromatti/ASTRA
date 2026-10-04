@@ -28,6 +28,9 @@ def floor_v2(b: SParts, spec: dict, st, rng: random.Random, floor_t: float, plat
     L, D = spec["L"], spec["D"]
     fb, fine, em = b.body, b.fine, b.emit
     fb.box((0.0, 0.0, -floor_t), (L, D, -0.012), STRUCT)
+    if getattr(st, "floor_fn", None) is not None:                                           # ARTE-INTERNI-2: the room lays its own floor (planks, tiles, zones: ship_surfaces.py)
+        st.floor_fn(b, spec, st, rng)
+        return
     if st.floor_mode == "plates":
         rows = int(D // 1.0)
         for j in range(rows):
@@ -235,6 +238,9 @@ def ceiling_v2(b: SParts, spec: dict, st, rng: random.Random, ceil_t: float) -> 
     L, D, H = spec["L"], spec["D"], spec["h"]
     fb, fine, em = b.body, b.fine, b.emit
     fb.box((0.0, 0.0, H), (L, D, H + ceil_t), STRUCT)                                    # the deck above
+    if getattr(st, "ceiling_fn", None) is not None:                                      # ARTE-INTERNI-2: the room builds its own ceiling (coffers, girders, clouds: ship_surfaces.py)
+        st.ceiling_fn(b, spec, st, rng)
+        return
     x0, x1, y0, y1 = WS + WF, L - WS - WF, FIN + WF, D - WS - WF
     mode = st.ceiling
     cell = st.light_cell
@@ -299,7 +305,9 @@ def ceiling_v2(b: SParts, spec: dict, st, rng: random.Random, ceil_t: float) -> 
                     fine.box((xb - 0.32, yc - 0.01, H - 0.05 - 0.2), (xb - 0.3, yc + 0.01, H - 0.05), TRIM)
     elif mode == "flat":
         fb.box((x0, y0, H - 0.05), (x1, y1, H), st.ceil)
-    else:                                                                                  # bands (the default): luminous bands between the beams, downlights between the bands
+    elif mode == "none":                                                                   # ARTE-INTERNI-2: only the deck above; the room builds its own ceiling (ship_surfaces.py)
+        pass
+    else:                                                                               # bands (the default): luminous bands between the beams, downlights between the bands
         fb.box((x0, y0, H - 0.05), (x1, y1, H - 0.05 + 0.001), st.ceil)
         tile_joints(b, spec, st, 1.2)
         beams(b, spec, st, beam_xs, 0.16)
