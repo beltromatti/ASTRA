@@ -323,11 +323,45 @@ Per ponte (triangoli delle sole stanze, mesh distinte, prima → dopo; il resto 
 
 **Limiti e cose da guardare nel gioco**
 - **Non provato in Unreal** (l'editor è del lead): l'importazione delle texture, le istanze, le mesh Nanite con 40 e più slot (`lounge`), la resa di prato, muschio e foglie a due facce sotto Lumen, le luci attori delle stanze M1 (hanno più luce di prima: se una stanza costa troppo, le manopole sono i numeri in `build_*.py`; se il locale è troppo chiaro o scuro, `LIGHT_LEVEL`).
-- **Restano com'erano** (generatori vecchi, non toccati): le cuccette `SM_BERTH_Stack_*` (12–13 k triangoli l'una, 28 per sala: sono quasi tutti i ~390 k triangoli del Crew Berthing, e il primo candidato a un rifacimento più leggero e più bello), `SM_MED_Bed` e le coperte dei pazienti, gli armadietti; i loro materiali `MI_MED_*`, `MI_MESS_*`, `MI_BERTH_*`, `MI_ENG_*` sono del progetto (nelle anteprime offline escono bianchi: nel gioco avranno i colori che hanno sempre avuto).
-- **Rifinite meno** (guscio v2, tema, materiali e luce nuovi, arredo dei generatori precedenti salvo dove detto): CIC, briefing, comunicazioni, uffici (solo sedia e postazione), archivi, laboratori, officine, impianti, armeria, poligono, sale volo, depositi, brig, teletrasporto, hangar delle navette, capsule di salvataggio, camere stagne. Sono il prossimo lavoro naturale.
+- **Restavano com'erano** (generatori vecchi, non toccati; **rifatti il 4/10, §10.5**): le cuccette `SM_BERTH_Stack_*` (12–13 k triangoli l'una, 28 per sala: quasi tutti i ~390 k triangoli del Crew Berthing), `SM_MED_Bed` e le coperte dei pazienti, gli armadietti; i materiali `MI_MED_*`, `MI_MESS_*`, `MI_BERTH_*`, `MI_ENG_*` restano del progetto per ciò che non è stato rifatto (nelle anteprime offline escono bianchi).
+- **Rifinite meno** (guscio v2, tema, materiali e luce nuovi, arredo dei generatori precedenti salvo dove detto; **dal 4/10 restano così solo le sale di comando, i laboratori, le officine, gli impianti, l'armeria, il poligono e le sale volo: §10.5**): CIC, briefing, comunicazioni, uffici (solo sedia e postazione), archivi, laboratori, officine, impianti, armeria, poligono, sale volo, brig, teletrasporto, hangar delle navette, capsule di salvataggio. Sono il prossimo lavoro naturale.
 - Le sale grandi dell'era M1 non sono mesh del kit: il controllo dei 150 k triangoli per mesh non le riguarda (`SM_HGR_Detail` ne ha 168 k).
 
 **Ricostruire** (nell'ordine; i primi due solo la prima volta e quando cambiano le texture): `interior_textures.py` e `polyhaven_models.py --all` (§1) → `ship_plan_gen.py` (il piano porta le luci e i posti nuovi) → `ship_kit.py` (FBX in `art/export/ship`) → `tools/ue.py pyfile tools/ue_scripts/build_ship_interior.py` (importa il kit, fa le istanze `MI_SHIP_*` da `room_materials.json`, rimette i ponti) → le cinque M1: generatore Blender e `build_<stanza>.py` (§1).
+
+### 10.5 L'arte degli interni, secondo giro (ARTE-INTERNI-2, 4/10)
+
+Riparte da ciò che il Capitano ha visto in gioco dopo il primo giro: il giardino con un «cielo aperto» (un piano blu-grigio), la biblioteca con un pavimento liscio sotto scaffali ricchi, le cabine con un muro subito davanti, e le stanze rimaste «meno rifinite». Anteprime guardate (altezza degli occhi, 1,68 m): `docs/progressi/interni_2026-10-04/`.
+
+**Fatto**
+
+| Cosa | Come |
+|---|---|
+| Giardini (`garden`) | soffitto vero (`ceiling="none"` più capriate ogni 4 m, cielo di pixel in cornici sopra il sentiero, che si legge come schermo, luci di crescita sopra le aiuole, irrigazione, condotto), tre lampade del piano (luce del sentiero e due di crescita: `ship_spec.py`, piano rigenerato), aiuole con piante leggere: 136 k → 110 k triangoli |
+| Biblioteca | pavimento di doghe di rovere con filetti d'ottone e tre tappeti, soffitto a cassettoni, mappamondo, scala, schedari, plinto con il modello della nave; libri a 4–8 triangoli (`SFB.swatch_slab`): 147 k → 87 k |
+| Salotto, giochi, osservatorio, Bow Observation | pavimenti di doghe e tessere (caffè a scacchiera di terrazzo, tessere nere), nuvole acustiche, tappeti; Bow Observation arredato (rosa dei venti in pietra e ottone, tavolo stellare, bar, salotti, cielo di stelle con anello di luce): 104 k → 69 k |
+| Cabine, stanze, suite | l'ingresso delle suite non è più un muro vuoto; oggetti personali in ogni cabina (foto, poltrona, lampada, mensola; chitarra o medaglie) |
+| Barbiere e sartoria | scacchiera, palo, poltrone di pelle, lavaggio, caschi, bottiglie, stoffe, manichini, specchio a tre ante |
+| Camere stagne e tute | tute EVA vere (busto rigido, cuscinetti, soffietti, zaino, casco con visiera) al posto dei manichini a scatole |
+| Depositi | merce vera: cartoni con nastro ed etichetta, ceste, sacchi, latte, valigie, fusti, bombole, bancali (`ship_stock.py`) |
+| Crew Berthing | `SM_BERTH_Stack_A/B/C` rifatte nel linguaggio del kit (montanti, piani, fiancate, tasca a rete con libro e foto, luce di lettura, targhetta, materasso, coperta, cuscino, tende a pieghe vere color ruggine: la Red watch; cassetto sotto): **4,1–4,3 k triangoli l'una, prima 12,5 k**; stesso frame e stesse altezze (materasso a +0,2 m sul piano: i sette dormienti di `build_berths.py` e le cuccette di `life.py` restano dove sono); armadietti `SM_BERTH_Lockers` (0,6 k) con prese d'aria forate, numero e spia. Il colore delle tende è la costante `CURTAIN` di `ship_berth_racks.py` |
+| Medbay | `SM_MED_Bed` rifatto (`ship_med_bed.py`: 2,4 k, prima 4,6 k): piano in due sezioni con lo schienale a 20°, materasso e cuscino, testiera e pediera, sponde, asta della flebo con sacca e pompa, unità di testaletto (prese dei gas, luce, targhetta) e monitor su braccio **nello stesso rettangolo** che `SM_MED_Vitals` copre; coperte dei pazienti nei tessuti del kit e a metà dei triangoli (6,2 k, prima 11,7 k) |
+| Quarantine | il letto d'isolamento del kit (`ship_furn4.hospital_bed`) aveva lo schienale che calava verso la testa: ora sale |
+
+**Ganci nuovi** (opt-in: una stanza cambia solo se la scelgo): `Style(floor_fn=, ceiling_fn=, floor_grid=, floor_guide=)` e `ceiling="none"` in `ship_shell.py` e `ship_rooms.py`; pavimenti di doghe, tessere e a zone, tappeti ornati, cassettoni, nuvole, capriate e schermi di cielo in `ship_surfaces.py`; griglia dei giunti e linee guida dipinte nei temi comando, equipaggio, medico e laboratorio (`ship_themes.py`).
+
+**Costo** (kit completo, `ship_measure.py` e `ship_cost.py`; «prima» = la base del 3/10, tutte le cifre sulle mesh distinte di ogni ponte): triangoli delle sole stanze **13,03 M → 10,18 M (−22 %)**; l'intero kit (446 mesh) da 6,61 M a **5,42 M**; la stanza più pesante 149 k → 131 k (`hydro`; poi `cabins` 131 k e `staterooms` 130 k: il limite è 150 k); slot 5 284 → 5 177; set di texture per ponte da −1 a −4 (stima a 2,67 MB il set: il Ponte 4 da 80 a 69 MB). Per ponte (M di triangoli): 2 0,84 → 0,69 · 3 1,06 → 0,79 · 4 1,98 → 1,47 · 5 1,43 → 1,12 · 6 1,71 → 1,30 · 7 1,32 → 0,99 · 8 1,68 → 1,31 · 9 1,38 → 1,15 · 10 0,50 → 0,41 · 11 0,76 → 0,66 · 12 0,29 → 0,25. Come:
+1. **la minuteria delle stanze (gruppo `fine`) non è più smussata** (`SParts.FINE_DIET`, acceso da `ship_kit.build_mesh` solo per le stanze; ombreggiatura liscia per angolo): 12 triangoli a scatola invece di 44, 28 a un'asticella invece di 92, −19 % dei triangoli del kit con lo stesso aspetto da un metro in su;
+2. **piante leggere** (alberi, vasi e aiuole a metà dei triangoli o meno: stesso aspetto da un metro in su), vasi torniti nel gruppo morbido, **niente più antúrio, ficus e zebrata** (la pianta da scrivania è un singonio piccolo): tre set di texture e tre slot in meno in ogni ponte che li usava;
+3. cuccette, armadietti, letti e coperte come sopra.
+
+Gli slot restano alti nel `lounge` (44) e in `games` (40): l'unione dei materiali quasi uguali (bianchi) non è stata fatta, i legni (`Wood`, `Walnut`) sono davvero diversi.
+
+**Strumenti nuovi** (`art/blender/`): `ship_measure.py` (triangoli, slot e firma geometrica di ogni mesh: `-- --json out.json [--only A,B]`), `ship_cost.py` (prima/dopo per ponte, firme cambiate), `ship_profile.py` (dove vanno i triangoli di una stanza, funzione per funzione), `ship_industrial.py` (tubi con colori di servizio, valvole, manometri, passerelle, copricavi, corsie, scarichi, avvolgitubo, lavaocchi: provato in una scena, **non ancora usato da nessuna stanza**).
+
+**Resta** (indagine con anteprime il 4/10, nessuna modifica): le stanze di comando (CIC, briefing, comunicazioni, uffici, archivi: pavimenti piatti, poco in mezzo alla sala), le officine, gli impianti e i macchinari (grandi sale scure con poche macchine e il pavimento piatto: servono tubi tra le macchine, passerelle, corsie e pezzi grandi più dettagliati: serbatoi, pompe, torni, armadi), l'armeria e il poligono, le sale volo; e **le stanze di servizio più ripetute** (Technical Space ×113, depositi di sezione ×125, spogliatoi ×98, stazioni DC ×65: armadietti neri, sale spoglie). `ship_industrial.py` è pensato per queste.
+
+**Ricostruire** (il piano è già rigenerato e nel ramo; 93 stanze hanno una firma diversa): `ship_kit.py` (FBX in `art/export/ship`) → `berths.py -- art/export/berths` e `medbay.py -- art/export/medbay` (cuccette, armadietti, letto, coperte) → nell'editor `build_berths.py` e `build_medbay.py`, poi `build_ship_interior.py` (importa solo gli FBX cambiati; crea `MI_SHIP_TileBlack` da `room_materials.json`).
 
 ## 11. Il gioco: cosa legge il piano
 

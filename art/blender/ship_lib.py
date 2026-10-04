@@ -258,7 +258,7 @@ class SParts(L.Parts):
                 fb.bm.free()
                 continue
             o = fb.to_object(f"{name}_{tag}")
-            lean = tag == "fine" and (self.FINE_DIET or bev <= 0)       # small hardware without a bevel: its round parts still shade round
+            lean = tag == "fine" and self.FINE_DIET                     # the rooms' small hardware has no bevel: its round parts still shade round (the other meshes are left as they were)
             if bev > 0 and not lean:
                 A.bevel_and_normals(o, width=bev, segments=self.BEVEL_SEGMENTS.get(tag, 2), angle_deg=self.angle)
             A.box_uv(o, texel_m=uv_meter)
