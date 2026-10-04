@@ -500,6 +500,8 @@ if OPEN_BRIDGE_LIFT:
     open_bridge_lift_housing()
 if BUILD_MAPS:
     wire_streaming(world, DECKS)                                          # last: the persistent level is still the current level for the actors above
+# adding the decks as streaming levels made the last one current: what the next script spawns would be saved into that deck (3 Oct: L_Deck12)
+unreal.get_editor_subsystem(unreal.LevelEditorSubsystem).set_current_level_by_name("L_Bridge")
 if SAVE_LEVEL:
     saved = unreal.EditorLoadingAndSavingUtils.save_map(world, LEVEL)
     saved_rest = unreal.EditorLoadingAndSavingUtils.save_dirty_packages(True, True)     # the actors' own files (one file per actor) and the assets

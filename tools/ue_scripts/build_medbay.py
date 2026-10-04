@@ -12,6 +12,13 @@ import sys
 
 import unreal
 
+# the actors go into L_Bridge's own persistent level, whatever level the editor had current: after build_ship_interior.py it was a deck's streamed
+# sub-level, and the five existing rooms were saved into L_Deck12, which the game never loads around them (3 Oct: the Mess Hall was not there)
+if unreal.EditorLevelLibrary.get_editor_world().get_outermost().get_name() != "/Game/ASTRA/Maps/L_Bridge":
+    unreal.EditorLoadingAndSavingUtils.load_map("/Game/ASTRA/Maps/L_Bridge")
+if not unreal.get_editor_subsystem(unreal.LevelEditorSubsystem).set_current_level_by_name("L_Bridge"):
+    raise RuntimeError("L_Bridge cannot be made the current level")
+
 ROOT = "/Users/beltromatti/Desktop/ASTRA"
 KIT = "/Game/ASTRA/Kit/Medbay"
 MI_DIR = "/Game/ASTRA/Materials/Instances"

@@ -3,6 +3,8 @@
 #include "RenderTimer.h"
 #include "DynamicResolutionState.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/StaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
 #include "GameFramework/Character.h"
 #include "ASTRA.h"
 #include "ASTRACharacter.h"
@@ -245,8 +247,8 @@ void UAstraHarness::Initialize(FSubsystemCollectionBase& Collection)
 	});
 	Bind(TEXT("/find"), EVerb::VERB_POST, [this](const TSharedPtr<FJsonObject>& B, const FHttpServerRequest&)
 	{
-		// the actors whose tag, name or class holds the words (any case), nearest the Captain first: where things are, for a
-		// test's route (the Falcons of Alpha: "ASTRA.Hangar.alpha")
+		// the actors whose tag, name, class or static mesh holds the words (any case), nearest the Captain first: where things are, for a
+		// test's route (the Falcons of Alpha: "ASTRA.Hangar.alpha"), and whether they are drawn and solid (a room that the game shows nothing of)
 		const FString Q = B->GetStringField(TEXT("q"));
 		APlayerController* P = PC();
 		UWorld* W = P ? P->GetWorld() : nullptr;
@@ -259,6 +261,10 @@ void UAstraHarness::Initialize(FSubsystemCollectionBase& Collection)
 			for (const FName& T : A->Tags)
 			{
 				bMatch |= T.ToString().Contains(Q);
+			}
+			if (const UStaticMeshComponent* SMC = !bMatch ? A->FindComponentByClass<UStaticMeshComponent>() : nullptr)
+			{
+				bMatch = SMC->GetStaticMesh() && SMC->GetStaticMesh()->GetName().Contains(Q);
 			}
 			if (bMatch)
 			{
@@ -284,6 +290,12 @@ void UAstraHarness::Initialize(FSubsystemCollectionBase& Collection)
 			                                 MakeShared<FJsonValueNumber>(FMath::RoundToDouble(L.Y * 100.0) / 100.0),
 			                                 MakeShared<FJsonValueNumber>(FMath::RoundToDouble(L.Z * 100.0) / 100.0)});
 			O->SetNumberField(TEXT("dist_m"), FMath::RoundToDouble(Hits[i].Key * 10.0) / 10.0);
+			if (const UStaticMeshComponent* SMC = A->FindComponentByClass<UStaticMeshComponent>())
+			{
+				O->SetStringField(TEXT("mesh"), SMC->GetStaticMesh() ? SMC->GetStaticMesh()->GetName() : TEXT("(none)"));
+				O->SetBoolField(TEXT("drawn"), !A->IsHidden() && SMC->IsVisible() && SMC->IsRegistered() && SMC->SceneProxy != nullptr);
+				O->SetStringField(TEXT("collision"), SMC->IsCollisionEnabled() ? (SMC->GetStaticMesh() && SMC->GetStaticMesh()->GetBodySetup() ? TEXT("on") : TEXT("on, no body")) : TEXT("off"));
+			}
 			Out.Add(MakeShared<FJsonValueObject>(O));
 		}
 		TSharedRef<FJsonObject> R = MakeShared<FJsonObject>();
