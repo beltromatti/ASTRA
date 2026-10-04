@@ -161,34 +161,46 @@ void UAstraSpaceLife::HandOver(double Now)
 	UAstraWarFX* Fx = Owner ? Owner->WarFX.Get() : nullptr;
 	for (FSite& S : Wrecks.SitesMutable())
 	{
-		if (Now - S.DiedAt < FWrecks::HandOverS || S.System != SystemKey)
+		if (S.System != SystemKey)
 		{
 			continue;
 		}
+		const double Age = Now - S.DiedAt;
 		for (FPieceRec& P : S.Pieces)
 		{
 			if (!P.bInFx || P.Section > 2)
 			{
 				continue;                                              // (a whole hull the war's older explosion left stays its own until the system is left)
 			}
+			const AstraFx::FPiece* Held = nullptr;
 			if (Fx)
 			{
-				// from where the effects have it now: what the player has seen goes on without a jump
 				for (const AstraFx::FPiece& FP : Fx->GetPieces())
 				{
 					if (FP.ShipId == S.ShipId && FP.Section == P.Section)
 					{
-						Wrecks.ReAnchor(S, P, Now, Sky, FP.Pivot, FP.Vel, FP.Att, FP.SpinAxis, FP.SpinRate);
+						Held = &FP;
 						break;
 					}
 				}
-				Fx->ReleasePiece(S.ShipId, P.Section);
 			}
-			if (P.bInFx)
+			if (Held && Age < FWrecks::HandOverS)
 			{
-				P.bInFx = false;                                       // (the effects no longer held it: its own arithmetic carries it)
-				S.bDirty = true;
+				continue;                                              // still theirs: burning at the cut, the windows going out
 			}
+			if (!Held && Age < 1.0)
+			{
+				continue;                                              // (made in this very frame)
+			}
+			if (Held)
+			{
+				// from where the effects have it now: what the player has seen goes on without a jump
+				Wrecks.ReAnchor(S, P, Now, Sky, Held->Pivot, Held->Vel, Held->Att, Held->SpinAxis, Held->SpinRate);
+				Fx->ReleasePiece(S.ShipId, P.Section);                 // (Held is gone from here on)
+			}
+			// else: the effects let it go sooner (their cap on pieces gives the oldest up when many ships break at once): its own arithmetic carries it from where it began
+			P.bInFx = false;
+			S.bDirty = true;
 		}
 	}
 }
@@ -605,6 +617,44 @@ FString UAstraSpaceLife::WreckStat() const
 	                       PodsNow, EmbersNow, TickCount ? WrecksMs / TickCount : 0.0);
 }
 
+bool UAstraSpaceLife::DebugResume(FString& OutDetail)
+{
+	if (!Owner || Owner->Ships.Num() == 0 || !bLaidOut)
+	{
+		OutDetail = TEXT("no system laid out to resume from");
+		return false;
+	}
+	// the wrecks of every system as they are, in the Gate's frame: what must be where it was after the resume
+	ResumeProbe.Reset();
+	ResumeClock = WreckClock();
+	for (const FSite& S : Wrecks.Sites())
+	{
+		for (int32 pi = 0; pi < S.Pieces.Num() && pi < 50; ++pi)
+		{
+			ResumeProbe.Add({S.Id * 100 + pi, FWrecks::PosAt(S.Pieces[pi], ResumeClock)});
+		}
+		for (int32 qi = 0; qi < S.Pods.Num() && qi < 49; ++qi)
+		{
+			ResumeProbe.Add({S.Id * 100 + 50 + qi, FWrecks::PosAt(S.Pods[qi], ResumeClock)});
+		}
+	}
+	// the save as the campaign writes it (text), and a resume from it as the campaign does it
+	FString Text;
+	const TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> Wr = TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>::Create(&Text);
+	FJsonSerializer::Serialize(Owner->SaveJson(), Wr);
+	TSharedPtr<FJsonObject> Back;
+	if (!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), Back) || !Back.IsValid())
+	{
+		ResumeProbe.Reset();
+		OutDetail = TEXT("the save did not read back");
+		return false;
+	}
+	bResumeProbe = true;
+	Owner->ResumeFrom(Back);
+	OutDetail = FString::Printf(TEXT("resumed from a save of %.1f KB: the plot is cleared, the system is laid out again in a frame or two"), Text.Len() / 1024.0);
+	return true;
+}
+
 bool UAstraSpaceLife::DebugLose(const FString& Which, const FString& How, int32 Section, FString& OutDetail)
 {
 	if (!Owner || Owner->Ships.Num() == 0)
@@ -724,6 +774,16 @@ namespace
 			}
 			UE_LOG(LogASTRA, Display, TEXT("[Space] wrecks round trip: %s, %d sites, %.1f KB; the objects %.2f ms (the sites that have not changed are kept), the text %.2f ms, read back %.2f ms"), bSame ? TEXT("SAME") : TEXT("DIFFERENT"),
 			       S->GetWrecks().Sites().Num(), Text.Len() / 1024.0, (Tj - T0) * 1000.0, (T1 - Tj) * 1000.0, (T2 - T1) * 1000.0);
+		}));
+
+	FAutoConsoleCommandWithWorld CmdSpaceWrecksResume(TEXT("astra.space.wrecks.resume"), TEXT("TESTING, destructive: resume the battle from its own save as the campaign does (the plot is cleared, a new Gate); the log then says whether every wreck is where it was"),
+		FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* W)
+		{
+			UAstraSpaceLife* S = WreckSpaceOf(W);
+			if (!S) { return; }
+			FString Detail;
+			S->DebugResume(Detail);
+			UE_LOG(LogASTRA, Display, TEXT("[Space] %s"), *Detail);
 		}));
 
 	FAutoConsoleCommandWithWorld CmdSpaceWrecksReset(TEXT("astra.space.wrecks.reset"), TEXT("Forget every wreck of every system (a new war)"),

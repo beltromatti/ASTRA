@@ -128,6 +128,9 @@ public:
 	bool DebugLose(const FString& Which, const FString& How, int32 Section, FString& OutDetail);
 	/** What the war has left, in a line: the sites, the lifepods, what is drawn and what it costs. */
 	FString WreckStat() const;
+	/** Testing: a real resume of the campaign from the battle's own save (the plot is cleared, the Gate stands in a new place, the system is laid out afresh); once it is, the log says whether every
+	 *  wreck is where it was relative to the Gate (astra.space.wrecks.resume). */
+	bool DebugResume(FString& OutDetail);
 
 	const AstraSpace::FLayout& GetLayout() const { return Layout; }
 	const AstraSpace::FTraffic& GetTraffic() const { return Traffic; }
@@ -201,6 +204,9 @@ private:
 	float WreckThinkT = 0.f, WreckPruneT = 30.f;
 	int32 WreckHullsNow = 0, ChunksNow = 0, PodsNow = 0, EmbersNow = 0, WreckHullsPeak = 0, ChunksPeak = 0;
 	double WrecksMs = 0.0;
+	bool bResumeProbe = false;                    // a resume is under way (DebugResume): the wrecks as they were, in the Gate's frame, to be compared once the system is laid out again
+	TArray<TPair<int32, FVector>> ResumeProbe;    // (site id and piece index folded in: one entry for each piece and pod)
+	double ResumeClock = 0.0;
 
 	// ---- cost
 	double TickMs = 0.0, TickMsMax = 0.0;

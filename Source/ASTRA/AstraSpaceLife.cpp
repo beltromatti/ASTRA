@@ -548,6 +548,28 @@ void UAstraSpaceLife::Tick(float SimDt, float RealDt)
 	{
 		return;
 	}
+	if (bResumeProbe)
+	{
+		// the system is laid out again after a resume (DebugResume): is every wreck where it was, relative to the Gate?
+		bResumeProbe = false;
+		double Farthest = 0.0;
+		int32 Missing = 0;
+		for (const TPair<int32, FVector>& P : ResumeProbe)
+		{
+			const AstraSpace::FSite* S = Wrecks.FindById(P.Key / 100);
+			const int32 K = P.Key % 100;
+			if (!S || (K < 50 ? !S->Pieces.IsValidIndex(K) : !S->Pods.IsValidIndex(K - 50)))
+			{
+				++Missing;
+				continue;
+			}
+			const FVector Now = K < 50 ? AstraSpace::FWrecks::PosAt(S->Pieces[K], ResumeClock) : AstraSpace::FWrecks::PosAt(S->Pods[K - 50], ResumeClock);
+			Farthest = FMath::Max(Farthest, FVector::Dist(Now, P.Value));
+		}
+		UE_LOG(LogASTRA, Display, TEXT("[Space] resume check: %s — %d parts of wrecks compared, the farthest is %.2f m from where it was in the Gate's frame, %d missing, the clock moved %+.2f s"),
+		       Missing == 0 && Farthest < 1.0 ? TEXT("SAME") : TEXT("DIFFERENT"), ResumeProbe.Num(), Farthest, Missing, WreckClock() - ResumeClock);
+		ResumeProbe.Reset();
+	}
 	if ((HostileScanT -= Dt) <= 0.0)
 	{
 		HostileScanT = 0.25;

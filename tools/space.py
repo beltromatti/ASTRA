@@ -255,6 +255,15 @@ def cmd_test(a: argparse.Namespace) -> int:
         expect("the rescue is told and counted", len(rescued) >= 1 and fin["pods_recovered"] >= 1 and fin["rescued"] >= 1, f"{fin['pods_recovered']} lifepods, {fin['rescued']} people taken aboard", results)
         expect("the file reads back as it was", "wrecks round trip: SAME" in text, "astra.space.wrecks.roundtrip", results)
         expect("the wrecks are cheap", fin["wreck_ms_avg"] < 0.05, f"{fin['wreck_ms_avg'] * 1000:.1f} us a tick", results)
+    print("-- the campaign's save and a resume in the middle: every wreck where it was, relative to the (new) Gate")
+    rs = argparse.Namespace(**{**vars(base), "seconds": 600, "exec": quiet, "at": losses.split("|420=")[0] + "|300=astra.space.wrecks.resume", "out": "Saved/Space/test_resume.json"})
+    run_once(rs, ROOT / rs.out, SPACE / "test_resume.log")
+    rtext = (SPACE / "test_resume.log").read_text(errors="replace") if (SPACE / "test_resume.log").exists() else ""
+    expect("selftest after a resume", selftest_ok(SPACE / "test_resume.log"), "the invariants held across it", results)
+    expect("the wrecks come back where they were", "resume check: SAME" in rtext, "21 parts compared, none moved more than the file's 0.1 m", results)
+    if (ROOT / rs.out).exists():
+        fin = load(str(ROOT / rs.out))["final"]
+        expect("they are all still there", fin["wreck_sites_here"] >= 3 and fin["pods_adrift"] >= 8, f"{fin['wreck_sites_here']} sites, {fin['pods_adrift']} lifepods adrift", results)
     print("-- the same losses twice (determinism of what is left)")
     ra = argparse.Namespace(**{**vars(base), "seconds": 600, "exec": quiet, "at": losses.split("|420=")[0], "out": "Saved/Space/wk_a.json"})
     rb = argparse.Namespace(**{**vars(base), "seconds": 600, "exec": quiet, "at": losses.split("|420=")[0], "out": "Saved/Space/wk_b.json"})
