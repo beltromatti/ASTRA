@@ -10,6 +10,7 @@
 
 class UCanvas;
 class UCanvasRenderTarget2D;
+class UTextureRenderTarget2D;
 class UFont;
 class UAstraScreensSubsystem;
 
@@ -91,4 +92,10 @@ private:
 	void DrawFlight(UCanvas* C, int32 W, int32 H, const FString& Slot);
 	/** A station's control surface: its modes in force as lit buttons, who set them, what the officer just did. */
 	void DrawControls(UCanvas* C, int32 W, int32 H, const FString& Station);
+
+	/** The status ticker of the consoles' spines and the walls (the ticker tile of the decor atlas, MI_BRG3_Decor): the condition, and one
+	 *  line of what is true now, a new one every few seconds. Painted into RT_ASTRA_Ticker, the render target the decor material reads. */
+	void DrawTicker(UCanvas* C, int32 W, int32 H);
+	UPROPERTY() TObjectPtr<UTextureRenderTarget2D> TickerTarget;
+	float TickerWait = 0.f;
 };

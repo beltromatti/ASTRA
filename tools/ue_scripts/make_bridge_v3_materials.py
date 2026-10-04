@@ -7,19 +7,26 @@ Creates:
               weight; nearest, no mips), T_BRG3_Labels (label atlas, 2048 x 4096), T_BRG3_Decor (the decor atlas: static display pages,
               soft glows, the consoles' silkscreen; 2048 x 4096)
   masters     M_BRG3_Lamps        emissive lamps: colour from the palette by UV cell, alert response like M_ASTRA_Emissive
-              M_BRG3_ScreenHolo   additive hover panel: ScreenTexture x Intensity, dim on its back side (BackGain)
+              M_BRG3_ScreenHolo   hover panel: a faint smoked sheet (Backing) lit by its page, ScreenTexture x Intensity, the
+                                  bright marks opaque (ContentAlpha), dim on its back side (BackGain)
               M_BRG3_Viewscreen   translucent image plane of the main viewscreen: ScreenTexture, Intensity, Opacity (0 = off)
   instances   in /Game/ASTRA/Materials/Instances, named exactly like the mesh slots so import_kit's assign_materials_by_slot finds
               them: MI_BRG3_Composite / Ivory / Brass / Navy / DeckPlate / DarkGlass / Leather / Lamps / LampsDim / LampsHot / Labels / Decor and one
               SCREEN_<station>_<n> per live screen (a static page until the game binds a live one); also, only if build_ship_interior.py has not made
               them yet (same values), the ship kit's MI_SHIP_Leaf / Soil / CrateBlue that the plants and globes on the consoles use
+  ticker      /Game/ASTRA/UI/RT_ASTRA_Ticker: the render target UAstraScreensSubsystem paints the status ticker into; MI_BRG3_Decor
+              (LiveTicker) shows it over the ticker tile of the decor atlas (art/_cache/bridge3/decor.json)
   hover UI    /Game/ASTRA/Kit/Bridge3/HoloUI/MI_UI_<Page>: the translucent twins of the MI_UI_* instances (same object names,
               so UAstraScreensSubsystem, which binds pages by material name, drives them like the opaque ones)
+
+ONLY = {"holo", "decor"} (set before exec) rebuilds just those: the hover panels' master, the decor instance and the ticker's target.
 """
 import json
 import os
 
 import unreal
+
+ONLY = globals().get("ONLY")
 
 ROOT = "/Users/beltromatti/Desktop/ASTRA"
 DATA = json.load(open(os.path.join(ROOT, "data", "ship", "aquila_bridge.json"), encoding="utf-8"))
@@ -113,7 +120,7 @@ class Graph:
         p = f"{MAT_DST}/{name}"
         if eal.does_asset_exist(p):
             self.m = eal.load_asset(p)
-            mel.delete_all_material_expressions(self.m)
+            for _e in list(mel.get_material_expressions(self.m)): mel.delete_material_expression(self.m, _e)   # (from a copy: UE 5.8's delete_all walks the list it removes from, and crashed the editor)
         else:
             self.m = tools.create_asset(name, MAT_DST, unreal.Material, unreal.MaterialFactoryNew())
         self.name = name
@@ -228,33 +235,76 @@ def flip_uv(g, x=-1500, y=0):
 
 
 def build_screen_holo():
+    """A hard-light sheet, not a glow: the page's dark ground is a faint smoked sheet (Backing) that holds the panel in the air
+    and gives the marks contrast against a sunlit console or the stars; the bright marks are opaque light. Purely additive, the
+    panels vanished against the bright bridge (the page's ground added nothing and its thin lines little). Seen from behind the
+    marks are dim (they read mirrored); the sheet stays."""
     g = Graph("M_BRG3_ScreenHolo")
     m = g.m
     m.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_UNLIT)
-    m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_ADDITIVE)
+    m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_TRANSLUCENT)
     m.set_editor_property("two_sided", True)
     uv = flip_uv(g)
     t = g.E(unreal.MaterialExpressionTextureSampleParameter2D, -700, 100, parameter_name="ScreenTexture",
             texture=tex("T_UI_Helm_A", UI_TEX), sampler_type=ST.SAMPLERTYPE_COLOR, group="Screen")
     g.L(uv, "", t, "UVs")
-    inten = g.S("Intensity", 10.0, -700, 350, "Screen")
-    e1 = g.op(unreal.MaterialExpressionMultiply, t, "RGB", inten, "", -400, 100)
-    out = e1
-    try:   # seen from behind the panel is much dimmer (the text would read mirrored and bright)
-        sign = g.E(unreal.MaterialExpressionTwoSidedSign, -700, 500)
-        facing = g.E(unreal.MaterialExpressionSaturate, -520, 500)
-        g.L(sign, "", facing, "")
-        gain = g.E(unreal.MaterialExpressionLinearInterpolate, -340, 460)
-        g.L(g.S("BackGain", 0.15, -700, 580, "Screen"), "", gain, "A")
-        g.L(g.K(1.0, -520, 620), "", gain, "B")
-        g.L(facing, "", gain, "Alpha")
-        out = g.op(unreal.MaterialExpressionMultiply, e1, "", gain, "", -200, 200)
-    except Exception as ex:      # the material still works without the back-side dimming
-        log.append(f"M_BRG3_ScreenHolo: no back dimming ({ex})")
-    mel.connect_material_property(out, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    sign = g.E(unreal.MaterialExpressionTwoSidedSign, -900, 600)
+    c = g.E(unreal.MaterialExpressionCustom, -400, 300)
+    c.set_editor_property("code", """
+float facing = saturate(Sign);
+float gain = lerp(BackGain, 1.0, facing);
+float lum = dot(Tex, float3(0.30, 0.59, 0.11));
+float marks = saturate(lum * ContentAlpha) * gain;
+float a = saturate(Backing + marks * (1.0 - Backing));
+// translucent blending multiplies the colour by the opacity: divide it back out so the marks keep their brightness
+return float4(Tex * Intensity * gain / max(a, 0.05), a);
+""")
+    c.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT4)
+    pins = []
+    for name in ("Tex", "Sign", "Intensity", "BackGain", "Backing", "ContentAlpha"):
+        ci = unreal.CustomInput()
+        ci.set_editor_property("input_name", name)
+        pins.append(ci)
+    c.set_editor_property("inputs", pins)
+    g.L(t, "RGB", c, "Tex")
+    g.L(sign, "", c, "Sign")
+    g.L(g.S("Intensity", 10.0, -700, 350, "Screen"), "", c, "Intensity")
+    g.L(g.S("BackGain", 0.15, -700, 430, "Screen"), "", c, "BackGain")
+    g.L(g.S("Backing", 0.30, -700, 510, "Screen"), "", c, "Backing")
+    g.L(g.S("ContentAlpha", 5.0, -700, 590, "Screen"), "", c, "ContentAlpha")
+    rgb = g.E(unreal.MaterialExpressionComponentMask, -200, 250, r=True, g=True, b=True, a=False)
+    g.L(c, "", rgb, "")
+    alpha = g.E(unreal.MaterialExpressionComponentMask, -200, 380, r=False, g=False, b=False, a=True)
+    g.L(c, "", alpha, "")
+    mel.connect_material_property(rgb, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    mel.connect_material_property(alpha, "", unreal.MaterialProperty.MP_OPACITY)
     g.finish()
     log.append("M_BRG3_ScreenHolo")
     return m
+
+
+def build_ticker_target():
+    """The render target of the status ticker (1024 x 64, the ticker tile's shape), cleared to the pages' dark ground."""
+    path = "/Game/ASTRA/UI/RT_ASTRA_Ticker"
+    rt = eal.load_asset(path) if eal.does_asset_exist(path) else tools.create_asset(
+        "RT_ASTRA_Ticker", "/Game/ASTRA/UI", unreal.TextureRenderTarget2D, unreal.TextureRenderTargetFactoryNew())
+    rt.set_editor_property("size_x", 1024)
+    rt.set_editor_property("size_y", 64)
+    rt.set_editor_property("clear_color", unreal.LinearColor(0.0012, 0.0027, 0.006, 1.0))
+    eal.save_loaded_asset(rt, only_if_is_dirty=False)
+    log.append("RT_ASTRA_Ticker")
+    return rt
+
+
+def decor_instance(screen, rt):
+    """MI_BRG3_Decor: the decor atlas, dimmer than the live pages (their Intensity is 22, the hover panels' 10); its ticker tile live."""
+    atlas = json.load(open(os.path.join(B3_SRC, "decor.json"), encoding="utf-8"))
+    (aw, ah), (x, y, w, h) = atlas["size"], atlas["px"]["ticker"]
+    make_mi(MI_DST, "MI_BRG3_Decor", screen, {"Intensity": 8.0, "Roughness": 0.35, "FlipU": 0.0, "FlipV": 0.0,
+                                               "TickerU0": x / aw, "TickerV0": y / ah, "TickerU1": (x + w) / aw, "TickerV1": (y + h) / ah,
+                                               "TickerGain": 2.0},
+            textures={"ScreenTexture": tex("T_BRG3_Decor"), "TickerTexture": rt}, switches={"LiveTicker": True})
+    log.append(f"MI_BRG3_Decor: the ticker at {x / aw:.4f},{y / ah:.4f} - {(x + w) / aw:.4f},{(y + h) / ah:.4f}")
 
 
 def build_viewscreen():
@@ -335,8 +385,7 @@ def build_instances(hard, lamps, screen, holo, viewscreen):
     make_mi(MI_DST, "MI_BRG3_LampsDim", lamps, {"Intensity": 6.0, "LightDimWeight": 0.0}, textures={"PaletteMap": pal})
     make_mi(MI_DST, "MI_BRG3_LampsHot", lamps, {"Intensity": 55.0, "LightDimWeight": 1.0}, textures={"PaletteMap": pal})
     make_mi(MI_DST, "MI_BRG3_Labels", screen, {"Intensity": 4.0, "Roughness": 0.4, "FlipU": 0.0, "FlipV": 0.0}, textures={"ScreenTexture": tex("T_BRG3_Labels")})
-    # the decor atlas: static display pages and soft glows, dimmer than the live pages (their Intensity is 22, the hover panels' 10)
-    make_mi(MI_DST, "MI_BRG3_Decor", screen, {"Intensity": 8.0, "Roughness": 0.35, "FlipU": 0.0, "FlipV": 0.0}, textures={"ScreenTexture": tex("T_BRG3_Decor")})
+    decor_instance(screen, build_ticker_target())
     log.append("shared instances")
 
     # one default instance per live screen: a static page until the game binds a live one; the surface decides the parent
@@ -368,15 +417,22 @@ def build_instances(hard, lamps, screen, holo, viewscreen):
     log.append(f"hover UI twins: {pages}")
 
 
-import_textures()
+if not ONLY:
+    import_textures()
 hard = eal.load_asset(f"{MAT_DST}/M_ASTRA_Hard")
 screen = eal.load_asset(f"{MAT_DST}/M_ASTRA_Screen")
 if hard is None or screen is None:
     raise RuntimeError("run make_materials.py and make_ui_materials.py first (M_ASTRA_Hard / M_ASTRA_Screen missing)")
-lamps = build_lamps()
-holo = build_screen_holo()
-viewscreen = build_viewscreen()
-build_instances(hard, lamps, screen, holo, viewscreen)
+if ONLY:
+    if "holo" in ONLY:
+        build_screen_holo()
+    if "decor" in ONLY:
+        decor_instance(screen, build_ticker_target())
+else:
+    lamps = build_lamps()
+    holo = build_screen_holo()
+    viewscreen = build_viewscreen()
+    build_instances(hard, lamps, screen, holo, viewscreen)
 # materials assigned at run time to Nanite meshes need the Nanite usage flag (the live screens on the opaque consoles)
 for base in ("M_ASTRA_Screen", "M_ASTRA_Hard", "M_ASTRA_Emissive"):
     mm = eal.load_asset(f"{MAT_DST}/{base}")

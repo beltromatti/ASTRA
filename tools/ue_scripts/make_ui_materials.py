@@ -1,6 +1,8 @@
 """Screen materials: imports art/_cache/ui/T_UI_*.png, builds M_ASTRA_Screen (emissive UI behind glossy glass,
-FlipU/FlipV), default slot instances MI_ASTRA_Screen{A,B,C,Touch,Tactical,Holo,Master} and per-station instances
-MI_UI_<Station>_<Slot>. Idempotent."""
+FlipU/FlipV; with the static switch LiveTicker, the rectangle TickerU0..V1 of ScreenTexture shows TickerTexture instead: the
+decor atlas's ticker tile reads the live status ticker, RT_ASTRA_Ticker), default slot instances
+MI_ASTRA_Screen{A,B,C,Touch,Tactical,Holo,Master} and per-station instances MI_UI_<Station>_<Slot>. Idempotent.
+MATERIAL_ONLY = True (set before exec) rebuilds M_ASTRA_Screen alone: no import, the instances untouched."""
 import json
 import os
 
@@ -16,8 +18,9 @@ MI = "/Game/ASTRA/Materials/Instances"
 UI_MI = "/Game/ASTRA/UI/Materials"
 log = []
 
+MATERIAL_ONLY = globals().get("MATERIAL_ONLY", False)
 tasks = []
-for f in sorted(os.listdir(SRC)):
+for f in ([] if MATERIAL_ONLY else sorted(os.listdir(SRC))):
     if f.endswith(".png"):
         t = unreal.AssetImportTask()
         t.filename = os.path.join(SRC, f)
@@ -27,7 +30,7 @@ for f in sorted(os.listdir(SRC)):
         t.save = False
         tasks.append(t)
 tools.import_asset_tasks(tasks)
-for p in eal.list_assets(TEX, recursive=False, include_folder=False):
+for p in ([] if MATERIAL_ONLY else eal.list_assets(TEX, recursive=False, include_folder=False)):
     tex = eal.load_asset(p)
     if isinstance(tex, unreal.Texture2D):
         tex.set_editor_property("srgb", True)
@@ -38,7 +41,7 @@ log.append(f"ui textures: {len(tasks)}")
 path = f"{MAT}/M_ASTRA_Screen"
 if eal.does_asset_exist(path):
     m = eal.load_asset(path)
-    mel.delete_all_material_expressions(m)
+    for _e in list(mel.get_material_expressions(m)): mel.delete_material_expression(m, _e)   # (from a copy: UE 5.8's delete_all walks the list it removes from, and crashed the editor)
 else:
     m = tools.create_asset("M_ASTRA_Screen", MAT, unreal.Material, unreal.MaterialFactoryNew())
 
@@ -74,9 +77,43 @@ L(flip, "", lerp, "Alpha")
 tex = E(unreal.MaterialExpressionTextureSampleParameter2D, -700, 100, parameter_name="ScreenTexture",
         texture=eal.load_asset(f"{TEX}/T_UI_Helm_A"), group="Screen")
 L(lerp, "", tex, "UVs")
-emis = E(unreal.MaterialExpressionMultiply, -400, 100)
-L(tex, "RGB", emis, "A")
-L(S("Intensity", 6.0, -700, 350), "", emis, "B")
+# the live ticker (LiveTicker on): inside the rectangle TickerU0,V0 - U1,V1 of the page, TickerTexture, stretched over it
+tick = E(unreal.MaterialExpressionCustom, -950, 500)
+tick.set_editor_property("code", """
+float2 q = (UV - float2(U0, V0)) / max(float2(U1 - U0, V1 - V0), 1e-5);
+float inside = step(0.0, q.x) * step(q.x, 1.0) * step(0.0, q.y) * step(q.y, 1.0);
+return float3(saturate(q), inside);
+""")
+tick.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT3)
+pins = []
+for name in ("UV", "U0", "V0", "U1", "V1"):
+    ci = unreal.CustomInput()
+    ci.set_editor_property("input_name", name)
+    pins.append(ci)
+tick.set_editor_property("inputs", pins)
+L(lerp, "", tick, "UV")
+for k, name in enumerate(("U0", "V0", "U1", "V1")):
+    L(S("Ticker" + name, 0.0, -1250, 480 + k * 70), "", tick, name)
+q = E(unreal.MaterialExpressionComponentMask, -760, 480, r=True, g=True, b=False, a=False)
+L(tick, "", q, "")
+inside = E(unreal.MaterialExpressionComponentMask, -760, 560, r=False, g=False, b=True, a=False)
+L(tick, "", inside, "")
+ttex = E(unreal.MaterialExpressionTextureSampleParameter2D, -600, 450, parameter_name="TickerTexture",
+         texture=unreal.load_object(None, "/Engine/EngineResources/Black.Black"), group="Screen")
+L(q, "", ttex, "UVs")
+tgain = E(unreal.MaterialExpressionMultiply, -420, 450)
+L(ttex, "RGB", tgain, "A")
+L(S("TickerGain", 2.0, -600, 620), "", tgain, "B")
+mix = E(unreal.MaterialExpressionLinearInterpolate, -300, 300)
+L(tex, "RGB", mix, "A")
+L(tgain, "", mix, "B")
+L(inside, "", mix, "Alpha")
+live = E(unreal.MaterialExpressionStaticSwitchParameter, -200, 150, parameter_name="LiveTicker", default_value=False, group="Screen")
+L(mix, "", live, "True")
+L(tex, "RGB", live, "False")
+emis = E(unreal.MaterialExpressionMultiply, -50, 100)
+L(live, "", emis, "A")
+L(S("Intensity", 6.0, -200, 350), "", emis, "B")
 mel.connect_material_property(emis, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
 base = E(unreal.MaterialExpressionConstant3Vector, -400, -150, constant=unreal.LinearColor(0.01, 0.012, 0.015, 1))
 mel.connect_material_property(base, "", unreal.MaterialProperty.MP_BASE_COLOR)
@@ -104,11 +141,11 @@ def mi(folder, name, texture, flip_u=0.0, flip_v=0.0, intensity=None):
 
 
 FLIP = globals().get("FLIP", {})   # {"Tactical": (1, 0), ...} orientation fixes found by visual checks
-for slot, tex_name in (("A", "Helm_A"), ("B", "Helm_B"), ("C", "Helm_C"), ("Touch", "Helm_Touch"), ("Tactical", "Tactical"),
+for slot, tex_name in () if MATERIAL_ONLY else (("A", "Helm_A"), ("B", "Helm_B"), ("C", "Helm_C"), ("Touch", "Helm_Touch"), ("Tactical", "Tactical"),
                        ("Holo", "Holo"), ("Master", "Master")):
     fu, fv = FLIP.get(slot, (0.0, 0.0))
     mi(MI, f"MI_ASTRA_Screen{slot}", tex_name, fu, fv, intensity=8.0 if slot == "Touch" else 22.0)
-for st in ("Helm", "Ops", "Comms", "Sensors", "Eng", "Flight"):
+for st in () if MATERIAL_ONLY else ("Helm", "Ops", "Comms", "Sensors", "Eng", "Flight"):
     for slot in ("A", "B", "C", "Touch"):
         fu, fv = FLIP.get(slot, (0.0, 0.0))
         mi(UI_MI, f"MI_UI_{st}_{slot}", f"{st}_{slot}", fu, fv, intensity=8.0 if slot == "Touch" else 22.0)
