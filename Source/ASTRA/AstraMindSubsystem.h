@@ -30,7 +30,7 @@ public:
 	/** The Captain chose: a new campaign or the saved one ("new" | "continue"); the mind resets or loads the war. */
 	void SendCampaign(const FString& Mode);
 
-	/** Launch `uv run astra-mind` automatically when nothing is listening. */
+	/** Launch `uv run astra-mind` automatically when nothing is listening (AstraMindLaunch.h: macOS, Windows, Linux). */
 	UPROPERTY(config)
 	bool bAutoLaunchMind = true;
 
@@ -41,6 +41,10 @@ private:
 	double NextStateTime = 0.0;
 	bool bLaunchedMind = false;
 	FProcHandle MindProc;   // the mind this game started (a packaged game stops it when it quits)
+	FString MindUrl;        // ws://127.0.0.1:<port>: 8765 unless ASTRA_MIND_PORT says another (AstraMindLaunch.h)
+	double MindLaunchedAt = 0.0;
+	double NextProcCheckTime = 0.0;
+	bool bMindExitReported = false;   // the mind this game started is gone, and the player was told where its log is
 	FString PendingCampaign;   // sent once connected
 	double LastStateSent = 0.0;
 	TArray<TSharedRef<FJsonObject>> PendingEvents;   // reports raised before the mind was reachable
@@ -89,6 +93,8 @@ private:
 	bool Tick(float DeltaTime);
 	void Connect();
 	void LaunchMind();
+	/** Is the mind this game started still running? When it is not, the log and the player say where its own log is. */
+	void WatchMindProcess(double Now);
 	void Send(const TSharedRef<FJsonObject>& Msg);
 	/** The Captain's context (protocol v2) on a player_text or ptt message. */
 	void AddContext(const TSharedRef<FJsonObject>& Msg) const;

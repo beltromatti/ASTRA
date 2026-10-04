@@ -9,7 +9,8 @@ struct ASTRA_API FAstraSettings
 {
 	int32 Quality = -1;       // the engine's scalability: 0 low · 1 medium · 2 high · 3 epic; -1 as the engine found it
 	int32 Image = 2;          // how low the dynamic resolution may go: 0 sharp (70 %) · 1 balanced (55 %) · 2 smooth (40 %)
-	bool bRetina = true;      // the image out at the display's own pixels (a Retina Mac: twice the half the engine makes by default), upscaled by MetalFX
+	bool bRetina = true;      // the Mac's: the image out at the display's own pixels (a Retina Mac: twice the half the engine makes by default), upscaled by MetalFX;
+	                          // Windows and Linux have no such setting (no row in the page, the field is not read)
 	int32 FrameRate = 60;     // 30 or 60
 	float Music = 1.f;        // 0..1 of the score's own level (it already sits under the dialogue)
 	float Voices = 1.f;       // 0..1 of the voices' level
@@ -43,7 +44,7 @@ public:
 private:
 	FSimpleDelegate OnBack;
 	int32 Selected = 0;
-	TSharedPtr<class SButton> Buttons[7];
+	TSharedPtr<class SButton> Buttons[8];   // one for each of the page's rows by its number, BACK's included (AstraSettings.cpp: NumRowIds)
 	bool IsLit(int32 Row) const;
 	void Change(int32 Row, int32 Step);
 	FString ValueOf(int32 Row) const;
