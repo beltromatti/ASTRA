@@ -744,6 +744,21 @@ bool UAstraBoardSubsystem::LaunchAssault(FString& OutDetail)
 	Assault.EtaS = R.EtaS;
 	Assault.LaunchT = Assault.T;
 	Assault.bLaunched = true;
+	{
+		const int32 DockFace = AstraBoardCraft::FacingOfNormal(Assault.Legs[0].OutNormal);
+		Assault.Met.bKnown = true;
+		Assault.Met.bNoPower = Ass.bTargetDisabled;
+		Assault.Met.ShieldPct = Ass.bShieldsKnown && !Ass.bTargetDisabled ? Ass.ShieldFrac[DockFace] * 100.f : 0.f;
+		Assault.Met.PdChannels = Ass.PdChannels;
+		Assault.Met.PdRangeKm = Ass.PdRangeKm;
+		Assault.Met.CraftNear = Ass.EnemyCraftNear;
+		Assault.Met.Boarders = 0;
+		for (const FLeg& L : Assault.Legs)
+		{
+			Assault.Met.Boarders += L.Men;
+		}
+		Assault.Met.Face = AsFaceName(DockFace);
+	}
 	// the marines who go leave the ship's life (they are in the boats)
 	if (Assault.bRoster)
 	{
@@ -1557,6 +1572,22 @@ TSharedRef<FJsonObject> UAstraBoardSubsystem::AssaultJson() const
 	if (!Assault.By.IsEmpty())
 	{
 		J->SetStringField(TEXT("ordered_by"), Assault.By);
+	}
+	if (!Assault.Spec.Reason.IsEmpty())
+	{
+		J->SetStringField(TEXT("reason"), Assault.Spec.Reason);
+	}
+	if (Assault.Met.bKnown)
+	{
+		// what the boats meet at the hatch, as it was when they were sent
+		TSharedRef<FJsonObject> M = MakeShared<FJsonObject>();
+		M->SetStringField(TEXT("dock_face"), Assault.Met.Face);
+		M->SetBoolField(TEXT("no_power"), Assault.Met.bNoPower);
+		M->SetNumberField(TEXT("her_shield_on_that_face_pct"), FMath::RoundToInt(Assault.Met.ShieldPct));
+		M->SetNumberField(TEXT("her_point_defence_channels"), Assault.Met.PdChannels);
+		M->SetNumberField(TEXT("her_craft_about_her"), Assault.Met.CraftNear);
+		M->SetNumberField(TEXT("men_in_the_boats"), Assault.Met.Boarders);
+		J->SetObjectField(TEXT("met_at_launch"), M);
 	}
 	J->SetNumberField(TEXT("elapsed_s"), FMath::RoundToInt(Assault.T));
 	TArray<TSharedPtr<FJsonValue>> Boats;

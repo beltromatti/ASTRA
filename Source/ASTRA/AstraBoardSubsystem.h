@@ -67,8 +67,9 @@ public:
 	};
 	/** Starts a boarding: the alarm, the lockdown, the marines called, the boarders on their way. False (and why) when the plan is not read or one is on. */
 	bool StartBoarding(const FSpec& Spec, FString& OutDetail);
-	/** Ends it (the test console, the end of a fight): the bulkheads open, the marines go back to their duty, the bodies are cleared away in a while. */
-	void EndBoarding(const TCHAR* Why);
+	/** Ends it (the test console, the end of a fight): the bulkheads open, the marines go back to their duty, the bodies are cleared away in a while. Told: the words the bridge hears of it
+	 *  (empty: the plain "the boarding is called off"). */
+	void EndBoarding(const TCHAR* Why, const FString& Told = FString());
 
 	// ------------------------------------------------------------------------------------------------ boarding by assault craft (AstraBoardAssault.cpp, docs/brief/ABBORDAGGI-2.md)
 	/** What an order to board is made of when boats fly it: who flies from where at whom (the ships are named as the commands name them: a contact id such as T-30, a name, "aquila"). */
@@ -83,7 +84,8 @@ public:
 		int32 Boarders = 0;            // men in all (0: the boats' full loads)
 		bool bLockdown = true;         // (the Aquila boarded) the pressure bulkheads round the hatches close
 		bool bCaptain = false;         // the Captain rides in the first boat (his marines')
-		FString By;                    // who ordered it ("Admiral Solm", "the Captain"), for the log
+		FString By;                    // who ordered it ("Admiral Solm", "the Captain"), for the log and for the minds' picture of the operation
+		FString Reason;                // why, in the words of whoever ordered it (the minds' own: they give one with every order)
 	};
 	/** Boats leave a carrier for a target and the fight is theirs: the boarders cut in where the boats latch; whoever survives goes home. False, and why, when it cannot be (no boat free, a shield
 	 *  that holds the hatch, no hatch on that face, a boarding already on). The reply is the facts. */
@@ -273,6 +275,18 @@ private:
 		double PlanSinceS = 0.0;                     // (the wall clock when the reading began: a bench runs the game's clock a thousand times too fast for it)
 		FAssaultSpec Spec;
 		FString PlanWhy;
+		/** What the boats meet at the hatch, as it was when they were sent (the minds' picture of the operation: the best moment to board, or not). */
+		struct FMet
+		{
+			bool bKnown = false;
+			bool bNoPower = false;
+			float ShieldPct = 0.f;                       // her shield on the face the first boat docks on
+			int32 PdChannels = 0;
+			float PdRangeKm = 0.f;
+			int32 CraftNear = 0;                         // her fighters about her
+			int32 Boarders = 0;                          // men in all
+			FString Face;
+		} Met;
 		TMap<int32, FBoardRoomMood> Moods;           // (a fight on a ship the war has shot at) how her rooms are: no power, fire, no air
 		bool bFromWar = false;                       // her people and bulkheads are the war's picture of her inside
 	};
@@ -337,6 +351,7 @@ private:
 	void LockCaptain(bool bMove, bool bLook);
 	void CaptainPrompt(const FString& Text, float Seconds);
 	void MakeCabin();
+	FVector HomeSpot() const;                        // the boat bay of Deck 8: where the boat sets him down (feet, cm)
 	FVector WorldOffset() const { return Mode == EMode::Remote && bCaptainAboard ? RemoteOffset : FVector::ZeroVector; }
 	// --- the weapons: the places the Captain's are kept (the posts, the stock of each), their pictures while he is near, and the armourer's delivery (AstraBoardArms.cpp)
 	struct FArmsPost

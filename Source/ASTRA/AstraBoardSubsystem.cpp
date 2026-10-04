@@ -523,16 +523,16 @@ void UAstraBoardSubsystem::EnterObserved(const FString& SourceText, int32 Breach
 	Phase = EPhase::Active;
 }
 
-void UAstraBoardSubsystem::EndBoarding(const TCHAR* Why)
+void UAstraBoardSubsystem::EndBoarding(const TCHAR* Why, const FString& Told)
 {
 	if (Phase == EPhase::Active)
 	{
-		Tell(FString::Printf(TEXT("the boarding is called off (%s)"), Why), false);
+		Tell(Told.IsEmpty() ? FString::Printf(TEXT("the boarding is called off (%s)"), Why) : Told, !Told.IsEmpty());
 		Finish(Why);
 	}
 	else if (Assault.bOn)
 	{
-		Tell(FString::Printf(TEXT("the boarding is called off (%s): the boats turn back"), Why), false);
+		Tell(Told.IsEmpty() ? FString::Printf(TEXT("the boarding is called off (%s): the boats turn back"), Why) : Told, !Told.IsEmpty());
 		EndAssaultFight(Why);
 	}
 }

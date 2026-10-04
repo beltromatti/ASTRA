@@ -17,6 +17,7 @@
 #include "AstraBattleSubsystem.h"
 #include "AstraBoardInterior.h"
 #include "AstraCombatant.h"
+#include "AstraDeckStreaming.h"
 #include "AstraFpsComponent.h"
 #include "AstraLifeSubsystem.h"
 #include "AstraShipSubsystem.h"
@@ -193,6 +194,19 @@ void UAstraBoardSubsystem::MakeCabin()
 	{
 		CabinSpot = Cabin->BuildCabin();
 	}
+}
+
+FVector UAstraBoardSubsystem::HomeSpot() const
+{
+	// the boat bay of Deck 8 (feet on its floor): where the Kestrels set him down
+	if (AqDmg.IsValid() && AqMap.IsValid())
+	{
+		if (const int32* C = AqDmg->CompByName.Find(FName(TEXT("d8_shuttle_bay_B1"))))
+		{
+			return AqMap->CentreOf(*C);
+		}
+	}
+	return FVector::ZeroVector;
 }
 
 // ================================================================================================================== the ride
@@ -440,6 +454,10 @@ void UAstraBoardSubsystem::TickRide(float Dt)
 			{
 				RidePromptT = 1.f;
 				CaptainPrompt(Leg && Leg->State == FLeg::EState::Home ? TEXT("HOME") : TEXT("THE KESTREL IS TAKING YOU HOME"), 1.4f);
+				if (UAstraDeckStreaming* DS = GetWorld() ? GetWorld()->GetSubsystem<UAstraDeckStreaming>() : nullptr)
+				{
+					DS->RequestAt(HomeSpot(), 60.f);                   // (the deck of the bay may have been let go while he was away: it loads while the boat flies)
+				}
 			}
 			if (RideT > RdHomeLimitS || (Leg && Leg->State == FLeg::EState::Home))
 			{
@@ -449,6 +467,17 @@ void UAstraBoardSubsystem::TickRide(float Dt)
 		else if (RideStep == 40 && RideT >= 0.7f)
 		{
 			// the boat bay of Deck 8
+			const FVector Bay = HomeSpot();
+			if (UAstraDeckStreaming* DS = GetWorld() ? GetWorld()->GetSubsystem<UAstraDeckStreaming>() : nullptr; DS && !bTestCaptain && !DS->IsReadyAt(Bay + FVector(0.0, 0.0, 100.0)))
+			{
+				// the screen is dark and the deck is not in the world yet: he waits for it in the troop bay (a few seconds), then it is loaded at once; he is not set down over a floor that is not there
+				DS->RequestAt(Bay, 90.f);
+				if (RideT < 0.7f + 6.f)
+				{
+					break;
+				}
+				DS->ForceReadyAt(Bay);
+			}
 			if (Cabin)
 			{
 				Cabin->End();
@@ -458,14 +487,6 @@ void UAstraBoardSubsystem::TickRide(float Dt)
 				Interior->End();
 			}
 			bCaptainAboard = false;
-			FVector Bay = FVector::ZeroVector;
-			if (AqDmg.IsValid() && AqMap.IsValid())
-			{
-				if (const int32* C = AqDmg->CompByName.Find(FName(TEXT("d8_shuttle_bay_B1"))))
-				{
-					Bay = AqMap->CentreOf(*C);
-				}
-			}
 			TeleportCaptain(Bay, 90.f, false);
 			LockCaptain(false, false);
 			FadeCaptain(false, RdFadeS);

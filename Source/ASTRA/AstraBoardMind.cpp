@@ -428,7 +428,18 @@ bool UAstraBoardSubsystem::HandleCommand(const FString& Name, const TSharedPtr<F
 				OutDetail = TEXT("no boarding is on");
 				return false;
 			}
-			EndBoarding(TEXT("ordered"));
+			// the recall and its reason: the bridge hears the ship that recalls her boats, and why (the minds give a reason with every order)
+			const FString By = BdStr(Args, TEXT("by")), Reason = BdStr(Args, TEXT("reason"));
+			FString Told;
+			if (Assault.bOn && !Assault.bRoster)
+			{
+				Told = FString::Printf(TEXT("%s recalls her boats%s%s"), *Assault.CarrierName, Reason.IsEmpty() ? TEXT("") : TEXT(": "), *Reason);
+			}
+			else if (!Reason.IsEmpty())
+			{
+				Told = FString::Printf(TEXT("the boarding is called off%s: %s"), By.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" by %s"), *By), *Reason);
+			}
+			EndBoarding(TEXT("ordered"), Told);
 			OutDetail = TEXT("the boarding is called off: the boats turn back or let go");
 			return true;
 		}
@@ -471,6 +482,7 @@ bool UAstraBoardSubsystem::HandleCommand(const FString& Name, const TSharedPtr<F
 			A.bLockdown = bLockAssault;
 			A.bCaptain = bCap;
 			A.By = BdStr(Args, TEXT("by"));
+			A.Reason = BdStr(Args, TEXT("reason"));
 			return StartAssault(A, OutDetail);
 		}
 		FSpec Spec;
@@ -721,7 +733,8 @@ namespace
 			{
 				S.bCaptain |= Word.Equals(TEXT("ride"));                       // (the Captain goes with the marines: the word ride anywhere after the verb)
 			}
-			S.By = TEXT("the console");
+			// (a launch from the console is somebody's operation all the same: the Captain's when the marines go, the Mandate's command staff's when the boats come)
+			S.By = bOut ? TEXT("the Captain") : TEXT("the Mandate's command staff");
 			FString D;
 			const bool bOk = B->StartAssault(S, D);
 			UE_LOG(LogASTRA, Log, TEXT("[Board] %s: %s"), bOk ? TEXT("assault ordered") : TEXT("assault refused"), *D);
@@ -759,6 +772,38 @@ namespace
 			const bool bOk = B->HandleCommand(A[0], J, D);
 			UE_LOG(LogASTRA, Log, TEXT("[Board] %s: %s"), bOk ? TEXT("ok") : TEXT("refused"), *D);
 			if (GEngine) { GEngine->AddOnScreenDebugMessage(-1, 6.f, bOk ? FColor::Green : FColor::Red, D); }
+		}));
+	FAutoConsoleCommandWithWorldAndArgs BdCmdRecall(TEXT("astra.board.recall"), TEXT("Testing: the boats are recalled with a reason, as a mind's recall comes: astra.board.recall <who, underscores for spaces> <the reason in words>"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* W)
+		{
+			UAstraBoardSubsystem* B = BdBoard(W);
+			if (!B || A.Num() < 1)
+			{
+				return;
+			}
+			TSharedPtr<FJsonObject> J = MakeShared<FJsonObject>();
+			J->SetStringField(TEXT("action"), TEXT("end"));
+			J->SetStringField(TEXT("by"), A[0].Replace(TEXT("_"), TEXT(" ")));
+			FString Reason;
+			for (int32 i = 1; i < A.Num(); ++i)
+			{
+				Reason += (i > 1 ? TEXT(" ") : TEXT("")) + A[i];
+			}
+			J->SetStringField(TEXT("reason"), Reason);
+			FString D;
+			const bool bOk = B->HandleCommand(TEXT("boarding"), J, D);
+			UE_LOG(LogASTRA, Log, TEXT("[Board] %s: %s"), bOk ? TEXT("ok") : TEXT("refused"), *D);
+		}));
+	FAutoConsoleCommandWithWorldAndArgs BdCmdOptions(TEXT("astra.board.options"), TEXT("Writes what a side's admiral reads of the boats to the log (the minds' picture): astra.board.options <0 ASTRA | 1 the Mandate>"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* W)
+		{
+			if (UAstraBoardSubsystem* B = BdBoard(W))
+			{
+				FString Out;
+				const TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> Wr = TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>::Create(&Out);
+				FJsonSerializer::Serialize(B->BoardingOptionsJson(A.Num() >= 1 ? FCString::Atoi(*A[0]) : 1), Wr);
+				UE_LOG(LogASTRA, Log, TEXT("[Board] options: %s"), *Out);
+			}
 		}));
 	FAutoConsoleCommandWithWorld BdCmdPicture(TEXT("astra.board.picture"), TEXT("Writes the marines' picture of the fight (the mind's context) to the log"),
 		FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* W)

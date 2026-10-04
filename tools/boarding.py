@@ -191,6 +191,13 @@ ASSAULT_SETUPS = {
                exec=f"{_AQ};astra.war.spawn acheron mandate 0 -3 0 90 id=M1 name=Raider static hold passive;{_NOFATE}",
                at="11000=astra.cmd set_shields {'mode':'off'}|11000=astra.board.pd aquila 0|11001=astra.board.assault in M1 - 2 port",
                expect=[r"order \d+: Raider launches 2 Skiffs", r"launched Skiff 1", r"has launched 2 assault craft at the Aquila", r"docked Skiff 1", r"the hull is cut open at", r"Boarding Alpha|Ferry Guard Alpha|boarders hold|boarders are beaten"]),
+    # the operation as the Mandate's admiral reads it while it is under way, and his recall with its reason as the bridge hears it (the first in-game test: an admiral recalled a launch his staff had made, with nothing said)
+    "in_recall": dict(doc="a launch from the console is the Mandate's own operation (who sent it, what the boats met) and a recall says who recalled the boats and why", seconds=11300,
+                      exec=f"{_AQ};astra.war.spawn acheron mandate 0 -3 0 90 id=M1 name=Raider static hold passive;{_NOFATE}",
+                      at="11000=astra.cmd set_shields {'mode':'off'}|11000=astra.board.pd aquila 0|11001=astra.board.assault in M1 - 2 port|11012=astra.board.options 1|"
+                         "11014=astra.board.recall Archon_Varek_Solm the Aquila's marines are at the breach and I will not feed them skiffs",
+                      expect=[r"order \d+: Raider launches 2 Skiffs", r"options: .*\"ordered_by\":\"the Mandate's command staff\"", r"\"met_at_launch\":\{[^}]*\"her_shield_on_that_face_pct\":0[^}]*\"her_point_defence_channels\":0",
+                              r"Raider recalls her boats: the Aquila's marines are at the breach and I will not feed them skiffs", r"not one boarder reached the ship|the boats of order 1 are told to go home"]),
     # the same, one boat: a lone skiff against a shield that is up on that face: it holds off and turns back; nobody comes aboard
     "in_shield": dict(doc="a skiff at a shield that holds: it turns back, no boarder comes", seconds=11400,
                       exec=f"{_AQ};astra.war.spawn acheron mandate 0 -3 0 90 id=M1 name=Raider static hold passive;{_NOFATE}",
