@@ -66,7 +66,7 @@ void UAstraSpaceLife::TickMotion(float SimDt)
 		M.Seen = Frame;
 		M.ShipId = S.Id;
 		M.Faction = S.Side == EAstraSide::Astra ? 0 : (S.Side == EAstraSide::Mandate ? 1 : 2);
-		M.bPowered = !S.bDisabled;
+		M.bPowered = !S.bDisabled && !S.bCold;                // (lying dark: drives off, no emissions: no jets, no wake)
 		AstraSpace::Observe(M, *C, S.Pos, S.Vel, S.Att, S.MaxAccel, FMath::DegreesToRadians(S.MaxTurnDeg), SimDt);
 		if (M.bPowered)
 		{

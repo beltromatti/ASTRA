@@ -203,7 +203,7 @@ def site_set(hull: Hull, with_stern: bool) -> list[dict]:
 
 
 def allocation_check(nozzles: list[dict], com: np.ndarray) -> list[str]:
-    """Every push and every turn a ship can ask for must have jets that give it: for each of the twelve directions (+-x of the push is the main drive's, not checked) the nozzles whose push or torque
+    """Every push and every turn a ship can ask for must have jets that give it: for each of the eleven directions (the push ahead is the main drive's, not checked) the nozzles whose push or torque
     is along it. Returns what is missing."""
     missing = []
     F = [-np.array(n["d"]) for n in nozzles]

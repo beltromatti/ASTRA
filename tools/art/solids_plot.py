@@ -37,22 +37,26 @@ def shadow(boxes: np.ndarray, cell: float, origin, axes: tuple[int, int], scale:
     return Image.fromarray(img)
 
 
+VIEWS = {"above": (0, 1), "side": (0, 2), "front": (1, 2)}
+DEFAULT_VIEW = {"SM_PLACE_KeeperRing": "front", "SM_PART_ArsenalCrane": "side"}           # (a ring is seen from its axis: that is where its hole is)
+
+
 def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--solids", default=str(ROOT / "data" / "space" / "solids.json"))
     p.add_argument("--out", default=str(ROOT / "Saved" / "Space" / "place_solids.jpg"))
     p.add_argument("--only", default="")
-    p.add_argument("--width", type=int, default=1500)
+    p.add_argument("--cell", type=int, default=740, help="width of a panel; the sheet has two columns")
+    p.add_argument("--all-views", action="store_true", help="above, side and front of each (a tall sheet) instead of one view of each")
     a = p.parse_args()
     d = json.loads(Path(a.solids).read_text())["meshes"]
     names = [n for n in d if not a.only or n in a.only.split(",")]
     try:
-        font = ImageFont.truetype("/System/Library/Fonts/Menlo.ttc", 15)
-        big = ImageFont.truetype("/System/Library/Fonts/Menlo.ttc", 19)
+        font = ImageFont.truetype("/System/Library/Fonts/Menlo.ttc", 14)
+        big = ImageFont.truetype("/System/Library/Fonts/Menlo.ttc", 16)
     except OSError:
         font = big = ImageFont.load_default()
-    W = a.width
-    panels: list[tuple[str, str, Image.Image]] = []
+    panels: list[tuple[str, Image.Image]] = []
     for name in names:
         m = d[name]
         cell = m["cell"]
@@ -61,31 +65,34 @@ def main() -> None:
         lo3 = [origin[k] + boxes[:, k].min() * cell for k in range(3)]
         hi3 = [origin[k] + (boxes[:, k] + boxes[:, 3 + k]).max() * cell for k in range(3)]
         ext = [hi3[k] - lo3[k] for k in range(3)]
-        scale = min((W - 40) / max(ext[0], 1.0), 430.0 / max(ext[1], ext[2], 1.0))
-        views = (("from above", (0, 1)), ("from the side", (0, 2)), ("from the front", (1, 2)))
-        head = f"{name}: {len(boxes)} boxes of cell {cell:g} m, {ext[0]:.0f} x {ext[1]:.0f} x {ext[2]:.0f} m (the orange mark is the Falcon, 12 m)"
-        for i, (label, ax) in enumerate(views):
+        views = list(VIEWS) if a.all_views else [DEFAULT_VIEW.get(name, "above")]
+        for view in views:
+            ax = VIEWS[view]
+            scale = min((a.cell - 40) / max(ext[ax[0]], 1.0), 300.0 / max(ext[ax[1]], 1.0))
             w = int(ext[ax[0]] * scale) + 40
             h = int(ext[ax[1]] * scale) + 30
             img = shadow(boxes, cell, origin, ax, scale, (lo3[ax[0]], lo3[ax[1]]), (max(w, 60), h))
-            dr = ImageDraw.Draw(img)
-            dr.rectangle((24, 8, 24 + 12 * scale, 8 + 3 * scale), fill=(255, 150, 60))
-            panels.append((head if i == 0 else "", label, img))
-    H = sum(img.height + 34 + (30 if head else 0) for head, _, img in panels)
-    sheet = Image.new("RGB", (W, H), (8, 10, 18))
+            ImageDraw.Draw(img).rectangle((24, 8, 24 + 12 * scale, 8 + 3 * scale), fill=(255, 150, 60))
+            cap = f"{name} {view}: {len(boxes)} boxes of {cell:g} m, {ext[0]:.0f} x {ext[1]:.0f} x {ext[2]:.0f} m"
+            panels.append((cap, img))
+    colw = a.cell
+    rows: list[list[tuple[str, Image.Image]]] = []
+    for i in range(0, len(panels), 2):
+        rows.append(panels[i:i + 2])
+    H = sum(max(im.height for _, im in r) + 30 for r in rows) + 30
+    sheet = Image.new("RGB", (colw * 2, H), (8, 10, 18))
     dr = ImageDraw.Draw(sheet)
-    y = 0
-    for head, label, img in panels:
-        if head:
-            dr.text((14, y + 6), head, fill=(230, 235, 245), font=big)
-            y += 30
-        dr.text((14, y + 2), label, fill=(140, 150, 170), font=font)
-        sheet.paste(img, (0, y + 20))
-        y += img.height + 34
+    dr.text((12, 6), "the solid parts of the places' hulls, as the game tests them for the Captain's Falcon (the orange mark is the Falcon, 12 m)", fill=(230, 235, 245), font=big)
+    y = 30
+    for r in rows:
+        for c, (cap, im) in enumerate(r):
+            dr.text((c * colw + 12, y + 2), cap, fill=(170, 180, 195), font=font)
+            sheet.paste(im, (c * colw, y + 22))
+        y += max(im.height for _, im in r) + 30
     out = Path(a.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     sheet.save(out, quality=86) if out.suffix.lower() in (".jpg", ".jpeg") else sheet.save(out)
-    print(out)
+    print(out, sheet.size)
 
 
 if __name__ == "__main__":
