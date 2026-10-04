@@ -750,11 +750,11 @@
    "frame": "ceiling",
    "collide": false,
    "doc": "two pipes on clamps",
-   "tris": 324,
+   "tris": 276,
    "min_cm": [
     -2.0,
     -22.0,
-    -22.0
+    -22.5
    ],
    "max_cm": [
     202.0,
@@ -971,7 +971,7 @@
    "frame": "wall",
    "collide": false,
    "doc": "riveted plate bay with a handrail and a stencil panel",
-   "tris": 1127,
+   "tris": 983,
    "min_cm": [
     0.0,
     -0.0,
@@ -996,7 +996,7 @@
    "frame": "wall",
    "collide": false,
    "doc": "pipe bank: three runs of copper with a valve wheel",
-   "tris": 1793,
+   "tris": 1409,
    "min_cm": [
     0.0,
     -0.0,
@@ -1023,7 +1023,7 @@
    "frame": "wall",
    "collide": false,
    "doc": "louvre and junction box",
-   "tris": 1156,
+   "tris": 1012,
    "min_cm": [
     0.0,
     -0.0,
@@ -1074,7 +1074,7 @@
    "frame": "wall",
    "collide": false,
    "doc": "hatch bay",
-   "tris": 1049,
+   "tris": 977,
    "min_cm": [
     0.0,
     -0.0,
@@ -1126,7 +1126,7 @@
    "frame": "wall",
    "collide": false,
    "doc": "plate bay stencilled HOLD FAST",
-   "tris": 1043,
+   "tris": 899,
    "min_cm": [
     0.0,
     -0.0,
@@ -1151,7 +1151,7 @@
    "frame": "wall",
    "collide": false,
    "doc": "plate bay with the Mandate's motto stencilled across it",
-   "tris": 1626,
+   "tris": 1482,
    "min_cm": [
     0.0,
     -0.0,
@@ -1176,7 +1176,7 @@
    "frame": "wall",
    "collide": false,
    "doc": "1 m filler",
-   "tris": 448,
+   "tris": 400,
    "min_cm": [
     0.0,
     -0.0,

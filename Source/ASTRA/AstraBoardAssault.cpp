@@ -1283,6 +1283,11 @@ bool UAstraBoardSubsystem::BeginRemoteScene()
 			M.bGutted = Rm.bGutted;
 			Assault.Moods.Add(Rm.Comp, M);
 		}
+		Assault.Fallen.Reset();
+		for (const FFleetSnapshot::FHand& H : Snap.Fallen)
+		{
+			Assault.Fallen.Add({H.Comp, H.PosCm, H.Person});
+		}
 	}
 	else if (bFacts && T.bDisabled)
 	{

@@ -11,6 +11,8 @@ Options:
   --no-export         build and check, write no FBX
   --sheet <dir>       render a contact sheet of the pieces into <dir> (Eevee, headless)
   --view <name>       render an assembled view (corridor | room | door) into --sheet's directory (board_kit_view.py)
+  --dump <file>       render the C++ dressing itself: the placements the bench's `dress` scenario dumped (tools/boarding.py run --scenario dress --dump <dir>), with --cam x,y,z,yaw[,pitch] (cm: where a Captain
+                      stands, which way he looks; as many as wanted) into --sheet's directory (or the FBX directory)
 
 Everything is in the layout frame of the Aquila's kit (X forward, Y to starboard, Z up, metres; the Y mirror of Blender is bridge3_lib's, as for the Aquila's kit). The frames of the pieces
 are board_kit_defs.py's.
@@ -37,7 +39,7 @@ ROOT = B3.ROOT
 DEFAULT_OUT = os.path.join(ROOT, "art", "export", "board")
 DEFAULT_JSON = os.path.join(ROOT, "data", "ship", "board_kit.json")
 UE_DIR = "/Game/ASTRA/Kit/Board"
-TRI_BUDGET = {"wall": 1400, "ceiling": 900, "floor": 400, "opening": 900, "prop": 3000, "body": 2500}      # per piece: what the instances of a deck can afford
+TRI_BUDGET = {"wall": 1500, "ceiling": 900, "floor": 400, "opening": 900, "prop": 2400, "body": 1100}      # per piece: what the instances of a deck can afford
 
 
 def _coarse_text_proto(text: str) -> dict:
@@ -170,6 +172,8 @@ def main() -> int:
     export = True
     sheet = None
     views: list[str] = []
+    dump = None
+    cams: list[tuple] = []
     i = 0
     while i < len(argv):
         a = argv[i]
@@ -188,6 +192,12 @@ def main() -> int:
         elif a == "--view":
             views.append(argv[i + 1])
             i += 1
+        elif a == "--dump":
+            dump = argv[i + 1]
+            i += 1
+        elif a == "--cam":
+            cams.append(tuple(float(v) for v in argv[i + 1].split(",")))
+            i += 1
         elif not a.startswith("--"):
             out_dir = a
         i += 1
@@ -201,13 +211,15 @@ def main() -> int:
         print(f"[board_kit] exported {len(built)} FBX files to {out_dir}")
     if json_path != "-":
         write_json(built, json_path)
-    if sheet or views:
+    if sheet or views or dump:
         import board_kit_view as V
         os.makedirs(sheet or out_dir, exist_ok=True)
         if sheet:
             V.sheet(built, os.path.join(sheet, "sheet"))
         for v in views:
             V.render_view(built, v, os.path.join(sheet or out_dir, f"view_{v}"))
+        if dump:
+            V.dump_view(built, dump, os.path.join(sheet or out_dir, "dress"), cams or [(0.0, 0.0, 165.0, 0.0)])
     return 0
 
 

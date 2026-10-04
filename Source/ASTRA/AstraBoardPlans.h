@@ -22,12 +22,16 @@ struct FBoardRoomMood
 	bool Burns() const { return Fire >= 0.10f && !bGutted; }
 };
 
+namespace AstraBoardDress { struct FLayout; }
+
 /** A ship's plan as boarding uses it. */
 struct ASTRA_API FBoardShipPlan
 {
 	FName Class;
 	FString Label;
 	FString Path;
+	FString Style;                                  // whose ship she is: mandate | astra | guild (the plan's "style": her decks are dressed in her side's hand)
+	TSharedPtr<AstraBoardDress::FLayout> Layout;    // the props of her rooms (AstraBoardDress::MakeLayout), from the plan alone; null for the Aquila
 	TSharedPtr<FAstraDamageMap> Dmg;
 	TSharedPtr<FAstraBoardMap> Map;
 	/** A hatch on the skin where a craft latches and the breach opens into Comp: in the plan's frame (cm). */

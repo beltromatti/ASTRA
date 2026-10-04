@@ -284,6 +284,58 @@ def corridor(built: dict, base: str) -> None:
     render(cam3, base + "_c")
 
 
+def _cube(c, s, mat: str):
+    bpy.ops.mesh.primitive_cube_add(size=1.0)
+    o = bpy.context.active_object
+    o.scale = s
+    o.location = (c[0], -c[1], c[2])
+    o.data.materials.append(bpy.data.materials[mat])
+    return o
+
+
+def dump_view(built: dict, dump_path: str, base: str, cams: list[tuple]) -> None:
+    """The C++ dressing itself, as the bench's `dress` scenario dumped it (tools/boarding.py run --scenario dress --dump <dir>): every placement of the rooms round a place made with the kit's meshes, the structure
+    under it as plain boxes, the lamps that are lit as lights; one picture for each camera (x, y, z cm, yaw degrees[, pitch]: what a Captain would see)."""
+    data = json.load(open(dump_path))
+    materials()
+    prepare(built)
+    start(1600, 900, 40, 0.9)
+    for kind, cx, cy, cz, hx, hy, hz in data["slabs"]:
+        if kind in (3, 4, 5, 6):                      # (the dressing hides the frames and the leaves, draws no strip of light)
+            continue
+        _cube((cx / 100.0, cy / 100.0, cz / 100.0), (2 * hx / 100.0, 2 * hy / 100.0, 2 * hz / 100.0), D.FRAME if kind == 0 else D.DECK)
+    lamps = []
+    missing = set()
+    for room in data["rooms"]:
+        for row in room["pieces"]:
+            key = row[0]
+            if key not in built:
+                missing.add(key)
+                continue
+            x, y, z, pitch, yaw, roll, sx, sy, sz = row[1:]
+            instance(built[key]["obj"], (x / 100.0, y / 100.0, z / 100.0), yaw, (sx, sy, sz))
+        lamps += room["lamps"]
+    if missing:
+        print(f"[board_kit_view] pieces in the dump that were not built: {sorted(missing)}")
+    for n, cam in enumerate(cams):
+        cx, cy, cz, yaw = cam[:4]
+        pitch = cam[4] if len(cam) > 4 else 0.0
+        near = sorted((l for l in lamps if l[3] < 2 and math.hypot(l[0] - cx, l[1] - cy) < 2200.0 and abs(l[2] - cz) < 400.0), key=lambda l: math.hypot(l[0] - cx, l[1] - cy))[:14]
+        lights = []
+        for i, (lx, ly, lz, st) in enumerate(near):
+            if st == 0:
+                lights.append(light(f"lamp{i}", (lx / 100.0, ly / 100.0, lz / 100.0), 190.0, (1.0, 0.7, 0.36), size=0.2, shadow=True))
+            else:
+                lights.append(light(f"lamp{i}", (lx / 100.0, ly / 100.0, lz / 100.0), 70.0, (1.0, 0.12, 0.05), size=0.2, shadow=True))
+        eye = (cx / 100.0, cy / 100.0, cz / 100.0)
+        cam_obj = camera(f"cam{n}", eye, (eye[0] + math.cos(math.radians(yaw)) * 10.0, eye[1] + math.sin(math.radians(yaw)) * 10.0, eye[2] + math.tan(math.radians(pitch)) * 10.0), 84)
+        tgt = (eye[0] + math.cos(math.radians(yaw)) * 12.0, eye[1] + math.sin(math.radians(yaw)) * 12.0, eye[2] - 0.2)
+        sp = PV.add_light("SPOT", "torch", (eye[0], eye[1], eye[2] - 0.1), 1500.0, (0.92, 0.96, 1.0), spot_angle=42.0, target=tgt, shadow=False)
+        render(cam_obj, f"{base}_{chr(ord('a') + n)}")
+        for o in lights + [sp]:
+            bpy.data.objects.remove(o, do_unlink=True)
+
+
 def render_view(built: dict, name: str, base: str) -> None:
     if name == "corridor":
         corridor(built, base)

@@ -16,7 +16,7 @@ from board_kit_defs import (BAY_H, BAY_W, BLAST_H, CLOTH, COPPER, DECK, DOOR_H, 
 
 
 # ============================================================================================================================ small helpers
-def _rivets(b: Parts, x0: float, x1: float, z0: float, z1: float, y: float, step: float = 0.42, size: float = 0.034) -> None:
+def _rivets(b: Parts, x0: float, x1: float, z0: float, z1: float, y: float, step: float = 0.72, size: float = 0.036) -> None:
     """A row of rivet heads round a panel's edge (x0..x1, z0..z1 at depth y): boxes, 12 triangles each."""
     nx = max(1, int(round((x1 - x0) / step)))
     nz = max(1, int(round((z1 - z0) / step)))
@@ -110,9 +110,9 @@ def wall_b(b: Parts) -> None:
     """The pipe bank: three runs of copper, a riser, a valve wheel, a gauge."""
     _frame_bay(b, upper=True)
     for i, z in enumerate((0.38, 0.72, 1.46)):
-        b.fine.cyl((0.1, 0.16, z), (BAY_W - 0.1, 0.16, z), 0.06, COPPER, seg=10)
-        for x in (0.22, 0.75, 1.28, 1.8):
-            b.fine.cyl((x, 0.1, z), (x, 0.215, z), 0.075, FRAME, seg=10)                       # the collars
+        b.fine.cyl((0.1, 0.16, z), (BAY_W - 0.1, 0.16, z), 0.06, COPPER, seg=8)
+        for x in (0.3, 1.0, 1.7):
+            b.fine.cyl((x - 0.03, 0.16, z), (x + 0.03, 0.16, z), 0.078, FRAME, seg=8)          # the collars
             b.fine.box((x - 0.03, 0.04, z - 0.1), (x + 0.03, 0.12, z + 0.1), FRAME)
     b.fine.cyl((1.7, 0.12, 0.2), (1.7, 0.12, BAY_H - 0.2), 0.045, VERD, seg=8)                  # the riser
     # the valve wheel on the middle run
@@ -223,7 +223,7 @@ def wall_plain(b: Parts) -> None:
     fb.box((t, 0.04, 1.0 - 0.035), (w - t, 0.095, 1.035), FRAME)
     fb.box((t + 0.04, 0.04, 0.16), (w - t - 0.04, 0.062, 0.95), PLATE)
     fb.box((t + 0.04, 0.04, 1.08), (w - t - 0.04, 0.062, BAY_H - t - 0.04), PLATE)
-    _rivets(b, t + 0.09, w - t - 0.09, 0.2, 0.9, 0.062, step=0.4)
+    _rivets(b, t + 0.09, w - t - 0.09, 0.2, 0.9, 0.062, step=0.6)
 
 
 def _rot_y(deg: float):
@@ -273,14 +273,14 @@ def header(b: Parts) -> None:
 # ============================================================================================================================ ceilings (z down from the ceiling's plane)
 def pipes(b: Parts) -> None:
     for y in (-0.115, 0.115):
-        b.fine.cyl((0.0, y, -0.12), (2.0, y, -0.12), 0.085, COPPER, seg=10)
+        b.fine.cyl((0.0, y, -0.12), (2.0, y, -0.12), 0.085, COPPER, seg=8)
     for x in (0.01, 1.0, 1.99):
         b.fine.box((x - 0.03, -0.2, -0.2), (x + 0.03, 0.2, -0.17), FRAME)                      # the clamp's strap under both
         for y in (-0.115, 0.115):
             b.fine.box((x - 0.012, y - 0.012, -0.17), (x + 0.012, y + 0.012, 0.0), FRAME)        # the rods to the ceiling
     for x in (0.03, 1.97):
         for y in (-0.115, 0.115):
-            b.fine.cyl((x, y, -0.12), (x + (0.025 if x < 1 else -0.025), y, -0.12), 0.105, VERD, seg=10)   # the flange rings
+            b.fine.cyl((x, y, -0.12), (x + (0.025 if x < 1 else -0.025), y, -0.12), 0.105, VERD, seg=8)    # the flange rings
 
 
 def tray(b: Parts) -> None:

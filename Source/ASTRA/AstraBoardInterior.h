@@ -24,10 +24,12 @@ class UMaterialInterface;
 class UPointLightComponent;
 class USpotLightComponent;
 class UStaticMesh;
+namespace AstraBoardDress { struct FFallen; }
 
 namespace AstraBoardInterior
 {
-	enum class ESlab : uint8 { Wall, Floor, Ceiling, Frame, Leaf, Strip };
+	enum class ESlab : uint8 { Wall, Floor, Ceiling, Frame, Leaf, Strip, Mark };       // (Mark: a lit square on the floor where stairs and lifts are: not a ceiling light)
+	constexpr int32 NumSlabKinds = 7;
 
 	/** One solid: an axis-aligned box (cm, the plan's frame). */
 	struct FSlab
@@ -44,6 +46,31 @@ namespace AstraBoardInterior
 	constexpr float CeilingCm = 20.f;
 	constexpr float DoorHeightCm = 222.f;
 	constexpr float BlastHeightCm = 240.f;
+
+	/** A gap in a wall: along it from S0 to S1, up from Bot to Top (cm above this room's floor: a door between a tall hall and a room on a higher deck stands where the higher floor is). */
+	struct FOpening
+	{
+		double S0 = 0.0, S1 = 0.0, Bot = 0.0, Top = 0.0;
+		int32 Portal = INDEX_NONE;
+		bool bFramed = false;                      // a door or a pressure bulkhead (the open ways are not framed)
+	};
+	/** A stretch of a wall that stands alike all along it: Solid lists the heights above the floor that are wall there ((from, to) pairs: a stretch above a door is one, a stretch beside it another). */
+	struct FWallRun
+	{
+		double S0 = 0.0, S1 = 0.0;
+		TArray<FVector2D, TInlineAllocator<3>> Solid;
+	};
+	/** One face of a room, as BuildComp makes it and as the dressing (AstraBoardDress) dresses it: face 0 +X, 1 -X, 2 +Y, 3 -Y; Plane the face's coordinate along its axis (X for 0 and 1, Y for 2 and 3), Sign which
+	 *  way it looks out of the room, T0..T1 its extent along the other axis, the openings (the gaps of its portals) and the runs of wall between them. */
+	struct FFaceGeo
+	{
+		int32 Face = 0;
+		bool bX = true;
+		double Sign = 1.0, Plane = 0.0, T0 = 0.0, T1 = 0.0;
+		TArray<FOpening> Opens;
+		TArray<FWallRun> Runs;
+	};
+	ASTRA_API void FaceGeo(const FAstraBoardMap& Map, int32 Comp, int32 Face, FFaceGeo& Out);
 
 	/** The solids of one compartment: its floor and ceiling, its four walls with the gaps of its portals (the doors, the open ways: the whole stretch the two rooms share), a frame round each door, a
 	 *  leaf in each pressure bulkhead that this room is the first side of, and a strip of light. */
@@ -69,8 +96,9 @@ public:
 	static FVector CabinOrigin();
 
 	/** The plan to make solid, where in the world it stands (ZoneOrigin), and how it is lit. InMoods: how the rooms are that the war has left not as built (rooms without power are dark, rooms that burn
-	 *  have their fire's light); null: all as built, lit by the style alone. */
-	void Begin(TSharedPtr<FBoardShipPlan> InPlan, const FVector& InOffset, EAstraInteriorStyle InStyle, const TMap<int32, FBoardRoomMood>* InMoods = nullptr);
+	 *  have their fire's light); null: all as built, lit by the style alone. InFallen: the crew she lost, where they fell (the war's picture of her: they lie where they fell). When the kit of the decks
+	 *  (art/blender/board_kit.py, imported by tools/ue_scripts/import_board_kit.py) is in the content, the rooms are dressed as they are built (AstraBoardDress); when it is not, they stay plain boxes. */
+	void Begin(TSharedPtr<FBoardShipPlan> InPlan, const FVector& InOffset, EAstraInteriorStyle InStyle, const TMap<int32, FBoardRoomMood>* InMoods = nullptr, const TArray<AstraBoardDress::FFallen>* InFallen = nullptr);
 	/** A small room of a boat (benches, red light): where a Captain waits while the boat flies. Returns where to put him (feet, cm). */
 	FVector BuildCabin();
 	/** The rooms round a point of the plan (cm) are made solid (a few at each call). Returns true while there is more to build there. */
@@ -85,6 +113,8 @@ public:
 	bool IsBegun() const { return Plan.IsValid(); }
 	int32 NumRooms() const { return Built.Num(); }
 	int32 NumSlabs() const { return NumInstances; }
+	/** What the dressing has put in the rooms built so far, in a line (the console's info): instances of the kit, props, bodies, lamps. Empty when the rooms are not dressed. */
+	FString DescribeDress() const;
 	/** Everything goes. */
 	void End();
 
@@ -128,4 +158,15 @@ private:
 	void AddSlabs(const TArray<AstraBoardInterior::FSlab>& Slabs);
 	void MakePads(int32 Comp);
 	void MoveLights();
+
+	// ---- the dressing (AstraBoardInteriorDress.cpp): the kit's pieces as instanced meshes, the lamps that light, the signs, the flames and sparks
+	struct FKitState;
+	TSharedPtr<FKitState> Kit;
+	UPROPERTY() TArray<TObjectPtr<UObject>> KitKeep;           // what the dressing's materials and pooled parts are made of (kept from the collector)
+	bool DressBegin(const TArray<AstraBoardDress::FFallen>* InFallen);
+	void DressBuilt(int32 Comp);
+	void DressShut(const TSet<int32>& ShutDoors);
+	void DressLights(const FVector& Eye);
+	void DressTick(float Dt);
+	void DressEnd();
 };

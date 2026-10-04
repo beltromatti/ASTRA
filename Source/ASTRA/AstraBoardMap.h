@@ -127,7 +127,14 @@ public:
 	/** The slots of a compartment hidden from a point and from which a step shows it: the places to fight a man who stands there, nearest to From first. */
 	void FightingSlots(int32 Comp, const FVector& Enemy, const FVector& From, const FBoardDoors* Doors, TArray<int32>& Out) const;
 
+	/** The boxes (cm, the plan's frame, axis aligned) of what stands in each room, the props of AstraBoardDress::MakeLayout: a spot picked with Inset is kept out of them, so nobody is placed in a crate or a
+	 *  cot. Set once, when the plan is read (the lanes the soldiers walk are kept clear of the props by the layout itself). All = every room's boxes one after the other, First = where each room's begin (and one more). */
+	void SetBlocks(TArray<FBox2D>&& All, TArray<int32>&& First);
+	TArrayView<const FBox2D> BlocksOf(int32 Comp) const;
+
 private:
+	TArray<FBox2D> BlockAll;
+	TArray<int32> BlockFirst;
 	TSharedPtr<const FAstraDamageMap> Src;
 	TArray<FBoardComp> Comps;
 	TArray<FBoardPortal> Portals;

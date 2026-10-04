@@ -229,7 +229,7 @@ bool UAstraBoardSubsystem::EnsureEnemyDecks(const FVector& NearPlanCm, int32 Max
 			}
 			bHulk = Dark * 2 > ScenePlan->Dmg->Comps.Num();
 		}
-		Interior->Begin(ScenePlan, RemoteOffset, bHulk ? EAstraInteriorStyle::Emergency : EAstraInteriorStyle::Lit, Assault.bFromWar ? &Assault.Moods : nullptr);
+		Interior->Begin(ScenePlan, RemoteOffset, bHulk ? EAstraInteriorStyle::Emergency : EAstraInteriorStyle::Lit, Assault.bFromWar ? &Assault.Moods : nullptr, Assault.bFromWar ? &Assault.Fallen : nullptr);
 	}
 	Interior->EnsureAround(NearPlanCm, MaxRooms);
 	return true;

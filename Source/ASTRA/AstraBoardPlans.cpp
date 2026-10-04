@@ -1,6 +1,7 @@
 #include "AstraBoardPlans.h"
 
 #include "ASTRA.h"
+#include "AstraBoardDress.h"
 #include "AstraFleetPlan.h"
 #include "Dom/JsonObject.h"
 #include "HAL/FileManager.h"
@@ -96,6 +97,7 @@ TSharedPtr<FBoardShipPlan> AstraBoardPlans::LoadFile(const FString& Path, FName 
 	if (FFileHelper::LoadFileToString(Text, *Path) && FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), Plan) && Plan.IsValid())
 	{
 		Plan->TryGetStringField(TEXT("label"), P->Label);
+		Plan->TryGetStringField(TEXT("style"), P->Style);
 		double Crew = 0.0;
 		Plan->TryGetNumberField(TEXT("crew"), Crew);
 		P->Crew = (int32)Crew;
@@ -174,8 +176,11 @@ TSharedPtr<FBoardShipPlan> AstraBoardPlans::LoadFile(const FString& Path, FName 
 			}
 		}
 	}
-	UE_LOG(LogASTRA, Log, TEXT("[Board] plan of the %s: %d compartments, %d portals, %d docks, %d posts (%.0f ms)"), *ClassKey.ToString(), P->Dmg->Comps.Num(), P->Map->GetPortals().Num(), P->Docks.Num(),
-	       P->Garrison.Num(), (FPlatformTime::Seconds() - T0) * 1000.0);
+	// what stands in her rooms: from the plan alone (nobody is placed in a crate: the map keeps the boxes)
+	const double TLay = FPlatformTime::Seconds();
+	P->Layout = AstraBoardDress::MakeLayout(*P);
+	UE_LOG(LogASTRA, Log, TEXT("[Board] plan of the %s: %d compartments, %d portals, %d docks, %d posts, %d props (%.0f ms, %.0f of them for the props)"), *ClassKey.ToString(), P->Dmg->Comps.Num(), P->Map->GetPortals().Num(),
+	       P->Docks.Num(), P->Garrison.Num(), P->Layout.IsValid() ? P->Layout->Props.Num() : 0, (FPlatformTime::Seconds() - T0) * 1000.0, (FPlatformTime::Seconds() - TLay) * 1000.0);
 	return P;
 }
 

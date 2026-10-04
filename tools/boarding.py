@@ -60,6 +60,10 @@ def cmd_run(a: argparse.Namespace) -> int:
         args.append(f"-setup={a.setup}")
     if getattr(a, "dump", ""):
         args.append(f"-dump={(ROOT / a.dump).resolve()}")
+    if getattr(a, "focus", ""):
+        args.append(f"-focus={a.focus}")
+    if getattr(a, "hurt", False):
+        args.append("-hurt")
     t0 = time.time()
     with open(log, "w") as f:
         p = subprocess.Popen(args, stdout=f, stderr=subprocess.STDOUT, cwd=str(ROOT))
@@ -297,7 +301,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     r = sub.add_parser("run")
-    r.add_argument("--scenario", default="all", help="all | map | rules | duel | squad | flank | board | orders (the marines' orders, on request only) | fps (the Captain's arms, on request only) | plans | attack (other ships' plans and the marines aboard one, on request only) | interior (every class's plan made solid and the simulation's routes walked through it, on request only) | war (a ship the war has shot at, boarded, on request only)")
+    r.add_argument("--scenario", default="all", help="all | map | rules | duel | squad | flank | board | orders (the marines' orders, on request only) | fps (the Captain's arms, on request only) | plans | attack (other ships' plans and the marines aboard one, on request only) | interior (every class's plan made solid and the simulation's routes walked through it, on request only) | war (a ship the war has shot at, boarded, on request only) | dress (every class's decks dressed: instances and triangles for the ship, each deck and the ring round a Captain against the plain boxes, the soldiers' ways clear of the props, the doors, no one placed in a prop; on request only)")
     r.add_argument("--seed", type=int, default=1)
     r.add_argument("--seeds", type=int, default=20, help="how many fights of each kind (seeds seed .. seed+seeds-1)")
     r.add_argument("--boarders", type=int, default=0, help="board: the size of the boarding party of the first setup (default 10, one skiff)")
@@ -308,7 +312,9 @@ def main() -> int:
     r.add_argument("--class", dest="klass", default="", help="plans/attack: the ship's class (acheron, styx, lethe, praetorian, vigilant)")
     r.add_argument("--fpsset", default="", help="fps: try other places and anchors without touching the table, \"rifle.hip=84,17,-10;rifle.hipturn=-3,-13,0;rifle.shoulder_l=62,-20,-42\" (keys: rifle./pistol. hip hipturn ads low lowturn gripl fov shoulder_r shoulder_l; pole_r pole_l for both)")
     r.add_argument("--fpsposes", default="", help="fps: write the engine's poses (idle, draw, reload, dry fire) to this JSON file, for the offline preview")
-    r.add_argument("--dump", default="", help="interior: write the solids of each class's plan (JSON, for the offline view) into this directory")
+    r.add_argument("--dump", default="", help="interior: write the solids of each class's plan (JSON, for the offline view) into this directory; dress: the dressing of the rooms round --focus (art/blender/board_kit.py --dump renders it)")
+    r.add_argument("--focus", default="", help="dress --dump: the place the dumped rooms are round, \"x,y,z\" in cm (default: where the first boat docks)")
+    r.add_argument("--hurt", action="store_true", help="dress --dump: dump the rooms as the war would leave them (dark, burning, gutted) instead of as built")
     r.add_argument("--timeout", type=int, default=1500)
     r.set_defaults(fn=cmd_run)
     c = sub.add_parser("craft")
