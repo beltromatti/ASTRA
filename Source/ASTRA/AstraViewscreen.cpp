@@ -35,7 +35,9 @@ namespace
 {
 	TAutoConsoleVariable<int32> CVarViewscreenHz(TEXT("astra.viewscreen.hz"), 30, TEXT("Main viewscreen: optical feed and overlay refreshes per second (0 = frozen)"));
 	TAutoConsoleVariable<int32> CVarViewscreenWidth(TEXT("astra.viewscreen.width"), 0,
-		TEXT("Main viewscreen: the optical feed's width in pixels (0 = the actor's FeedWidth; the height keeps the screen's 2.4:1)"));
+		TEXT("Main viewscreen: the optical feed's width in pixels, fixed (0 = as many as the screen covers on the Captain's view, between 480 and astra.viewscreen.maxwidth, while the frame holds; the height keeps the screen's 2.4:1)"));
+	TAutoConsoleVariable<int32> CVarViewscreenMaxWidth(TEXT("astra.viewscreen.maxwidth"), 1280,
+		TEXT("Main viewscreen: the widest the optical feed grows to when the screen covers that many pixels and the frame holds its pace"));
 	TAutoConsoleVariable<float> CVarViewscreenFill(TEXT("astra.viewscreen.fill"), 0.35f,
 		TEXT("Main viewscreen: the sensors' fill from the camera's side, as a fraction of the star's light (a ship against the star is not a black cut-out; 0 = off)"));
 	FAutoConsoleCommandWithWorldAndArgs CmdViewscreenDump(TEXT("astra.viewscreen.dump"),
@@ -929,13 +931,37 @@ void AAstraViewscreen::Tick(float DeltaSeconds)
 	const int32 HzMax = CVarViewscreenHz.GetValueOnGameThread();
 	const int32 Hz = HzMax <= 0 ? 0 : (Fps >= 0.92f * TargetFps ? HzMax : (Fps >= 0.8f * TargetFps ? FMath::Min(HzMax, 20) : FMath::Min(HzMax, 12)));
 	const bool bDue = Hz > 0 && Now - LastCaptureAt >= 1.0 / Hz - 0.004;
-	if (const int32 Want = CVarViewscreenWidth.GetValueOnGameThread(); Want >= 320 && Want <= 2048 && Want != FeedWidth && Feed)
+	// the feed's width: as many pixels as the screen covers on the Captain's view (a 640-pixel feed was stretched to some 1100 Retina pixels from
+	// the chair, 4 Oct: soft), between 480 and astra.viewscreen.maxwidth in steps of 64; it grows only while the game keeps its pace and gives way
+	// at once when frames run long, like the feed's rate; astra.viewscreen.width fixes it
+	int32 Want = CVarViewscreenWidth.GetValueOnGameThread();
+	if (Want <= 0 && bWatched && Now >= NextSizeAt)
 	{
-		// a new size for the feed (testing the cost of a sharper image): the capture's history starts again
+		NextSizeAt = Now + 3.0;
+		APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
+		FVector2D L, R;
+		const FTransform T = GetActorTransform();
+		const float HalfW = WidthM * 50.f, MidH = HeightM * 50.f;
+		if (PC && PC->ProjectWorldLocationToScreen(T.TransformPosition(FVector(0.f, -HalfW, MidH)), L, true) &&
+		    PC->ProjectWorldLocationToScreen(T.TransformPosition(FVector(0.f, HalfW, MidH)), R, true))
+		{
+			const int32 MaxW = FMath::Clamp(CVarViewscreenMaxWidth.GetValueOnGameThread(), 480, 2048);
+			const int32 Covered = FMath::Clamp(FMath::DivideAndRoundUp(FMath::RoundToInt((float)FVector2D::Distance(L, R)), 64) * 64, 480, MaxW);
+			Want = Fps < 0.8f * TargetFps ? FMath::Min(FeedWidth, 640) : (Covered > FeedWidth && Fps < 0.92f * TargetFps ? FeedWidth : Covered);
+			if (FMath::Abs(Want - FeedWidth) < FeedWidth / 5)
+			{
+				Want = FeedWidth;                       // (a fifth or less of a change: not worth the capture's lost history)
+			}
+		}
+	}
+	if (Want >= 320 && Want <= 2048 && Want != FeedWidth && Feed)
+	{
+		// a new size for the feed: the capture's history starts again
 		FeedHeight = FMath::RoundToInt(Want * 267.f / 640.f);
 		FeedWidth = Want;
 		Feed->InitAutoFormat(FeedWidth, FeedHeight);
 		Feed->UpdateResourceImmediate(true);
+		UE_LOG(LogASTRA, Log, TEXT("[Viewscreen] the feed is %d x %d pixels now (%.0f fps of %.0f)"), FeedWidth, FeedHeight, Fps, TargetFps);
 	}
 	if (bWatched)
 	{

@@ -108,6 +108,7 @@ private:
 	double LastCaptureAt = -1.0;       // the last refresh of the feed and the overlay
 	float SmoothDt = 0.f;                 // the frame time, smoothed (the feed gives way when frames run long)
 	double NextShowListAt = 0.0;       // when the list of what the camera may see is rebuilt
+	double NextSizeAt = 0.0;           // when the feed's width is next weighed against the pixels the screen covers on the Captain's view
 	/** The camera sees only space (the sky, the Aquila's hull, ships, weapons, wrecks): the bridge, the decks inside and
 	 *  the planet's surface zone never enter its scene (half the render thread's work of a capture was theirs). */
 	void RebuildShowList();
