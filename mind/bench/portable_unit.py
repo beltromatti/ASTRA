@@ -392,6 +392,19 @@ class TestPackaging(unittest.TestCase):
         r = subprocess.run([sys.executable, str(MIND.parent / "tools" / "portability.py"), "--lock", str(MIND / "astra_mind" / "host.py")], capture_output=True, text=True)
         self.assertEqual(r.returncode, 0, r.stdout[-800:] + r.stderr[-400:])
 
+    def test_the_windows_scripts_are_plain_ascii_and_the_batch_file_has_windows_line_ends(self) -> None:
+        # Windows PowerShell 5.1 reads a script with no byte order mark in the system's code page: an accent or a typographic apostrophe would come out as
+        # something else (or as a syntax error); cmd.exe is happiest with CRLF
+        folder = MIND.parent / "tools" / "windows"
+        scripts = sorted(folder.glob("*.ps1")) + sorted(folder.glob("*.bat"))
+        self.assertGreaterEqual(len(scripts), 5)
+        for path in scripts:
+            data = path.read_bytes()
+            self.assertTrue(all(b < 128 for b in data), f"{path.name} is not plain ASCII")
+        for path in sorted(folder.glob("*.bat")):
+            data = path.read_bytes()
+            self.assertEqual(data.count(b"\n"), data.count(b"\r\n"), f"{path.name} needs CRLF line ends")
+
     def test_the_project_passes_its_own_portability_check(self) -> None:
         tool = str(MIND.parent / "tools" / "portability.py")
         selftest = subprocess.run([sys.executable, tool, "--selftest"], capture_output=True, text=True)

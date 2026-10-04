@@ -55,7 +55,10 @@ function Find-UnrealEngine {
     catch { }
     $candidates += "C:\Program Files\Epic Games\UE_5.8"
     foreach ($c in $candidates) {
-        if (Test-Path (Join-Path $c "Engine\Build\BatchFiles\RunUAT.bat")) { return $c }
+        try {      # (Join-Path si ferma con un errore su un disco che non esiste)
+            if (Test-Path (Join-Path $c "Engine\Build\BatchFiles\RunUAT.bat")) { return $c }
+        }
+        catch { }
     }
     return $null
 }
@@ -77,7 +80,14 @@ if (-not $SoloMente) {
     if (-not $UEDir) { Fail "Unreal Engine 5.8 non trovato: indica -UE 'C:\Program Files\Epic Games\UE_5.8' (o imposta UE_ROOT)" }
     Write-Host "Unreal Engine: $UEDir"
     if (Get-Process -Name "UnrealEditor" -ErrorAction SilentlyContinue) { Fail "chiudi prima l'editor" }
-    $assets = Get-ChildItem -Path (Join-Path $Repo "Content") -Recurse -File -Include *.uasset, *.umap | Select-Object -First 25
+    # i manichini di Epic (i corpi dell'equipaggio) non stanno in git: senza, il gioco parte con un equipaggio senza corpi
+    $Manny = Join-Path $Repo "Content\Characters\Mannequins\Meshes\SKM_Manny_Simple.uasset"
+    if (-not (Test-Path $Manny)) {
+        Write-Host "Content\Characters (i manichini di Epic, fuori da git) manca: lo copio dal motore."
+        & (Join-Path $PSScriptRoot "Setup-EpicContent.ps1") -UE $UEDir
+        if (-not (Test-Path $Manny)) { Fail "Content\Characters manca e non l'ho potuto copiare: esegui tools\windows\Setup-EpicContent.ps1" }
+    }
+    $assets =Get-ChildItem -Path (Join-Path $Repo "Content") -Recurse -File -Include *.uasset, *.umap | Select-Object -First 25
     foreach ($a in $assets) {
         if (Test-LfsPointer $a.FullName) { Fail "$($a.FullName) e' un puntatore di Git LFS: esegui 'git lfs pull' nel repository" }
     }

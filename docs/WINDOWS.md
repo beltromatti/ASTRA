@@ -66,6 +66,7 @@ Quello che resta non provato senza un PC è elencato in §7.3.
 |---|---|---|
 | `tools/pacchetto.sh` | `RunUAT BuildCookRun` per Mac, la mente in `Contents/Resources/mind`, dati in Application Support, `codesign`, `PlistBuddy`, `rsync`, `cp -c` | `tools/windows/Pacchetto-Windows.ps1` (§6) + `Setup-ASTRA.ps1`/`.bat` per la prima configurazione |
 | `tools/ricompila.sh`, `avvia_editor.sh`, `perf/*.sh`, `survive.sh` | strumenti dello sviluppatore Mac (zsh, `pgrep`, percorsi di Epic) | restano così: sono del Mac del lead. Per compilare su Windows vedi §6.2; il `pkill -f astra-mind` di `ricompila.sh` ha il suo gemello in `tools/windows/Stop-Mind.ps1` |
+| `tools/setup_epic_content.sh` | copia dal motore i manichini di Epic (`Content/Characters`, fuori da git: sono i corpi dell'equipaggio) | `tools/windows/Setup-EpicContent.ps1`: la stessa copia da `Templates\TemplateResources\High\Characters\Content`; `Pacchetto-Windows.ps1` la fa da solo se mancano |
 | `tools/play.py` | lancia il gioco col banco di prova | ora: `UE_ROOT`, `UnrealEditor.exe`, `ASTRA.exe` con `--app`, `Get-CimInstance`/`taskkill` al posto di `pgrep`/`pkill`, processo staccato di Windows |
 | `tools/damage.py`, `life.py`, `lift.py`, `boarding.py`, `transport.py` | lanciano i comandi senza grafica | già usano `UE_ROOT` e il percorso di Windows. **Non ancora**: `tools/war.py` e `tools/space.py` (una riga ciascuno, come in `damage.py`), `tools/soak.py` (`pgrep`) |
 | `tools/art/*`, `tools/ue_scripts/*`, Blender | arte e importazioni dentro l'editor o Blender | strumenti di sviluppo, nessun codice di gioco: invariati |
@@ -189,7 +190,9 @@ producibile se la scrittura non è latina (come sempre).
 
 ### 6.2 Passi (in ordine)
 1. `git clone` del repository in `C:\ASTRA`, poi `git lfs pull`; sul ramo che include `worktree-agent-a77d0ce415fad4f4a` (o `main` dopo l'unione).
-2. Prima di compilare, i controlli che non servono Unreal: `python tools\portability.py` (zero risultati attesi), `python tools\portability.py --lock` (se c'è uv).
+2. **I manichini di Epic**: `powershell -NoProfile -ExecutionPolicy Bypass -File tools\windows\Setup-EpicContent.ps1` copia `Content\Characters` (125 MB) dal motore. Non sta in git, e senza di lui il gioco
+   parte con un equipaggio senza corpi, in silenzio. Il pacchetto (passo 5) lo fa da solo se manca; la compilazione e l'editor no.
+   Poi, prima di compilare, i controlli che non servono Unreal: `python tools\portability.py` (zero risultati attesi), `python tools\portability.py --lock` (se c'è uv).
 3. **Compilare l'editor**: `"C:\Program Files\Epic Games\UE_5.8\Engine\Build\BatchFiles\Build.bat" ASTRAEditor Win64 Development -Project="C:\ASTRA\ASTRA.uproject" -WaitMutex`.
    Qui arriveranno gli errori MSVC (§6.4): sono il lavoro vero della giornata. Poi `ASTRA Win64 Development` (il gioco).
 4. Prova senza grafica, come sul Mac: `"C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe" C:\ASTRA\ASTRA.uproject -run=AstraMindLaunch -launch=dev -nullrhi -unattended -nosound -nopause` (e `-launch=packaged`): avvia la mente vera
@@ -212,13 +215,14 @@ producibile se la scrittura non è latina (come sempre).
 ### 6.4 Problemi probabili e dove guardare
 | Sintomo | Probabile causa | Dove / cosa fare |
 |---|---|---|
-| errori `C2…`, `C4…` o `error LNK` nei file di `Source/ASTRA` | codice mai compilato con MSVC (macro di Windows come `min`/`max`/`GetObject`/`SendMessage` che entrano in conflitto con nomi nostri, conversioni implicite, intestazioni mancanti, `-Wshadow` che sui blocchi di unità può dare errori) | correggere caso per caso; `-DisableUnity` isola un file alla volta (provato sul Mac: compila) |
+| errori `C2…`, `C4…` o `error LNK` nei file di `Source/ASTRA` | codice mai compilato con MSVC (macro di Windows come `min`/`max`/`GetObject`/`SendMessage` che entrano in conflitto con nomi nostri, conversioni implicite, intestazioni mancanti, `-Wshadow` che sui blocchi di unità può dare errori; con `BuildSettingsVersion.V7` anche C4456/C4458 (ombre: i sei punti noti sono in §7.3) e C4702, il codice irraggiungibile di un `if` su una costante) | correggere caso per caso; `-DisableUnity` isola un file alla volta (provato sul Mac: compila); `#pragma warning(disable: 4702)` o `if constexpr` per il C4702 |
 | `uv non trovato` a schermo | né `mind\bin\uv.exe` né uv nel PATH | rilanciare il pacchetto con `-Uv`, o `winget install --id astral-sh.uv -e`, o `ASTRA_UV` |
 | `the mind stopped (exit code 1)` poco dopo l'avvio | niente chiave (`RuntimeError: Chiave mancante nel .env`) o una libreria che non carica | `astra-mind.log`; `Setup-ASTRA.bat` ricontrolla tutto |
 | `OSError: [WinError 126]` / `DLL load failed` in torch o onnxruntime | manca il Visual C++ Redistributable | `Engine\Extras\Redist\en-us\UEPrereqSetup_x64.exe` nel pacchetto (lo mette `-prereqs`), o `https://aka.ms/vs/17/release/vc_redist.x64.exe` |
 | la mente non si connette, nessun errore | la porta 8765 è riservata o presa | variabile di sistema `ASTRA_MIND_PORT=18765` (vale per gioco e mente) |
 | `uv sync` fallisce | rete assente o filtrata; antivirus che mette in quarantena `uv.exe`/`python.exe` | rilanciare `Setup-ASTRA.bat`: ciò che è scaricato resta; escludere la cartella di `%LOCALAPPDATA%\ASTRA` dall'antivirus |
 | `Setup-ASTRA.ps1` "l'esecuzione di script è disabilitata" | criterio di esecuzione di PowerShell | usare `Setup-ASTRA.bat` (passa `-ExecutionPolicy Bypass` per quella sola esecuzione: non cambia nessuna impostazione del sistema) |
+| il gioco parte ma l'equipaggio non ha corpi (nessun errore: nel log i `LoadObject` di `/Game/Characters/Mannequins/...` tornano vuoti) | `Content\Characters` non c'è: sono i manichini del motore, fuori da git | `tools\windows\Setup-EpicContent.ps1`, poi ricompilare il pacchetto |
 | il gioco cuoce con "path too long" | repository in un percorso lungo | clonare in `C:\ASTRA` |
 | `uv sync` si ferma con un percorso troppo lungo dentro `%LOCALAPPDATA%\ASTRA\venv` | un profilo utente dal nome lungo più le cartelle profonde dei pacchetti Python | variabile di sistema `ASTRA_HOME=C:\ASTRA-data` (la leggono il gioco, la mente e `Setup-ASTRA.bat`, e il venv nasce lì) |
 | il gioco salva in un posto in cui non può scrivere | pacchetto sotto Program Files | una cartella scrivibile, o `-SaveToUserDir` |
@@ -233,7 +237,7 @@ UnrealEditor-Cmd ASTRA.uproject -run=AstraMindLaunch [-probe] [-launch=dev|packa
 Engine/Build/BatchFiles/Mac/Build.sh ASTRAEditor Mac Development -Project="$PWD/ASTRA.uproject" -WaitMutex [-DisableUnity | -DisableAdaptiveUnity]
 
 # mente
-cd mind && .venv/bin/python -m unittest bench.portable_unit -v                     # 35 prove, senza rete né modelli
+cd mind && .venv/bin/python -m unittest bench.portable_unit -v                     # 36 prove, senza rete né modelli
 ASTRA_TEST_BOOT=1 .venv/bin/python -m unittest bench.portable_unit.TestBoot          # la mente vera su una porta libera
 ASTRA_TEST_PORTABLE_REAL=1 ASTRA_VOICE_MODELS=<cartella> .venv/bin/python -m unittest bench.portable_unit.TestPortableEngines   # Pocket TTS parla, i motori di Windows ascoltano
 .venv/bin/python -m unittest discover -s bench -t . -p "*_unit.py"                  # 549 prove della mente
@@ -250,7 +254,7 @@ python3 tools/shadow_audit.py [-j N] [--all]      # sul Mac, dopo una compilazio
   ciascun sistema, maiuscole e minuscole, variabili che cambiano mente/uv/dati, la porta), la macchina vera, `-probe` (un vero `CreateProc` che scrive il suo ambiente e il controllo che l'ambiente del gioco
   sia tornato com'era), `-launch=dev` (la mente vera dal venv del repository: il client WebSocket del gioco si connette dopo 4 s, la mente scrive "game connected" nel suo log, `TerminateProc` la ferma) e
   `-launch=packaged` (una copia della mente in un finto `ASTRA.app/Contents/Resources/mind`, dati propri, uv crea il venv nuovo in 20 s, stessi controlli).
-- `bench.portable_unit` 35 prove OK (porta, log da processi veri con scritture native e tetto, segnali con e senza SIGHUP, scelta dei motori su macchine Windows/Mac Intel/Apple Silicon finte, SAPI con un
+- `bench.portable_unit` 36 prove OK (porta, log da processi veri con scritture native e tetto, segnali con e senza SIGHUP, scelta dei motori su macchine Windows/Mac Intel/Apple Silicon finte, SAPI con un
   PowerShell finto, lock e pyproject d'accordo, ruote di Windows, controllo di portabilità, caricamento nativo); 549 prove `*_unit` e 82 prove `*_server` della mente: tutte OK.
 - Motori portabili **veri**, forzati con `ASTRA_STT=portable`: la frase «Helm, come to heading two one seven and full ahead.» fatta da Pocket TTS → `parakeet-onnx`: «Helm. Come to heading 217 and full ahead.» in
   0,10 s; `faster-whisper`: «Come to heading 217 and full ahead.» in 1,69 s.
