@@ -18,6 +18,7 @@ class FASTRAGameModule : public FDefaultGameModuleImpl
 public:
 	virtual void StartupModule() override
 	{
+// portable-ok: the Mac's own start-up problem; Windows starts in borderless full screen from Config/Windows/WindowsGameUserSettings.ini
 #if !WITH_EDITOR && PLATFORM_MAC
 		// The app opens in a window and goes full screen by itself once it is in front. When the engine creates a window
 		// already full screen it waits, without a limit, for macOS to finish the transition, and macOS makes it only for

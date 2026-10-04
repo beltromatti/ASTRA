@@ -16,6 +16,10 @@ Build/*
 !Build/Mac/
 Build/Mac/*
 !Build/Mac/Resources/
+# (and Build/Windows/Application.ico: the icon of ASTRA.exe, tools/art/app_icon_windows.py)
+!Build/Windows/
+Build/Windows/*
+!Build/Windows/Application.ico
 .vs/
 .idea/
 *.xcworkspace

@@ -11,7 +11,11 @@
 - The game's names are fixed afterwards (voice_glossary.py) or offered as a prompt where the engine takes one.
 
 `python -m astra_mind.stt` prints which engines are available here; `--fetch` downloads the Parakeet model (`--fetch-portable`:
-the ONNX export for machines without the Neural Engine helper).
+the ONNX export for machines without the Neural Engine helper, `--fetch-whisper`: faster-whisper's model).
+
+ASTRA_STT chooses: an engine's name (`parakeet`, `parakeet-onnx`, `whisperkit`, `faster-whisper`) is tried first; `portable` keeps only the
+engines that run on any machine (Parakeet ONNX, faster-whisper: the path of a Windows or Linux PC, forced on a Mac to test it); `off` has
+none (the Captain types).
 """
 from __future__ import annotations
 
@@ -28,7 +32,7 @@ from .voice_audio import f32_to_pcm16, pcm16_to_f32, resample, speech_frames, tr
 from .voice_glossary import GLOSSARY, Glossary
 from .voice_lang import domain_hits, resolve_language
 from .voice_stt_backends import (BackendResult, FasterWhisperBackend, ParakeetBackend, PARAKEET_LANGS, SherpaParakeetBackend, SttBackend,
-                                 WhisperKitBackend, fetch_sherpa_model)
+                                 WhisperKitBackend, fetch_faster_whisper_model, fetch_sherpa_model)
 
 log = logging.getLogger("astra.stt")
 
@@ -75,25 +79,34 @@ def unsure(conf: float | None, text: str) -> bool:
     return conf is not None and conf < ESCALATE_CONF and not any(domain_hits(text).values())
 
 
+def default_backends(forced: str = "") -> list[SttBackend]:
+    """The engines this machine can run, the fast one first: the Neural Engine helper where there is one, the same model on the CPU elsewhere;
+    then the engines that know every language, for the phrases the first is unsure of. `forced` is ASTRA_STT: the name of an engine to try
+    first, `portable` (only the engines that run on any machine) or `off` (none)."""
+    forced = forced.strip().lower()
+    if forced == "off":
+        return []
+    portable_only = forced == "portable"
+    backends: list[SttBackend] = []
+    if not portable_only and ParakeetBackend.available():
+        backends.append(ParakeetBackend())
+    elif SherpaParakeetBackend.usable():
+        backends.append(SherpaParakeetBackend())
+    if not portable_only and WhisperKitBackend.available():
+        backends.append(WhisperKitBackend())
+    if FasterWhisperBackend.available():
+        backends.append(FasterWhisperBackend())
+    backends.sort(key=lambda b: 0 if b.name == forced else 1)
+    return backends
+
+
 class Recognizer:
     """Backends, language and names behind one object. `recognise(pcm16)` for a finished recording, `session()` for one
     that is still being made."""
 
     def __init__(self, backends: list[SttBackend] | None = None, glossary: Glossary = GLOSSARY, prior: str | None = None) -> None:
         if backends is None:
-            # the fast engine for the 25 European languages: the Neural Engine helper here, the same model on the CPU elsewhere;
-            # then the engines that know every language, for the phrases the first is unsure of
-            backends = []
-            if ParakeetBackend.available():
-                backends.append(ParakeetBackend())
-            elif SherpaParakeetBackend.available():
-                backends.append(SherpaParakeetBackend())
-            if WhisperKitBackend.available():
-                backends.append(WhisperKitBackend())
-            if FasterWhisperBackend.available():
-                backends.append(FasterWhisperBackend())
-            forced = os.environ.get("ASTRA_STT", "").lower()      # parakeet | parakeet-onnx | whisperkit | faster-whisper: tried first
-            backends.sort(key=lambda b: 0 if b.name == forced else 1)
+            backends = default_backends(os.environ.get("ASTRA_STT", ""))
         self.backends = backends
         self.glossary = glossary
         self.prior = prior or self._saved_language()              # the language of the last order
@@ -106,7 +119,7 @@ class Recognizer:
     @staticmethod
     def _saved_language() -> str:
         try:
-            return (CACHE / "captain_lang.txt").read_text().strip() or "en"
+            return (CACHE / "captain_lang.txt").read_text(encoding="utf-8").strip() or "en"
         except OSError:
             return "en"
 
@@ -413,13 +426,15 @@ def main() -> None:
     ap.add_argument("--fetch", action="store_true",
                     help="download what this machine needs: the Parakeet model through the helper (Apple Silicon) or the ONNX export (elsewhere)")
     ap.add_argument("--fetch-portable", action="store_true", help="download the ONNX export of Parakeet (any platform, ~490 MB)")
+    ap.add_argument("--fetch-whisper", action="store_true", help="download faster-whisper's model into the Hugging Face cache (any platform, ~480 MB)")
     ap.add_argument("--warm-whisper", action="store_true",
                     help="start WhisperKit once so the Neural Engine compiles its model (minutes, the first time on a machine only)")
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
     logging.getLogger("httpx").setLevel(logging.WARNING)                     # (its lines carry the download's long signed address)
     print("Parakeet (Neural Engine):", "yes" if ParakeetBackend.available() else "no (build it: mind/stt_server/build.sh)")
-    print("Parakeet (ONNX, CPU, any platform):", "yes" if SherpaParakeetBackend.available() else "no (uv sync --extra portable; --fetch-portable)")
+    print("Parakeet (ONNX, CPU, any platform):", "yes" if SherpaParakeetBackend.available() else
+          ("not downloaded yet (--fetch-portable, or the first start does it)" if SherpaParakeetBackend.usable() else "no (uv sync --extra portable; --fetch-portable)"))
     print("WhisperKit:", "yes" if WhisperKitBackend.available() else "no (whisperkit-cli)")
     print("faster-whisper:", "yes" if FasterWhisperBackend.available() else "no (uv sync --extra portable)")
     if args.warm_whisper:
@@ -428,6 +443,8 @@ def main() -> None:
             print("WhisperKit ready:", await b.start(timeout_s=1800.0))
             b.stop()
         asyncio.run(warm())
+    if args.fetch_whisper:
+        print("faster-whisper model:", fetch_faster_whisper_model())
     if args.fetch_portable or (args.fetch and not ParakeetBackend.available()):
         print("Parakeet (ONNX) model:", fetch_sherpa_model())
     elif args.fetch:

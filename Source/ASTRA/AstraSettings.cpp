@@ -23,8 +23,28 @@ namespace
 	const FLinearColor Ink(0.86f, 0.9f, 0.95f);
 	const FLinearColor Dim(0.52f, 0.58f, 0.66f);
 	const FLinearColor Accent(0.42f, 0.78f, 1.f);
+	enum ERow : int32 { RowGraphics, RowImage, RowRetina, RowFrameRate, RowMusic, RowVoices, RowSubtitles, RowBack, NumRowIds };
 	const TCHAR* Rows[] = {TEXT("GRAPHICS"), TEXT("IMAGE"), TEXT("RETINA"), TEXT("FRAME RATE"), TEXT("MUSIC"), TEXT("VOICES"), TEXT("SUBTITLES"), TEXT("BACK")};
-	constexpr int32 NumRows = UE_ARRAY_COUNT(Rows);
+	static_assert(UE_ARRAY_COUNT(Rows) == NumRowIds, "a name for every row");
+
+	// RETINA (the 3D view at the display's own pixels instead of half of them, upscaled) is the Mac's: that is what the engine does on a Retina screen by
+	// default. A game on Windows or Linux renders at its window's pixels, and has neither the row nor the setting. The difference is the preprocessor's,
+	// not an `if` on a constant: MSVC may report the branch that cannot run as unreachable code (C4702), which this project's build settings make an error.
+	// portable-ok: the rows and the notes of the other systems are the ones without RETINA
+#if PLATFORM_MAC
+	constexpr int32 SettingsShownRows[] = {RowGraphics, RowImage, RowRetina, RowFrameRate, RowMusic, RowVoices, RowSubtitles, RowBack};
+	const TCHAR* const SettingsThirtyNote = TEXT("30 frames a second: twice the time for each image, much sharper and cooler on a fanless Mac");
+#else
+	constexpr int32 SettingsShownRows[] = {RowGraphics, RowImage, RowFrameRate, RowMusic, RowVoices, RowSubtitles, RowBack};
+	const TCHAR* const SettingsThirtyNote = TEXT("30 frames a second: twice the time for each image, much sharper and cooler running");
+#endif
+
+	/** The rows this system shows, in order (every one on the Mac). */
+	const TArray<int32>& VisibleRows()
+	{
+		static const TArray<int32> Visible(SettingsShownRows, UE_ARRAY_COUNT(SettingsShownRows));
+		return Visible;
+	}
 
 	void SetCVar(const TCHAR* Name, float Value)
 	{
@@ -45,7 +65,10 @@ FAstraSettings& FAstraSettings::Get()
 		bLoaded = true;
 		GConfig->GetInt(SettingsSection, TEXT("Quality"), S.Quality, GGameUserSettingsIni);
 		GConfig->GetInt(SettingsSection, TEXT("Image"), S.Image, GGameUserSettingsIni);
+		// portable-ok: only the Mac has the Retina setting (the other systems' bRetina stays false: no row, no cvar, no key)
+#if PLATFORM_MAC
 		GConfig->GetBool(SettingsSection, TEXT("Retina"), S.bRetina, GGameUserSettingsIni);
+#endif
 		GConfig->GetInt(SettingsSection, TEXT("FrameRate"), S.FrameRate, GGameUserSettingsIni);
 		GConfig->GetFloat(SettingsSection, TEXT("Music"), S.Music, GGameUserSettingsIni);
 		GConfig->GetFloat(SettingsSection, TEXT("Voices"), S.Voices, GGameUserSettingsIni);
@@ -67,7 +90,10 @@ void FAstraSettings::Save() const
 	}
 	GConfig->SetInt(SettingsSection, TEXT("Quality"), Quality, GGameUserSettingsIni);
 	GConfig->SetInt(SettingsSection, TEXT("Image"), Image, GGameUserSettingsIni);
+	// portable-ok: only the Mac has the Retina setting
+#if PLATFORM_MAC
 	GConfig->SetBool(SettingsSection, TEXT("Retina"), bRetina, GGameUserSettingsIni);
+#endif
 	GConfig->SetInt(SettingsSection, TEXT("FrameRate"), FrameRate, GGameUserSettingsIni);
 	GConfig->SetFloat(SettingsSection, TEXT("Music"), Music, GGameUserSettingsIni);
 	GConfig->SetFloat(SettingsSection, TEXT("Voices"), Voices, GGameUserSettingsIni);
@@ -99,9 +125,12 @@ void FAstraSettings::Apply() const
 	}
 	// the dynamic resolution keeps the frame inside its time: at 30 frames a second it has twice the time for each image
 	SetCVar(TEXT("r.DynamicRes.FrameTimeBudget"), 1000.f / (float)FrameRate);
-	// the upscaler's output: the display's own pixels, or (0) the engine's default, half of them on a Retina screen, doubled by the window
+	// the upscaler's output (the Mac): the display's own pixels, or (0) the engine's default, half of them on a Retina screen, doubled by the window
 	// (the user saw the doubled image as pixelated: a 1710 x 1107 picture spread over a 3420 x 2214 panel)
+	// portable-ok: the Mac's Retina output; the other systems keep the engine's own
+#if PLATFORM_MAC
 	SetCVar(TEXT("r.SecondaryScreenPercentage.GameViewport"), bRetina ? 100.f : 0.f);
+#endif
 	SetCVar(TEXT("r.DynamicRes.MinScreenPercentage"), EngineFloor());
 	UE_LOG(LogASTRA, Log, TEXT("[Settings] quality %d, image floor %.0f%%, retina output %s, %d fps, music %.0f%%, voices %.0f%%, subtitles %s"), Quality,
 	       EngineFloor(), bRetina ? TEXT("on") : TEXT("off"), FrameRate, Music * 100.f, Voices * 100.f, bSubtitles ? TEXT("on") : TEXT("off"));
@@ -110,6 +139,7 @@ void FAstraSettings::Apply() const
 // --------------------------------------------------------------------------------------------------- the page
 void SAstraSettingsPage::Construct(const FArguments& Args)
 {
+	static_assert(UE_ARRAY_COUNT(Buttons) == NumRowIds, "a button for every row: BACK's was one past the end of a seven-button array");
 	OnBack = Args._OnBack;
 	UFont* Title = LoadObject<UFont>(nullptr, TEXT("/Game/ASTRA/UI/Fonts/F_ASTRA_Title.F_ASTRA_Title"));
 	UFont* Mono = LoadObject<UFont>(nullptr, TEXT("/Game/ASTRA/UI/Fonts/F_ASTRA_Mono.F_ASTRA_Mono"));
@@ -117,9 +147,9 @@ void SAstraSettingsPage::Construct(const FArguments& Args)
 	auto MonoFont = [Mono](int32 Size) { return Mono ? FSlateFontInfo(Mono, Size) : FCoreStyle::GetDefaultFontStyle("Mono", Size); };
 
 	TSharedRef<SVerticalBox> List = SNew(SVerticalBox);
-	for (int32 Row = 0; Row < NumRows; ++Row)
+	for (const int32 Row : VisibleRows())
 	{
-		List->AddSlot().AutoHeight().Padding(0, Row == NumRows - 1 ? 22 : 5)
+		List->AddSlot().AutoHeight().Padding(0, Row == RowBack ? 22 : 5)
 		[
 			SAssignNew(Buttons[Row], SButton)
 			.ButtonStyle(&FCoreStyle::Get().GetWidgetStyle<FButtonStyle>("NoBorder"))
@@ -185,7 +215,7 @@ void SAstraSettingsPage::Construct(const FArguments& Args)
 bool SAstraSettingsPage::IsLit(int32 Row) const
 {
 	// the row under the mouse, else the one the arrows chose
-	for (int32 i = 0; i < NumRows; ++i)
+	for (const int32 i : VisibleRows())
 	{
 		if (Buttons[i].IsValid() && Buttons[i]->IsHovered())
 		{
@@ -202,7 +232,7 @@ FString SAstraSettingsPage::ValueOf(int32 Row) const
 	static const TCHAR* Image[] = {TEXT("SHARP"), TEXT("BALANCED"), TEXT("SMOOTH")};
 	switch (Row)
 	{
-	case 0:
+	case RowGraphics:
 	{
 		int32 Q = S.Quality;
 		if (Q < 0 && GEngine && GEngine->GetGameUserSettings())
@@ -211,12 +241,12 @@ FString SAstraSettingsPage::ValueOf(int32 Row) const
 		}
 		return Q >= 0 && Q <= 3 ? Quality[Q] : TEXT("CUSTOM");
 	}
-	case 1: return Image[S.Image];
-	case 2: return S.bRetina ? TEXT("FULL") : TEXT("HALF");
-	case 3: return FString::Printf(TEXT("%d"), S.FrameRate);
-	case 4: return FString::Printf(TEXT("%d%%"), FMath::RoundToInt(S.Music * 100.f));
-	case 5: return FString::Printf(TEXT("%d%%"), FMath::RoundToInt(S.Voices * 100.f));
-	case 6: return S.bSubtitles ? TEXT("ON") : TEXT("OFF");
+	case RowImage: return Image[S.Image];
+	case RowRetina: return S.bRetina ? TEXT("FULL") : TEXT("HALF");
+	case RowFrameRate: return FString::Printf(TEXT("%d"), S.FrameRate);
+	case RowMusic: return FString::Printf(TEXT("%d%%"), FMath::RoundToInt(S.Music * 100.f));
+	case RowVoices: return FString::Printf(TEXT("%d%%"), FMath::RoundToInt(S.Voices * 100.f));
+	case RowSubtitles: return S.bSubtitles ? TEXT("ON") : TEXT("OFF");
 	default: return FString();
 	}
 }
@@ -226,14 +256,13 @@ FString SAstraSettingsPage::NoteOf(int32 Row) const
 	const FAstraSettings& S = FAstraSettings::Get();
 	switch (Row)
 	{
-	case 0: return TEXT("HIGH and EPIC light the ship with Lumen and full shadows; LOW and MEDIUM trade that light for speed");
-	case 1: return S.Image == 0 ? TEXT("the image never drops below 70% resolution: the sharpest, and in a heavy battle the frame rate may fall")
+	case RowGraphics: return TEXT("HIGH and EPIC light the ship with Lumen and full shadows; LOW and MEDIUM trade that light for speed");
+	case RowImage: return S.Image == 0 ? TEXT("the image never drops below 70% resolution: the sharpest, and in a heavy battle the frame rate may fall")
 	             : S.Image == 1 ? TEXT("never below 55% resolution: sharp, and smooth in most battles")
 	                            : TEXT("down to 40% resolution when the battle is heavy: the frame rate first");
-	case 2: return S.bRetina ? TEXT("the picture is rebuilt at your display's own pixels: the sharpest on a Retina Mac, a few milliseconds more")
-	                         : TEXT("half the display's pixels, doubled by the window: softer, the frame rate first");
-	case 3: return S.FrameRate == 30 ? TEXT("30 frames a second: twice the time for each image, much sharper and cooler on a fanless Mac")
-	                                 : TEXT("60 frames a second: the smoothest motion; the resolution adapts to keep it");
+	case RowRetina: return S.bRetina ? TEXT("the picture is rebuilt at your display's own pixels: the sharpest on a Retina Mac, a few milliseconds more")
+	                                 : TEXT("half the display's pixels, doubled by the window: softer, the frame rate first");
+	case RowFrameRate: return S.FrameRate == 30 ? SettingsThirtyNote : TEXT("60 frames a second: the smoothest motion; the resolution adapts to keep it");
 	default: return FString();
 	}
 }
@@ -243,7 +272,7 @@ void SAstraSettingsPage::Change(int32 Row, int32 Step)
 	FAstraSettings& S = FAstraSettings::Get();
 	switch (Row)
 	{
-	case 0:
+	case RowGraphics:
 	{
 		int32 Q = S.Quality;
 		if (Q < 0 && GEngine && GEngine->GetGameUserSettings())
@@ -253,12 +282,12 @@ void SAstraSettingsPage::Change(int32 Row, int32 Step)
 		S.Quality = (FMath::Max(Q, 0) + Step + 4) % 4;
 		break;
 	}
-	case 1: S.Image = (S.Image + Step + 3) % 3; break;
-	case 2: S.bRetina = !S.bRetina; break;
-	case 3: S.FrameRate = S.FrameRate == 60 ? 30 : 60; break;
-	case 4: S.Music = FMath::Fmod(FMath::RoundToFloat(S.Music * 10.f + Step + 11.f), 11.f) / 10.f; break;
-	case 5: S.Voices = FMath::Fmod(FMath::RoundToFloat(S.Voices * 10.f + Step + 11.f), 11.f) / 10.f; break;
-	case 6: S.bSubtitles = !S.bSubtitles; break;
+	case RowImage: S.Image = (S.Image + Step + 3) % 3; break;
+	case RowRetina: S.bRetina = !S.bRetina; break;
+	case RowFrameRate: S.FrameRate = S.FrameRate == 60 ? 30 : 60; break;
+	case RowMusic: S.Music = FMath::Fmod(FMath::RoundToFloat(S.Music * 10.f + Step + 11.f), 11.f) / 10.f; break;
+	case RowVoices: S.Voices = FMath::Fmod(FMath::RoundToFloat(S.Voices * 10.f + Step + 11.f), 11.f) / 10.f; break;
+	case RowSubtitles: S.bSubtitles = !S.bSubtitles; break;
 	default: OnBack.ExecuteIfBound(); return;
 	}
 	S.Apply();
@@ -275,7 +304,9 @@ FReply SAstraSettingsPage::OnKeyDown(const FGeometry& Geometry, const FKeyEvent&
 	}
 	if (K == EKeys::Up || K == EKeys::Down)
 	{
-		Selected = (Selected + (K == EKeys::Up ? -1 : 1) + NumRows) % NumRows;
+		const TArray<int32>& Visible = VisibleRows();
+		const int32 At = FMath::Max(0, Visible.IndexOfByKey(Selected));
+		Selected = Visible[(At + (K == EKeys::Up ? -1 : 1) + Visible.Num()) % Visible.Num()];
 		return FReply::Handled();
 	}
 	if (K == EKeys::Left || K == EKeys::Right || K == EKeys::Enter)

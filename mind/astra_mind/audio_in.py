@@ -102,7 +102,9 @@ class PushToTalk:
             if any(k in name.lower() for k in _BLUETOOTH):
                 for i, d in enumerate(sd.query_devices()):
                     dn = str(d["name"]).lower()
-                    if d["max_input_channels"] > 0 and any(k in dn for k in ("macbook", "built-in", "builtin", "internal", "imac", "mac mini", "mac studio")):
+                    # (a Windows laptop's own microphone is "Microphone Array (...)", some makers say "Integrated")
+                    if d["max_input_channels"] > 0 and any(k in dn for k in ("macbook", "built-in", "builtin", "internal", "integrated", "microphone array",
+                                                                             "imac", "mac mini", "mac studio")):
                         return i, str(d["name"])
             return None, name
         except Exception:  # noqa: BLE001

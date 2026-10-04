@@ -116,7 +116,7 @@ class Ledger:
     def prior(self) -> float:
         """What earlier runs spent (the sum of the log)."""
         try:
-            return sum(json.loads(l).get("cost", 0.0) for l in (CACHE / "spend.jsonl").read_text().splitlines() if l.strip())
+            return sum(json.loads(l).get("cost", 0.0) for l in (CACHE / "spend.jsonl").read_text(encoding="utf-8").splitlines() if l.strip())
         except (OSError, ValueError):
             return 0.0
 

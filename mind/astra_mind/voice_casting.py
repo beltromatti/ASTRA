@@ -216,7 +216,7 @@ async def main() -> None:
         crew = {o.id: o.voice for o in CREW.values()}
         overrides = propose_overrides(rows, crew)
         if not args.no_write:
-            OVERRIDES_FILE.write_text(json.dumps(overrides, indent=1, sort_keys=True))
+            OVERRIDES_FILE.write_text(json.dumps(overrides, indent=1, sort_keys=True), encoding="utf-8")
             write_report(rows, langs, crew, overrides, src)
             print("REPORT", src)
         print("OVERRIDES", json.dumps(overrides, indent=1))
@@ -233,11 +233,11 @@ async def main() -> None:
     overrides = propose_overrides(rows, crew)
     date = dt.date.today().isoformat()
     if not args.no_write:
-        gains = json.loads(GAINS_FILE.read_text()) if GAINS_FILE.exists() else {}
+        gains = json.loads(GAINS_FILE.read_text(encoding="utf-8")) if GAINS_FILE.exists() else {}
         for r in rows:
             gains[f"{r['lang']}/{r['voice']}"] = {"lufs": r["lufs"], "peak": r["peak"]}
-        GAINS_FILE.write_text(json.dumps(gains, indent=1, sort_keys=True))
-        OVERRIDES_FILE.write_text(json.dumps(overrides, indent=1, sort_keys=True))
+        GAINS_FILE.write_text(json.dumps(gains, indent=1, sort_keys=True), encoding="utf-8")
+        OVERRIDES_FILE.write_text(json.dumps(overrides, indent=1, sort_keys=True), encoding="utf-8")
         out = REPO_ROOT / "docs" / "bench" / f"voci_casting_{date}.md"
         write_report(rows, langs, crew, overrides, out)
         print("REPORT", out)

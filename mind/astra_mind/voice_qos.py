@@ -25,9 +25,9 @@ _libc = None
 
 def _lib():
     global _libc
-    if _libc is None and sys.platform == "darwin":
+    if _libc is None and sys.platform == "darwin":       # portable-ok: macOS's scheduler classes; other systems keep their own priorities (a no-op here)
         try:
-            _libc = ctypes.CDLL("/usr/lib/libSystem.B.dylib")
+            _libc = ctypes.CDLL("/usr/lib/libSystem.B.dylib")       # portable-ok: macOS's libSystem
         except OSError:
             _libc = False
     return _libc or None

@@ -8,6 +8,7 @@
 
 #include "ASTRA.h"
 #include "AstraCrewMember.h"
+#include "AstraMindLaunch.h"
 #include "AstraShipSubsystem.h"
 #include "Dom/JsonObject.h"
 #include "Engine/Engine.h"
@@ -29,7 +30,6 @@
 
 namespace
 {
-	const TCHAR* MindUrl = TEXT("ws://127.0.0.1:8765");
 	UAstraMindSubsystem* GActiveMind = nullptr;
 
 	FAutoConsoleCommand CmdSay(TEXT("astra.say"), TEXT("Speak to the bridge crew as the Captain (typed): astra.say <text>"),
@@ -67,6 +67,8 @@ void UAstraMindSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
 	GActiveMind = this;
+	// the mind's door: 8765, or the port the machine chose for both sides (ASTRA_MIND_PORT, which the mind reads too)
+	MindUrl = FString::Printf(TEXT("ws://127.0.0.1:%d"), AstraMindLaunch::Port(AstraMindLaunch::FMachine::Live()));
 	FModuleManager::LoadModuleChecked<FWebSocketsModule>(TEXT("WebSockets"));
 	TickHandle = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateUObject(this, &UAstraMindSubsystem::Tick), 0.0f);
 	NextConnectTime = FPlatformTime::Seconds() + 0.5;
@@ -193,29 +195,68 @@ void UAstraMindSubsystem::Connect()
 void UAstraMindSubsystem::LaunchMind()
 {
 	bLaunchedMind = true;
-	FString MindDir = FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() / TEXT("mind"));
-	const FString Saved = FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
-	const FString LogFile = Saved / TEXT("Logs/astra-mind.log");
-	IFileManager::Get().MakeDirectory(*(Saved / TEXT("Logs")), true);
-	// the game's Saved folder is where the campaign lives: the mind keeps the war and the story beside it
-	FString Env = FString::Printf(TEXT("ASTRA_SAVED='%s' "), *Saved);
-	if (!FPaths::FileExists(MindDir / TEXT("pyproject.toml")))
+	// The game starts `uv` itself, no shell (AstraMindLaunch.h): in the mind's folder, with the game's Saved folder (the campaign lives there: the
+	// mind keeps the war and the story beside it), the file the mind writes its own log to, and for a packaged game the mind's own data folder (the
+	// key, the voice models, its Python environment, caches: Application Support/ASTRA, %LOCALAPPDATA%\ASTRA, ~/.local/share/ASTRA).
+	const AstraMindLaunch::FPlan Plan = AstraMindLaunch::MakePlan(AstraMindLaunch::FMachine::Live());
+	if (Plan.IsValid())
 	{
-		// a packaged game: the mind travels inside the app bundle (Contents/Resources/mind); its own data (the key, the
-		// voice models, its Python environment, caches) lives in Application Support/ASTRA
-		MindDir = FPaths::ConvertRelativePathToFull(FPaths::Combine(FPaths::GetPath(FString(FPlatformProcess::ExecutablePath())), TEXT("../Resources/mind")));
-#if PLATFORM_MAC
-		const FString Home = FPlatformMisc::GetEnvironmentVariable(TEXT("HOME")) / TEXT("Library/Application Support/ASTRA");
-#else
-		const FString Home = FPaths::ConvertRelativePathToFull(FPaths::Combine(FPlatformProcess::UserSettingsDir(), TEXT("ASTRA")));
-#endif
-		IFileManager::Get().MakeDirectory(*Home, true);
-		Env += FString::Printf(TEXT("ASTRA_HOME='%s' UV_PROJECT_ENVIRONMENT='%s/venv' "), *Home, *Home);
+		UE_LOG(LogASTRA, Log, TEXT("[Mind] starting the mind from %s"), *Plan.MindDir);
+		MindLogFile = Plan.LogFile;
+		const bool bFirstStart = Plan.bPackaged && !IFileManager::Get().DirectoryExists(*(Plan.DataDir / TEXT("venv")));
+		FString Error;
+		if (AstraMindLaunch::Start(Plan, MindProc, Error))
+		{
+			UE_LOG(LogASTRA, Log, TEXT("[Mind] launched astra-mind (ok): %s"), *Plan.Describe());
+			MindLaunchedAt = FPlatformTime::Seconds();
+			if (bFirstStart)
+			{
+				// uv makes the mind's Python environment on the first start: minutes, with a network (tools/windows/Setup-ASTRA.ps1 does it ahead of time)
+				Screen(TEXT("SHIP: First start on this machine: the crew's minds are being installed (a few minutes, the internet is needed). The game goes on meanwhile."),
+				       FColor::Orange, 20.f);
+			}
+			return;
+		}
+		UE_LOG(LogASTRA, Error, TEXT("[Mind] launched astra-mind (FAILED): %s"), *Error);
+		Screen(FString::Printf(TEXT("SHIP: The crew's minds could not be started. %s"), *Error), FColor::Orange, 20.f);
+		return;
 	}
-	const FString Cmd = FString::Printf(TEXT("-lc \"cd '%s' && %sexec uv run --frozen astra-mind >> '%s' 2>&1\""), *MindDir, *Env, *LogFile);
-	UE_LOG(LogASTRA, Log, TEXT("[Mind] starting the mind from %s"), *MindDir);
-	MindProc = FPlatformProcess::CreateProc(TEXT("/bin/zsh"), *Cmd, true, true, true, nullptr, 0, nullptr, nullptr);
-	UE_LOG(LogASTRA, Log, TEXT("[Mind] launched astra-mind (%s)"), MindProc.IsValid() ? TEXT("ok") : TEXT("FAILED"));
+	UE_LOG(LogASTRA, Error, TEXT("[Mind] launched astra-mind (FAILED): %s"), *Plan.Error);
+	Screen(FString::Printf(TEXT("SHIP: The crew's minds could not be started. %s"), *Plan.Error), FColor::Orange, 20.f);
+}
+
+void UAstraMindSubsystem::WatchMindProcess(double Now)
+{
+	if (!MindProc.IsValid() || bMindExitReported || Now < NextProcCheckTime)
+	{
+		return;
+	}
+	NextProcCheckTime = Now + 2.0;
+	if (FPlatformProcess::IsProcRunning(MindProc))
+	{
+		return;
+	}
+	// the mind this game started is gone (a failure at its start: no key, a library that does not load; or it fell): say where its own log is
+	int32 Code = 0;
+	FPlatformProcess::GetProcReturnCode(MindProc, &Code);
+	FPlatformProcess::CloseProc(MindProc);
+	bMindExitReported = true;
+	if (IsConnected())
+	{
+		// a mind that an earlier session left running is serving the game: the one this game started found its door taken and stood down
+		UE_LOG(LogASTRA, Log, TEXT("[Mind] the mind this game started is gone (exit code %d), but a mind is connected: nothing to report"), Code);
+		return;
+	}
+	UE_LOG(LogASTRA, Error, TEXT("[Mind] the mind stopped (exit code %d) %.0f s after it was started: its log is %s"), Code, Now - MindLaunchedAt, *MindLogFile);
+	AstraMindLaunch::AppendLog(MindLogFile, FString::Printf(TEXT("the mind failed: its process exited with code %d, %.0f s after it was started (uv or Python stopped before it could write here?)"),
+	                                                       Code, Now - MindLaunchedAt));
+	// portable-ok: the hint names the setup program that exists on Windows
+#if PLATFORM_WINDOWS
+	const TCHAR* Hint = TEXT(" Setup-ASTRA.bat shows what went wrong.");
+#else
+	const TCHAR* Hint = TEXT("");
+#endif
+	Screen(FString::Printf(TEXT("SHIP: The crew's minds have stopped (code %d). Their log is %s.%s"), Code, *MindLogFile, Hint), FColor::Orange, 20.f);
 }
 
 namespace
@@ -366,6 +407,7 @@ bool UAstraMindSubsystem::Tick(float DeltaTime)
 	const double Now = FPlatformTime::Seconds();
 	BindShipEvents();   // even before the mind answers: the reports raised meanwhile are queued
 	TickVoices();
+	WatchMindProcess(Now);
 	if (!Socket.IsValid() || (!Socket->IsConnected() && Now >= NextConnectTime))
 	{
 		if (Now >= NextConnectTime)
@@ -555,7 +597,15 @@ void UAstraMindSubsystem::OnText(const FString& Text)
 		FString Mic;
 		if (Msg->TryGetStringField(TEXT("mic"), Mic))
 		{
-			Screen(FString::Printf(TEXT("Microphone %s (allow microphone access for the game in System Settings)"), *Mic), FColor::Orange, 10.f);
+// portable-ok: the hint names each system's own settings page; the others follow
+#if PLATFORM_MAC
+			const TCHAR* Where = TEXT(" (allow microphone access for the game in System Settings)");
+#elif PLATFORM_WINDOWS
+			const TCHAR* Where = TEXT(" (allow microphone access for desktop apps in Settings > Privacy & security > Microphone)");
+#else
+			const TCHAR* Where = TEXT("");
+#endif
+			Screen(FString::Printf(TEXT("Microphone %s%s"), *Mic, Where), FColor::Orange, 10.f);
 		}
 	}
 }
