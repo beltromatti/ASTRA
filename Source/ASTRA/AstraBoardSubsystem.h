@@ -31,6 +31,7 @@ class APawn;
 class UAstraBattleSubsystem;
 class UAstraCombatFx;
 class UAstraFpsComponent;
+struct FFpsSquadRow;
 class UAstraLifeSubsystem;
 class UAstraShipSubsystem;
 
@@ -179,6 +180,8 @@ public:
 	float LastHurtAmount() const { return CapHurtAmount; }
 	/** The nearest able enemy that sees the Captain, distance (cm), or a negative number. */
 	float NearestThreatCm() const { return ThreatCm; }
+	/** The marines' squads for the Captain's screen (UAstraFpsComponent): each with how many are on their feet of how many it has, what it is doing and whether it is in contact. Empty when no fight is on. */
+	void SquadRows(TArray<FFpsSquadRow>& Out) const;
 	/** What the minds read of the Captain's body in the fight (ship_state.boarding.captain and the marines' picture): how he stands (standing, crouched, lying), whether he leans, how many of the boarders have him in sight. */
 	void AddCaptainBody(FJsonObject& O) const;
 

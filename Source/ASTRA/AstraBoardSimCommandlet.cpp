@@ -3831,6 +3831,156 @@ static void BoardScenarioAttack(const FString& Class, int32 Seed, int32 Seeds, c
 	}
 	BRecord->SetObjectField(TEXT("attack"), Rec);
 }
+// ================================================================================================================== orders given at random, on every class's plan (ABBORDAGGI-4: do the infantry orders hold on rooms they were not tuned on?)
+
+/** The marines go aboard a class's ship (24 of them, two Kestrels' worth) and, every fifteen seconds, a squad of theirs is given an order at random: a task, a room or a section of the plan, and the things that go with it (fire held, doors
+ *  shut behind, a place to cover, a sync number). What is checked is what must hold whatever is ordered: nobody off the plan, no number gone bad, the step as cheap as before, the same fight from the same seed. The numbers of the fights
+ *  mean nothing (orders at random are bad orders): this is the robustness of the drills on the plans of all the classes, not their worth. */
+static void BoardScenarioFuzz(const FString& Only, int32 Seed, int32 Seeds, const FTuning& Tuning)
+{
+	TArray<FName> Classes;
+	AstraBoardPlans::ClassesWithPlans(Classes);
+	if (!Only.IsEmpty())
+	{
+		Classes = {FName(*Only)};
+	}
+	if (Classes.IsEmpty())
+	{
+		BCheck("fuzz", false, TEXT("no plans in data/ship/plans"));
+		return;
+	}
+	for (const FName& K : Classes)
+	{
+		FString Why;
+		const TSharedPtr<FBoardShipPlan> P = AstraBoardPlans::Load(K, Why);
+		if (!P.IsValid())
+		{
+			BCheck("fuzz", false, FString::Printf(TEXT("%s: %s"), *K.ToString(), *Why));
+			continue;
+		}
+		const FAstraBoardMap& M = *P->Map;
+		TArray<int32> Rooms;                                         // the rooms with a floor to stand on (the plan's planned-only ones have no box)
+		for (int32 c = 0; c < M.GetComps().Num(); ++c)
+		{
+			const FBoardComp& C = M.GetComps()[c];
+			if (C.Box.IsValid && C.Box.GetSize().X > 150.0 && C.Box.GetSize().Y > 150.0)
+			{
+				Rooms.Add(c);
+			}
+		}
+		TArray<int32> Doors;                                         // the damage map's doors that join two rooms
+		for (const FBoardPortal& Po : M.GetPortals())
+		{
+			if (Po.bDoor() && Po.Door != INDEX_NONE)
+			{
+				Doors.Add(Po.Door);
+			}
+		}
+		struct FOne { uint32 Hash = 0; int32 Bad = 0, Nan = 0, Orders = 0, Steps = 0; double Ms = 0.0, MsMax = 0.0; bool bScene = false; double EndS = 0.0; };
+		const auto RunOne = [&](int32 SeedOne) -> FOne
+		{
+			FOne Out;
+			FAstraBoardSim Sim;
+			Sim.Init(P->Map.ToSharedRef(), SeedOne);
+			Sim.Tuning = Tuning;
+			Sim.Tuning.bEvacuate = true;
+			AstraBoardScene::FSpec Spec;
+			Spec.Attacker = ESide::Aquila;
+			Spec.Attackers = 24;
+			Spec.Objective = (SeedOne % 3 == 0) ? TEXT("bridge") : ((SeedOne % 3 == 1) ? TEXT("engineering") : TEXT("captain"));
+			Spec.PostShare = 0.6f;
+			Spec.Roaming = 6;
+			Spec.bSweep = true;
+			Spec.Seed = SeedOne;
+			const AstraBoardScene::FResult Sc = AstraBoardScene::Build(Sim, *P, Spec);
+			if (!Sc.bOk || Sc.AttackSquads.IsEmpty() || Rooms.IsEmpty())
+			{
+				return Out;
+			}
+			Out.bScene = true;
+			FRandomStream Rnd(SeedOne * 7919 + 17);
+			double NextAt = 10.0;
+			const auto Give = [&](FAstraBoardSim& S)
+			{
+				if (S.Time() < NextAt)
+				{
+					return;
+				}
+				NextAt = S.Time() + 15.0;
+				const int32 Sq = Sc.AttackSquads[Rnd.RandRange(0, Sc.AttackSquads.Num() - 1)];
+				const int32 Room = Rooms[Rnd.RandRange(0, Rooms.Num() - 1)];
+				FOrder O;
+				static const ETask Tasks[] = {ETask::Hold, ETask::Advance, ETask::Assault, ETask::FallBack, ETask::Withdraw, ETask::Sweep, ETask::Breach, ETask::Take, ETask::Ambush};
+				O.Task = Tasks[Rnd.RandRange(0, UE_ARRAY_COUNT(Tasks) - 1)];
+				O.Comp = Room;
+				O.Pos = M.CentreOf(Room);
+				O.Radius = Rnd.FRand() < 0.4f ? 0.f : (float)Rnd.RandRange(400, 2500);
+				O.bFireHeld = Rnd.FRand() < 0.3f;
+				O.bInside = Rnd.FRand() < 0.2f;
+				O.bSealBehind = Rnd.FRand() < 0.3f;
+				O.Sync = Rnd.FRand() < 0.4f ? Rnd.RandRange(1, 2) : 0;
+				O.CoverComp = Rnd.FRand() < 0.3f ? Rooms[Rnd.RandRange(0, Rooms.Num() - 1)] : INDEX_NONE;
+				if (O.Task == ETask::Breach && !Doors.IsEmpty())
+				{
+					O.Door = Doors[Rnd.RandRange(0, Doors.Num() - 1)];
+				}
+				if (O.Task == ETask::Sweep)
+				{
+					const FBoardComp& R0 = M.GetComps()[Room];
+					for (int32 c : Rooms)
+					{
+						const FBoardComp& C = M.GetComps()[c];
+						if (C.Deck == R0.Deck && C.Section == R0.Section)
+						{
+							O.Sector.Add(c);
+						}
+					}
+				}
+				O.Where = M.Describe(Room);
+				S.OrderEx(Sq, O);
+				++Out.Orders;
+			};
+			const FRunResult R = RunSim(Sim, 600.0, Give);
+			Out.Hash = R.Hash;
+			Out.Bad = R.BadPos;
+			Out.Steps = R.Steps;
+			Out.Ms = R.Ms;
+			Out.MsMax = R.MsMax;
+			Out.EndS = R.T;
+			for (const FUnit& U : Sim.Units())
+			{
+				Out.Nan += (U.Pos.ContainsNaN() || !FMath::IsFinite(U.Hp) || !FMath::IsFinite(U.Yaw)) ? 1 : 0;
+			}
+			return Out;
+		};
+		int32 Ran = 0, Bad = 0, Nan = 0, Orders = 0, Differ = 0, Steps = 0;
+		double Ms = 0.0, MsMax = 0.0, EndS = 0.0;
+		for (int32 s = 0; s < Seeds; ++s)
+		{
+			const FOne A = RunOne(Seed + s);
+			if (!A.bScene)
+			{
+				continue;
+			}
+			const FOne B = RunOne(Seed + s);                         // (the same seed, the same orders, the same fight)
+			++Ran;
+			Bad += A.Bad;
+			Nan += A.Nan;
+			Orders += A.Orders;
+			Differ += A.Hash != B.Hash ? 1 : 0;
+			Steps += A.Steps;
+			Ms += A.Ms;
+			MsMax = FMath::Max(MsMax, A.MsMax);
+			EndS += A.EndS;
+		}
+		const double PerStep = Steps ? Ms / Steps : 0.0;
+		BNote(FString::Printf(TEXT("  %-10s %d fights with %d orders at random (%.1f a fight), %.0f s on average: %d men off the plan, %d numbers gone bad, %d fights that differ from their twin; %.3f ms a step (worst %.1f)"), *K.ToString(), Ran, Orders,
+		                      Ran ? (double)Orders / Ran : 0.0, Ran ? EndS / Ran : 0.0, Bad, Nan, Differ, PerStep, MsMax));
+		BCheck(TCHAR_TO_ANSI(*FString::Printf(TEXT("fuzz: %s"), *K.ToString())), Ran > 0 && Bad == 0 && Nan == 0 && Differ == 0 && PerStep < 3.0 && MsMax < 80.0,
+		       FString::Printf(TEXT("%d fights, %d orders at random: %d men off the plan, %d bad numbers, %d not repeatable; %.3f ms a step, worst %.1f"), Ran, Orders, Bad, Nan, Differ, PerStep, MsMax));
+	}
+}
+
 // ================================================================================================================== a ship the war has shot at (FLOTTA-VIVA's inside, then the marines)
 
 /** FLOTTA-VIVA's inside of a class's ship is shot at (so many blows, then a minute), its snapshot is taken as the host takes it, and the marines go aboard that ship: with the people the war left, where it
@@ -4009,7 +4159,7 @@ int32 UAstraBoardSimCommandlet::Main(const FString& Params)
 	FParse::Value(*Params, TEXT("-setup="), GSetup);
 	Scenario = Scenario.ToLower();
 	FRig Rig;
-	if (Scenario == TEXT("plans") || Scenario == TEXT("attack") || Scenario == TEXT("interior") || Scenario == TEXT("war") || Scenario == TEXT("dress") || Scenario == TEXT("escort"))      // (on request only: other ships' plans, the marines going aboard one, the plans made solid and dressed; no plan of the Aquila needed)
+	if (Scenario == TEXT("plans") || Scenario == TEXT("attack") || Scenario == TEXT("interior") || Scenario == TEXT("war") || Scenario == TEXT("dress") || Scenario == TEXT("escort") || Scenario == TEXT("fuzz"))      // (on request only: other ships' plans, the marines going aboard one, the plans made solid and dressed; no plan of the Aquila needed)
 	{
 		FString Class;
 		FParse::Value(*Params, TEXT("-class="), Class);
@@ -4040,6 +4190,10 @@ int32 UAstraBoardSimCommandlet::Main(const FString& Params)
 		else if (Scenario == TEXT("escort"))
 		{
 			BoardScenarioEscort(Class.IsEmpty() ? FString(TEXT("acheron")) : Class, Seed, Seeds, T);
+		}
+		else if (Scenario == TEXT("fuzz"))
+		{
+			BoardScenarioFuzz(Class, Seed, Seeds, T);
 		}
 		else
 		{

@@ -937,6 +937,10 @@ void UAstraBoardSubsystem::TickAssault(float Dt)
 	Assault.T += Dt;
 	if (Assault.bPlanWait)
 	{
+		if (IsRunningCommandlet() && Assault.PlanFuture.IsValid())
+		{
+			Assault.PlanFuture.Wait();                           // (a bench: the war does not run on while her decks are read, so the boats go when they would on a machine with nothing else to do)
+		}
 		if (!Assault.PlanFuture.IsReady())
 		{
 			if (FPlatformTime::Seconds() - Assault.PlanSinceS > 40.0)

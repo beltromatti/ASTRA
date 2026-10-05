@@ -488,6 +488,49 @@ TSharedRef<FJsonObject> UAstraBoardSubsystem::Snapshot() const
 	return J;
 }
 
+void UAstraBoardSubsystem::SquadRows(TArray<FFpsSquadRow>& Out) const
+{
+	Out.Reset();
+	if (Phase != EPhase::Active || !Map.IsValid())
+	{
+		return;                                              // (the screen asks only while IsActive: the Captain is in this fight)
+	}
+	for (const FSquad& S : Fight.Squads())
+	{
+		if (S.Side != ESide::Aquila)
+		{
+			continue;
+		}
+		FFpsSquadRow R;
+		for (const int32 M : S.Members)
+		{
+			if (!Fight.Units().IsValidIndex(M))
+			{
+				continue;
+			}
+			const FUnit& U = Fight.Units()[M];
+			if (U.bExternal || U.Act == EAct::Gone || U.Act == EAct::Dead)
+			{
+				continue;                                    // (the Captain is not a squad's man; the dead and those who left the ship are not counted)
+			}
+			++R.Total;
+			R.Able += U.Able() ? 1 : 0;
+		}
+		if (R.Total == 0)
+		{
+			continue;
+		}
+		R.Name = S.Name;
+		R.bContact = S.bContact;
+		// what it is doing: its drill if it has one (stacked at a door, two rooms cleared of five...), else its task and its place
+		const FString Drill = Fight.DrillText(S);
+		R.Text = Drill.IsEmpty() ? FString::Printf(TEXT("%s%s"), TaskName(S.Task), S.TargetComp != INDEX_NONE && Map->GetComps().IsValidIndex(S.TargetComp) ? *FString::Printf(TEXT(" %s"), *Map->Describe(S.TargetComp)) : TEXT("")) : Drill;
+		Out.Add(MoveTemp(R));
+	}
+	// in contact first, then as they are named
+	Out.Sort([](const FFpsSquadRow& A, const FFpsSquadRow& B) { return A.bContact != B.bContact ? A.bContact : A.Name < B.Name; });
+}
+
 void UAstraBoardSubsystem::AddCaptainBody(FJsonObject& O) const
 {
 	// how he stands and who has him in sight: facts for the minds to say what they judge of them (a Captain standing in the open with two of the enemy on him is worth a word); the pawn's own, so a bench's Captain has none
@@ -1099,7 +1142,24 @@ namespace
 				if (GEngine) { GEngine->AddOnScreenDebugMessage(-1, 8.f, FColor::Cyan, T); }
 			}
 		}));
-	FAutoConsoleCommandWithWorldAndArgs BdCmdCommand(TEXT("astra.board.cmd"), TEXT("Testing: one of the boarding commands by its JSON: astra.board.cmd marine_order {\"squad\":\"all\",\"task\":\"hold\",\"place\":\"engineering\"}"),
+	FAutoConsoleCommandWithWorld BdCmdSquads(TEXT("astra.board.squads"), TEXT("The marines' squads as the Captain's screen shows them: name, on their feet of how many, what they do (written to the log)"),
+		FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* W)
+		{
+			if (UAstraBoardSubsystem* B = BdBoard(W))
+			{
+				TArray<FFpsSquadRow> Rows;
+				B->SquadRows(Rows);
+				if (Rows.IsEmpty())
+				{
+					UE_LOG(LogASTRA, Log, TEXT("[Board] squads: none (no fight is on)"));
+				}
+				for (const FFpsSquadRow& R : Rows)
+				{
+					UE_LOG(LogASTRA, Log, TEXT("[Board] squad: %s %d/%d%s - %s"), *R.Name, R.Able, R.Total, R.bContact ? TEXT(" IN CONTACT") : TEXT(""), *R.Text);
+				}
+			}
+		}));
+	FAutoConsoleCommandWithWorldAndArgs BdCmdCommand(TEXT("astra.board.cmd"),TEXT("Testing: one of the boarding commands by its JSON: astra.board.cmd marine_order {\"squad\":\"all\",\"task\":\"hold\",\"place\":\"engineering\"}"),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* W)
 		{
 			UAstraBoardSubsystem* B = BdBoard(W);

@@ -220,5 +220,31 @@ int32 SAstraCombatHud::OnPaint(const FPaintArgs&, const FGeometry& G, const FSla
 		X += W2 + ColGap;
 		DrawColumn(TEXT("COMMAND"), FpsKeysCommand, NC, X);
 	}
+	// the marines' squads, top right: the Captain sees his orders carried out (a squad's name, how many on their feet of how many, what it is doing; amber when it is in contact, red when it is mauled)
+	if (State.SquadsAlpha > 0.02f && !State.Squads.IsEmpty())
+	{
+		const float A = State.SquadsAlpha;
+		const float RowH = 20.f * U, Pad = 10.f * U, HeadH = 20.f * U, W = 470.f * U;
+		const int32 N = FMath::Min(State.Squads.Num(), 8);
+		const float H = 2.f * Pad + HeadH + N * RowH;
+		const FVector2D Origin(Size.X - 24.f * U - W, 24.f * U);
+		Box(Origin, FVector2D(W, H), FLinearColor(0.004f, 0.006f, 0.01f, 0.55f * A), L + 1);
+		Text(TEXT("MARINES"), Origin + FVector2D(Pad, 0.7f * Pad), Small, FLinearColor(0.62f, 0.7f, 0.8f, 0.9f * A), L + 3);
+		float Y = Origin.Y + Pad + HeadH;
+		for (int32 i = 0; i < N; ++i, Y += RowH)
+		{
+			const FAstraFpsHudState::FSquadRow& R = State.Squads[i];
+			const bool bMauled = R.Total >= 3 && R.Able * 3 <= R.Total;
+			const FLinearColor Col = R.bContact ? FLinearColor(1.f, 0.78f, 0.3f, A) : FLinearColor(0.78f, 0.86f, 0.95f, A);
+			const FLinearColor Count = bMauled ? FLinearColor(1.f, 0.35f, 0.28f, A) : Col;
+			if (R.bContact)
+			{
+				Box(FVector2D(Origin.X + Pad, Y + 4.f * U), FVector2D(4.f * U, RowH - 8.f * U), FLinearColor(1.f, 0.78f, 0.3f, 0.95f * A), L + 3);
+			}
+			Text(R.Name.Left(15), FVector2D(Origin.X + Pad + 10.f * U, Y + 2.f * U), Small, Col, L + 3);
+			Text(FString::Printf(TEXT("%d/%d"), R.Able, R.Total), FVector2D(Origin.X + Pad + 118.f * U, Y + 2.f * U), Small, Count, L + 3);
+			Text(R.Text.Len() > 38 ? R.Text.Left(36) + TEXT("..") : R.Text, FVector2D(Origin.X + Pad + 164.f * U, Y + 2.f * U), Small, FLinearColor(Col.R, Col.G, Col.B, 0.85f * A), L + 3);
+		}
+	}
 	return L + 4;
 }
