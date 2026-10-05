@@ -1137,9 +1137,11 @@ class Mind:
             if who in _FOR_THE_ADMIRAL:
                 await self.director.admiral_reply(words, lang, self._battle_state())      # (only Rourke: the allied captains are not woken for words to the admiral)
                 return
-            if who not in _FOR_ALL and self.war.captain_to_fleet(words, lang, to=who):
-                self.war.kick()                                    # (one ship's captain, or the group that holds her: Rourke does not answer words for a ship)
-                return
+            if who not in _FOR_ALL:
+                if self.war.captain_to_fleet(words, lang, to=who):
+                    self.war.kick()                                # (one ship's captain, or the group that holds her: Rourke does not answer words for a ship)
+                    return
+                log.info("fleet net: nobody answers to %r, the words go to everyone", who)
             self.war.captain_to_fleet(words, lang)
             self.war.kick()
             await self.director.admiral_reply(words, lang, self._battle_state())
@@ -1217,7 +1219,7 @@ class Mind:
             turn_task = asyncio.create_task(self.agent.handle(text, lang, ctx, note=note, gate=gate))
             if ch and ch.live and self._can_answer(ch.party):
                 r = await router_mod.for_party(self.llm, text, ctx)
-                log.info("channel open with %s: out on it (%s, %.0f ms): %r", ch.party, r.how, r.ms, r.external[:80])
+                log.info("channel open with %s: out on it (%s, %.0f ms)%s: %r", ch.party, r.how, r.ms, f", for {r.to}" if r.to else "", r.external[:80])
                 if r.external:
                     party_task = asyncio.create_task(self._to_party(r.party, r.external, lang, r.to))
         t = await turn_task
