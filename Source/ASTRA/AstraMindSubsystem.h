@@ -109,6 +109,27 @@ public:
 	UWorld* GameWorld() const;
 	/** The last lines the crew spoke (name, text), as heard: the Captain's datapad keeps a comms log. */
 	const TArray<TPair<FString, FString>>& GetHeardLines() const { return HeardLines; }
+	/** A line of the radio nets' traffic (what Fleet, the allied captains, the flight net and the marines said: the Captain hears only what is addressed to him, or a net he asked for,
+	 *  and reads the rest here) or a line an officer wrote on a console's log with the silent `console_log` tool (docs/protocollo_voce.md §5ter). The mind sends them; the comms and
+	 *  flight consoles, the control surfaces and the datapad's log page show them. */
+	struct FNetLine
+	{
+		FString Net;           // fleet | flight | marines; empty for a console log line
+		FString Station;       // the console it belongs to: comms (the fleet net), flight (the flight net), xo (the marines), or the officer's own for a log line
+		FString Who;           // who said it (a name), or the officer who wrote the log line
+		FString Text;
+		bool bUrgent = false;  // the sender said danger now
+		bool bAloud = false;   // it was heard on the bridge's speaker (an answer to the Captain, a call to him, a net on the speaker)
+		bool bNotice = false;  // a log line worth a glance
+		double Time = 0.0;     // FPlatformTime::Seconds() when it came
+	};
+	/** Everything the nets and the logs said lately, oldest first. */
+	const TArray<FNetLine>& GetNetLines() const { return NetLines; }
+	/** The newest `Max` lines of one console (its own log lines and the traffic of the net it has the watch on), oldest first. */
+	void GetConsoleLines(const FString& Station, int32 Max, TArray<FNetLine>& Out) const;
+	/** The Captain asked to hear this net on the bridge's speaker (fleet | flight | marines). */
+	bool IsNetOnSpeaker(const FString& Net) const { return NetsOnSpeaker.Contains(Net); }
+
 	/** Someone not of the crew speaking now over a channel (the Archon, the Admiral, a controller): their name, else "". */
 	const FString& GetExternalSpeaker() const { return ExternalSpeaker; }
 	/** What they are saying (the line in flight). */
@@ -124,4 +145,6 @@ public:
 
 private:
 	TArray<TPair<FString, FString>> HeardLines;
+	TArray<FNetLine> NetLines;       // the nets' traffic and the consoles' log lines the mind sent (capped; cleared with each new session)
+	TSet<FString> NetsOnSpeaker;     // the nets the Captain asked to hear
 };

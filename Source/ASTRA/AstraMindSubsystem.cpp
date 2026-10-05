@@ -128,6 +128,8 @@ void UAstraMindSubsystem::Connect()
 	{
 		ConnectFailures = 0;
 		UE_LOG(LogASTRA, Log, TEXT("[Mind] connected"));
+		NetLines.Reset();            // a new session: the mind starts with empty logs and no net on the speaker
+		NetsOnSpeaker.Reset();
 		TSharedRef<FJsonObject> Hello = MakeShared<FJsonObject>();
 		Hello->SetStringField(TEXT("type"), TEXT("hello"));
 		Hello->SetStringField(TEXT("client"), TEXT("ue"));
@@ -175,6 +177,7 @@ void UAstraMindSubsystem::Connect()
 		// nobody has the floor any more (the music comes back), and the lines in flight will not be finished
 		FloorState = TEXT("idle");
 		VoiceProtocol = 1;
+		NetsOnSpeaker.Reset();
 		for (TPair<int32, FVoiceLine>& P : Voices)
 		{
 			if (UAudioComponent* C = P.Value.Comp.Get())
@@ -582,6 +585,75 @@ void UAstraMindSubsystem::OnText(const FString& Text)
 		UE_LOG(LogASTRA, Verbose, TEXT("[Mind] line %d dropped (%s): %s"), (int32)Msg->GetNumberField(TEXT("id")),
 		       *Msg->GetStringField(TEXT("reason")), *Msg->GetStringField(TEXT("text")));
 	}
+	else if (Type == TEXT("net_traffic") || Type == TEXT("console_log"))
+	{
+		// the radio nets' traffic and the officers' silent log lines (docs/protocollo_voce.md §5ter): nothing is voiced; the consoles and the datapad show them
+		FNetLine L;
+		L.Time = FPlatformTime::Seconds();
+		const bool bTraffic = Type == TEXT("net_traffic");
+		Msg->TryGetStringField(TEXT("text"), L.Text);
+		if (bTraffic)
+		{
+			Msg->TryGetStringField(TEXT("net"), L.Net);
+			Msg->TryGetStringField(TEXT("console"), L.Station);
+			Msg->TryGetStringField(TEXT("name"), L.Who);
+			Msg->TryGetBoolField(TEXT("urgent"), L.bUrgent);
+			Msg->TryGetBoolField(TEXT("aloud"), L.bAloud);
+		}
+		else
+		{
+			FString Kind;
+			Msg->TryGetStringField(TEXT("station"), L.Station);
+			Msg->TryGetStringField(TEXT("by"), L.Who);
+			L.bNotice = Msg->TryGetStringField(TEXT("kind"), Kind) && Kind == TEXT("notice");
+		}
+		if (!L.Text.IsEmpty() && !L.Station.IsEmpty())
+		{
+			FAstraTimeline::Record(bTraffic ? TEXT("net") : TEXT("log"), FString::Printf(TEXT("%s: %s"), bTraffic ? *L.Net : *L.Station, *L.Text));
+			NetLines.Add(L);
+			if (NetLines.Num() > 160)
+			{
+				NetLines.RemoveAt(0, NetLines.Num() - 160);
+			}
+		}
+	}
+	else if (Type == TEXT("net_speaker"))
+	{
+		// the Captain asked for a net on the bridge's speaker, or to take it off (the consoles say which are on)
+		FString SpeakerNet;
+		bool bOn = false;
+		if (Msg->TryGetStringField(TEXT("net"), SpeakerNet) && Msg->TryGetBoolField(TEXT("on"), bOn))
+		{
+			if (bOn)
+			{
+				NetsOnSpeaker.Add(SpeakerNet);
+			}
+			else
+			{
+				NetsOnSpeaker.Remove(SpeakerNet);
+			}
+		}
+	}
+	else if (Type == TEXT("notice"))
+	{
+		// a line addressed to the Captain whose voice could not be made, sent as text: the subtitle without a voice, and the comms log has it
+		const int32 NoticeId = (int32)Msg->GetNumberField(TEXT("id"));
+		const FString NoticeSpeaker = Msg->GetStringField(TEXT("speaker"));
+		const FString NoticeName = Msg->GetStringField(TEXT("name"));
+		const FString NoticeText = Msg->GetStringField(TEXT("text"));
+		double HoldS = 0.0;
+		Msg->TryGetNumberField(TEXT("hold_s"), HoldS);
+		if (AASTRAPlayerController* PC = Cast<AASTRAPlayerController>(UGameplayStatics::GetPlayerController(GameWorld(), 0)))
+		{
+			PC->Subtitle(NoticeId, NoticeSpeaker, NoticeName, NoticeText, (float)FMath::Max(HoldS, 3.0), false);
+		}
+		HeardLines.Add(TPair<FString, FString>(NoticeName, NoticeText));
+		if (HeardLines.Num() > 12)
+		{
+			HeardLines.RemoveAt(0);
+		}
+		UE_LOG(LogASTRA, Log, TEXT("[Crew] %s: %s (read, no voice)"), *NoticeSpeaker, *NoticeText);
+	}
 	else if (Type == TEXT("transcript"))
 	{
 		FAstraTimeline::Record(TEXT("heard"), FString::Printf(TEXT("[%s] %s"), *Msg->GetStringField(TEXT("lang")), *Msg->GetStringField(TEXT("text"))));
@@ -606,6 +678,18 @@ void UAstraMindSubsystem::OnText(const FString& Text)
 			const TCHAR* Where = TEXT("");
 #endif
 			Screen(FString::Printf(TEXT("Microphone %s%s"), *Mic, Where), FColor::Orange, 10.f);
+		}
+	}
+}
+
+void UAstraMindSubsystem::GetConsoleLines(const FString& Station, int32 Max, TArray<FNetLine>& Out) const
+{
+	Out.Reset();
+	for (int32 i = NetLines.Num() - 1; i >= 0 && Out.Num() < Max; --i)
+	{
+		if (NetLines[i].Station == Station)
+		{
+			Out.Insert(NetLines[i], 0);
 		}
 	}
 }
