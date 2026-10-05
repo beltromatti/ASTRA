@@ -20,8 +20,9 @@ from . import context as context_model
 from . import models
 from . import stations as station_model
 from .crew import CREW, bridge_now, crew_context, system_prompt
+from .nets import NET_EVENT
 from .openrouter import Completion, OpenRouter, ToolCall
-from .tools import DEPT_TOOLS, LOOKUPS, SHIP_TOOL_NAMES, SPEAK, initiative_names, owner_of, tools_for
+from .tools import CONSOLE_LOG, DEPT_TOOLS, LOOKUPS, SHIP_TOOL_NAMES, SILENT_TOOLS, SPEAK, initiative_names, owner_of, tools_for
 
 log = logging.getLogger("astra.agent")
 
@@ -71,6 +72,9 @@ class BridgeAgent:
         self.heard: Callable[[float], list[tuple[float, str, str, bool]]] = lambda seconds: []
         # what is queued on the speech floor and not said yet (speech.Voice.waiting, set by the server): (who, words, how urgent)
         self.waiting: Callable[[], list[tuple[str, str, str]]] = lambda: []
+        # the radio nets and the consoles' logs (nets.Nets, set by the server): `console_log` writes there, `net_speaker` puts a net on the speaker, `digest` is what the
+        # officers see of both at the head of a turn (what the nets said that the Captain has not heard, what the consoles logged)
+        self.nets: Any = None
         self.titles = {k: v.title for k, v in CREW.items()}
         self.orders: deque[tuple[float, str]] = deque(maxlen=12)   # the Captain's last words to the bridge (they outlive the history's cuts)
         self._active: set[Turn] = set()  # turns being worked on (what preempt() reaches)
@@ -123,7 +127,12 @@ class BridgeAgent:
     def _now(self, state: dict[str, Any], ctx: context_model.Context | None = None) -> str:
         """The bridge this moment (crew.bridge_now), for the head of a turn's last message."""
         hearing = context_model.describe(ctx, self.titles) if ctx else ""
-        return bridge_now(state, self.ship.recent_events(), hearing, self._said_aloud(), self._waiting(), self._context(), self._orders())
+        return bridge_now(state, self.ship.recent_events(), hearing, self._said_aloud(), self._waiting(), self._context(), self._orders(),
+                          where=context_model.where_now(ctx, state), logs=self._logs())
+
+    def _logs(self) -> str:
+        """What the nets said that the Captain has not heard, and what the consoles' logs hold (nets.Nets.digest): the officers' sense of what the bridge knows and has not said."""
+        return self.nets.digest() if self.nets is not None else ""
 
     def _waiting(self) -> str:
         """The lines queued on the floor behind whoever is speaking: the officers see the backlog (a crisis made fifty urgent lines in four minutes, 2 Oct,
@@ -156,6 +165,19 @@ class BridgeAgent:
         msgs = [self._system(lang, state), {"role": "user", "content": "[the bridge is manned: stand by]"}]
         await models.chat(self.llm, "crew", messages=msgs, tools=tools_for(state).tools, max_tokens=1, retry=False, first_token_s=20.0)
         return time.perf_counter() - t0
+
+    async def _console_log(self, args: dict[str, Any]) -> dict[str, Any]:
+        """An officer writes a line on a console's log, silently (nets.Nets.console_log)."""
+        if self.nets is None:
+            return {"ok": True, "detail": "(no console to write on in this build)"}
+        return self.nets.console_log(str(args.get("station") or ""), str(args.get("text") or ""), kind=str(args.get("kind") or "routine"),
+                                     by=str(args.get("station") or ""))
+
+    async def _net_speaker(self, args: dict[str, Any]) -> dict[str, Any]:
+        """A radio net goes on the bridge's speaker, or off it, because the Captain asked."""
+        if self.nets is None:
+            return {"ok": False, "detail": "the nets cannot be put on the speaker in this build"}
+        return self.nets.set_speaker(str(args.get("net") or "").lower(), bool(args.get("on", True)))
 
     async def _standing_order(self, args: dict[str, Any]) -> dict[str, Any]:
         """The Captain's orders that last: recorded, or withdrawn (a department's, or all of them)."""
@@ -220,10 +242,11 @@ class BridgeAgent:
                 await self.say("xo", _fallback_line(lang), lang, "calm")
             results = await self._collect(pending, turn)
             main_lines = len(turn.lines)
-            failures = [a for a in turn.actions if not a[2].get("ok", False)]
+            acted = [a for a in turn.actions if a[0] not in SILENT_TOOLS]          # (a line written on a console's log is no order to read back)
+            failures = [a for a in acted if not a[2].get("ok", False)]
             looked_up = any(n in LOOKUPS for n, _, _ in turn.actions)
             if not turn.cancelled:
-                if turn.actions and not comp.error and (not turn.lines or looked_up):
+                if acted and not comp.error and (not turn.lines or looked_up):
                     await self._follow_up(turn, msgs, lang, readback=True, ts=ts)      # orders carried out in silence, or a file read: say what
                 elif failures:
                     await self._follow_up(turn, msgs, lang, readback=False, ts=ts)
@@ -250,9 +273,9 @@ class BridgeAgent:
         sysmsg = {"role": "system", "content": system} if system else self._system(lang, state)
         msgs: list[dict[str, Any]] = [sysmsg] + hist
         now = "" if system else self._now(state) + "\n\n"            # (a role with a prompt of its own carries its own view of the ship)
-        msgs.append({"role": "user", "content": now + user + "\n" + (ask or EVENT_ASK) + (STANDING_ASK if self.standing else "")})
+        msgs.append({"role": "user", "content": now + user + "\n" + (ask or EVENT_ASK) + (STANDING_ASK if self.standing and not speak_only else "")})   # (a turn that can only speak carries nothing out)
         on_call = self._on_call(turn, lang, t0, pending, ts, state, fired, captain=False, allowed=allowed)
-        tools = [t for t in ts.tools if t["function"]["name"] in (allowed | {"speak"})]
+        tools = [t for t in ts.tools if t["function"]["name"] in (allowed | {"speak"} | (set() if speak_only else {"console_log"}))]   # (the log is silent: nobody's authority is needed)
         self._active.add(turn)
         try:
             comp = await self._llm(turn, role, msgs, tools, on_call, **({"max_tokens": 360} if role == "crew" else {}))   # (the other roles carry their own)
@@ -265,9 +288,9 @@ class BridgeAgent:
                 log.info("event turn: no speak call (content not voiced): %s", comp.content[:160])
             results = await self._collect(pending, turn)
             main_lines = len(turn.lines)
-            if turn.actions and not turn.lines and not comp.error and not turn.cancelled:
-                await self._follow_up(turn, msgs, lang, readback=True)   # acted on initiative in silence: say so
-            if turn.lines or turn.actions:
+            if any(a[0] not in SILENT_TOOLS for a in turn.actions) and not turn.lines and not comp.error and not turn.cancelled:
+                await self._follow_up(turn, msgs, lang, readback=True)   # acted on initiative in silence: say so (what was only written on a log is not an action)
+            if turn.lines or any(a[0] not in SILENT_TOOLS for a in turn.actions):       # (a turn that only wrote the console logs is on the logs, not in the talk: the cache and the history stay short)
                 self._record(user, comp.tool_calls, results, turn, main_lines)
             turn.t_end = time.perf_counter() - t0
             self.spent += turn.cost
@@ -286,20 +309,29 @@ class BridgeAgent:
                "since (the state above is now), and the bridge has heard what «Said aloud» lists. If it still matters to the Captain, they "
                "say it now as it stands — updated, short, in character — with speak. If it no longer matters, or the Captain has already "
                "heard it (from them or from anyone, in other words too) and nothing has changed since that he must act on, they say "
-               "nothing: do not call speak. A line that answers an order of the Captain's (what was done about it, what the other ship or "
+               "nothing: do not call speak; what is only routine they may write on their console's log (console_log) instead of letting it vanish. "
+               "A line that answers an order of the Captain's (what was done about it, what the other ship or "
                "console said) still matters unless it has been said already: the Captain is waiting for it — say it, updated if things "
                "changed, and add only what is new and pressing.")
         msgs = [self._system(lang, state)] + self._last_turns(4) + [{"role": "user", "content": self._now(state) + "\n\n" + ask}]
         said: list[str] = []
+        logged: list[str] = []
 
         async def on_call(call: ToolCall) -> None:
+            args = call.arguments() or {}
             if call.name == "speak":
-                line = str((call.arguments() or {}).get("text") or "").strip()
+                line = str(args.get("text") or "").strip()
                 if line:
                     said.append(line)
+            elif call.name == "console_log":
+                res = await self._console_log(args)
+                if res.get("ok"):
+                    logged.append(str(args.get("text") or ""))
 
-        comp = await models.chat(self.llm, "crew", messages=msgs, tools=[SPEAK], tool_choice="auto", on_tool_call=on_call, max_tokens=160)
+        comp = await models.chat(self.llm, "crew", messages=msgs, tools=[SPEAK, CONSOLE_LOG], tool_choice="auto", on_tool_call=on_call, max_tokens=160)
         self.spent += comp.cost
+        if comp.error and not said and not logged:
+            raise RuntimeError(f"the model did not answer: {comp.error[:100]}")           # (the speech floor tells a model that failed from an officer who chose silence)
         return " ".join(said) if said else None
 
     # ------------------------------------------------------------------------------------------------ internals
@@ -355,6 +387,10 @@ class BridgeAgent:
                 await self._voice(turn, t0, speaker, line, lang, args.get("tone", "calm"))
             elif call.name == "standing_order" and captain:
                 pending.append((call, asyncio.create_task(self._standing_order(args))))     # the mind's own, not the ship's
+            elif call.name == "console_log":
+                pending.append((call, asyncio.create_task(self._console_log(args))))        # silent, nobody's authority is needed (the mind's own, like the standing order)
+            elif call.name == "net_speaker" and captain:
+                pending.append((call, asyncio.create_task(self._net_speaker(args))))        # the Captain asked for a net on the speaker (or off it)
             elif call.name == "station" and (captain or (allowed is not None and "station" in allowed)):
                 pending.append((call, asyncio.create_task(self._station(args, ts, state, captain, standing_for))))
             elif call.name in ts.names and (captain or (allowed is not None and call.name in allowed)) and call.name in SHIP_TOOL_NAMES:
@@ -494,9 +530,11 @@ EVENT_ASK = ("The Captain should hear this: the responsible officer reports it n
              "report that changes nothing the Captain must decide is better left unsaid. Ranges, shield percentages and countdowns "
              "that move every few seconds are on the screens: say them when they cross a line that matters (into or out of our guns, "
              "shields failing, a section gone), never as a running commentary of the same target — and news that is about someone else's "
-             "post is no occasion for an officer to restate their own fight (the target's range and shields again, the next salvo). A voice over the radio (an enemy "
-             "commander, an allied captain, a pilot) was heard by the Captain himself: nobody repeats or sums up what it said; an "
-             "officer speaks after it only to add what the bridge knows and it did not say. A hail and a channel are Communications' "
+             "post is no occasion for an officer to restate their own fight (the target's range and shields again, the next salvo). A voice over the radio that the Captain "
+             "heard himself (an enemy commander on his channel, the admiral or a captain answering him, a net he asked to hear: it is in «Said aloud» and in the recent events "
+             "as «over the radio») is nobody's to repeat or sum up; an "
+             "officer speaks after it only to add what the bridge knows and it did not say. Net traffic he did not hear (the «net:» events) is its listener's: see the nets. "
+             "A hail and a channel are Communications' "
              "(Martin): he alone says who is calling, if the Captain did not hear it, and keeps the channel; no other officer relays a "
              "call or offers to answer it for the Captain. Within "
              "their own authority an officer may also act at once: with live consoles, set a mode on their own console when their "
@@ -505,6 +543,32 @@ EVENT_ASK = ("The Captain should hear this: the responsible officer reports it n
              "tool call does nothing and misleads the Captain. What needs the Captain's word (course changes on your own, a "
              "new offensive, leaving, breaking off, a channel with the enemy) is proposed instead — unless a standing order in "
              "force covers it.")
+NET_ASK = ("NET TRAFFIC (the «net:» event above): radio on a net that the Captain has NOT heard — it is not on the bridge's speaker; he reads the consoles' logs and the datapad. The "
+           "officer who has the watch on that net decides, line by line, between two things. "
+           "TELL HIM — one short `speak` line of their own (never the sender's words read back), and the log as well if they like — when: the event says [URGENT]; a line calls the "
+           "Captain or needs his answer; it is an order from Fleet; a ship, a squadron, a pilot or a marine is lost or down; or it is a warning he has not had (an attack coming, a ship "
+           "under fire). "
+           "LOG IT — `console_log`, one telegraphic line in English, and NO `speak` — when it is routine: a position, a range, a bearing, a formation held, a «ready», a rearm done, a team "
+           "in place, a bulkhead sealed, an ally holding. A turn of routine traffic has no `speak` call at all. "
+           "What the Captain has already heard («Said aloud», in any words), what his own order just produced, and what the boards show are never told again; when lines are already "
+           "waiting to be said, only what outweighs them is worth adding.")
+
+
+def net_ask(events: list[str]) -> str:
+    """The ask of a report turn that has net traffic among its news: the listener's doctrine alone when the news is only traffic (the general ask says «report it», and the officers
+    follow the first thing they are told), with the general ask when other news is there too."""
+    return NET_ASK if all(e.startswith(NET_EVENT) for e in events) else EVENT_ASK + " " + NET_ASK
+WHEEL_ASK = ("THE COMMAND WHEEL: the event above is an order the Captain gave WITHOUT A WORD, from his command wheel. It is HIS ORDER, exactly as if he had spoken it, and the console has "
+             "already carried it out (you only have `speak`: do not carry it out again). "
+             "WHO: ONE officer answers, the one whose station it is — Helm for course and speed; Tactical for targets, weapons, missiles, shields and decoys; Flight Control for the flight "
+             "deck and the squadrons; Operations for power, damage control, the transporter and the main screen; the XO for the alert level. An order that spans two stations (engage: guns "
+             "and bow) is answered once, by Tactical. Nobody else says anything, the XO included. "
+             "HOW: two to five words, in the Captain's language and in character — «Aye, helm.» «Weapons free.» «Red alert.» «Falcons launching.» «Screen on the target.» Not a sentence: no "
+             "what-it-means («all hands to battle stations»), no range, target or heading read back, nothing about what happens next, no «Captain, …» preamble, no question about whether he "
+             "meant it. "
+             "UNLESS the detail in brackets shows that something did not go through (refused, failed, not possible, no lane free), or the order will hurt the ship in a way the Captain "
+             "cannot see on the wheel (it turns her broadside to a missile salvo, it drops the shields with a torpedo in the water): then one short line says what did not happen or "
+             "what is wrong, instead of the acknowledgement.")
 STANDING_ASK = (" Standing orders in force (see them in the rules) are the Captain's orders given in advance: when this "
                 "event is what one is about, that officer carries it out now, fully (weapons free means firing: fire_weapons or "
                 "an engage mode, not just a target), with the tool calls in this same turn, and says what was done.")

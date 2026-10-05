@@ -1,0 +1,72 @@
+{
+ "session": "s1",
+ "start": "2026-10-05T00:16:34",
+ "duration_s": 183.73,
+ "captain": [],
+ "producers": [
+  {
+   "t": 9.31,
+   "kind": "net",
+   "speaker": "castellan",
+   "text": "Aquila, Praetorian: contatto singolo, Lethe, a trenta chilometri su rilevamento 200. Resto in schermo su di voi, armi libere; ditemi se volete che stringa.",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 117.44,
+   "kind": "report",
+   "speaker": "xo",
+   "text": "Bentornato a bordo, Capitano. Siamo in pattuglia davanti al Janus Gate Aurelia, scafo e scudi al cento per cento, calore tredici, nessun contatto sul nostro plot.",
+   "urgent": false
+  },
+  {
+   "t": 117.94,
+   "kind": "report",
+   "speaker": "xo",
+   "text": "Il Praetorian tiene lo schermo su di noi e segnala un contatto singolo, il Lethe, a trenta chilometri su rilevamento due-zero-zero: la guerra chiede di sapere che cosa vuole quel Lethe.",
+   "urgent": false
+  },
+  {
+   "t": 163.61,
+   "kind": "report",
+   "speaker": "comms",
+   "text": "Capitano, intelligence dal netto flotta: F-M1, circa tre navi, un Acheron e due Styx, a Thule. Fonte un corriere della Gilda pagato in scrip di deuterio.",
+   "urgent": false
+  }
+ ],
+ "events": [
+  {
+   "t": 116.16,
+   "text": "bridge: the Captain returns to the bridge after the watch change — the XO welcomes them back and sums up in two or three short lines where the Aquila is, her state, and what the war needs from her now",
+   "report": true
+  }
+ ],
+ "recorded": {
+  "spoken": [
+   {
+    "t": 9.7,
+    "speaker": "castellan",
+    "text": "Aquila, Praetorian: contatto singolo, Lethe, a trenta chilometri su rilevamento 200. Resto in schermo su di voi, armi libere; ditemi se volete che stringa."
+   },
+   {
+    "t": 117.52,
+    "speaker": "xo",
+    "text": "Bentornato a bordo, Capitano. Siamo in pattuglia davanti al Janus Gate Aurelia, scafo e scudi al cento per cento, calore tredici, nessun contatto sul nostro plot."
+   },
+   {
+    "t": 127.92,
+    "speaker": "xo",
+    "text": "Il Praetorian tiene lo schermo su di noi e segnala un contatto singolo, il Lethe, a trenta chilometri su rilevamento due-zero-zero: la guerra chiede di sapere che cosa vuole quel Lethe."
+   },
+   {
+    "t": 163.92,
+    "speaker": "comms",
+    "text": "Capitano, intelligence dal netto flotta: F-M1, circa tre navi, un Acheron e due Styx, a Thule. Fonte un corriere della Gilda pagato in scrip di deuterio."
+   }
+  ],
+  "dropped": [],
+  "rethought": []
+ },
+ "unpaired_pulses": 0
+}

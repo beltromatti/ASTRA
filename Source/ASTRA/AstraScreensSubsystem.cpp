@@ -670,6 +670,54 @@ namespace
 		}
 		return Out;
 	}
+
+	/** The lines the nets and the officers' logs put on a screen (docs/protocollo_voce.md §5ter), oldest first in `Lines`, drawn newest at the bottom: a row each, at most two for a
+	 *  long one. The label is the net ("FLEET"), or for a log line the station (`bStation`) or "LOG"; cyan for a net's traffic (dim when the Captain heard it aloud), green for a log line,
+	 *  amber for a notice, red for a sender who said danger now; the age at the right edge. Returns the y under the last row. */
+	float DrawNetRows(const FPaint& P, const TArray<UAstraMindSubsystem::FNetLine>& Lines, float X, float Y, float TextX, float AgeX, int32 MaxChars, int32 MaxRows, bool bStation)
+	{
+		struct FRow { FString Label, Text, Age; FLinearColor LabelCol = CYAN; FLinearColor TextCol = TEXTC; };
+		const FLinearColor Soft = RGB(120, 160, 205);
+		const double Now = FPlatformTime::Seconds();
+		TArray<FRow> Rows;                                       // collected newest first, each entry's last segment first
+		for (int32 i = Lines.Num() - 1; i >= 0 && Rows.Num() < MaxRows; --i)
+		{
+			const UAstraMindSubsystem::FNetLine& L = Lines[i];
+			FString Who = L.Who;
+			int32 Paren = INDEX_NONE;
+			if (Who.FindChar(TEXT('('), Paren))
+			{
+				Who = Who.Left(Paren).TrimEnd();
+			}
+			const bool bTraffic = !L.Net.IsEmpty();
+			const FString Body = (bTraffic && !Who.IsEmpty()) ? Who + TEXT(": ") + L.Text : L.Text;
+			const FString Label = bTraffic ? (L.Net == TEXT("marines") ? FString(TEXT("MARINES")) : L.Net.ToUpper()) : (bStation ? L.Station.ToUpper() : FString(TEXT("LOG")));
+			const double Age = FMath::Max(0.0, Now - L.Time);
+			const FString AgeText = Age < 90.0 ? FString::Printf(TEXT("%.0fS"), Age) : FString::Printf(TEXT("%.0fM"), Age / 60.0);
+			TArray<FString> Segs = Wrap(Body, MaxChars);
+			for (int32 k = FMath::Min(2, Segs.Num()) - 1; k >= 0 && Rows.Num() < MaxRows; --k)
+			{
+				FRow R;
+				R.Label = k == 0 ? Label : FString();
+				R.Text = Segs[k];
+				R.Age = k == 0 ? AgeText : FString();
+				R.LabelCol = L.bUrgent ? RED : (L.bNotice ? AMBER : (bTraffic ? (L.bAloud ? DIM : CYAN) : GREEN));
+				R.TextCol = (L.bAloud || (!bTraffic && !L.bNotice)) ? Soft : TEXTC;
+				Rows.Add(R);
+			}
+		}
+		for (int32 r = Rows.Num() - 1, Row = 0; r >= 0; --r, ++Row)
+		{
+			const float RY = Y + Row * 21.f;
+			P.Text(X, RY, Rows[r].Label, true, 14, Rows[r].LabelCol);
+			P.Text(TextX, RY, Rows[r].Text, true, 15, Rows[r].TextCol);
+			if (!Rows[r].Age.IsEmpty())
+			{
+				P.Text(AgeX, RY, Rows[r].Age, true, 13, Soft, 2);
+			}
+		}
+		return Y + Rows.Num() * 21.f;
+	}
 }
 
 void UAstraScreensSubsystem::DrawPadOverview(UCanvas* C, int32 W, int32 H)
@@ -1437,9 +1485,31 @@ void UAstraScreensSubsystem::DrawControls(UCanvas* C, int32 W, int32 H, const FS
 	// the officer's own words for the station, and the last things done
 	P.Panel(16, Bottom, W - 16, H - 12, TEXT("Officer"));
 	P.Text(32, Bottom + 36, S->Status.Left(int32((W - 64) / 8.8f)), true, 15, TEXTC);
+	// the officer's last line on their console's silent log (the `console_log` tool, docs/protocollo_voce.md §5ter), under what they last did; the net traffic is not theirs to show here
+	FString LastNote;
+	if (const UAstraMindSubsystem* Mind = GetWorld()->GetGameInstance() ? GetWorld()->GetGameInstance()->GetSubsystem<UAstraMindSubsystem>() : nullptr)
+	{
+		TArray<UAstraMindSubsystem::FNetLine> Notes;
+		Mind->GetConsoleLines(Station, 8, Notes);
+		for (int32 i = Notes.Num() - 1; i >= 0 && LastNote.IsEmpty(); --i)
+		{
+			if (Notes[i].Net.IsEmpty())
+			{
+				LastNote = Notes[i].Text;
+			}
+		}
+	}
 	for (int32 k = 0; k < 2 && k < S->Actions.Num(); ++k)
 	{
+		if (k == 1 && !LastNote.IsEmpty())
+		{
+			break;
+		}
 		P.Text(32, Bottom + 60 + k * 22, (TEXT("› ") + S->Actions[S->Actions.Num() - 1 - k]).Left(int32((W - 64) / 8.4f)), true, 14, k == 0 ? CYAN : DIM);
+	}
+	if (!LastNote.IsEmpty())
+	{
+		P.Text(32, Bottom + (S->Actions.Num() >= 1 ? 82.f : 60.f), (TEXT("LOG  ") + LastNote).Left(int32((W - 64) / 8.4f)), true, 14, GREEN);
 	}
 }
 
@@ -1484,7 +1554,7 @@ namespace
 {
 	const TArray<FString>& PadPages()
 	{
-		static const TArray<FString> P = {TEXT("overview"), TEXT("contact"), TEXT("damage"), TEXT("fleet"), TEXT("orders")};
+		static const TArray<FString> P = {TEXT("overview"), TEXT("contact"), TEXT("damage"), TEXT("fleet"), TEXT("orders"), TEXT("log")};
 		return P;
 	}
 
@@ -1539,7 +1609,8 @@ bool UAstraScreensSubsystem::PushPad(const FString& Page, const FString& Focus, 
 	PadPushedAt = Time;
 	RedrawPadNow();
 	static const TMap<FString, FString> Names = {{TEXT("overview"), TEXT("THE SHIP AT A GLANCE")}, {TEXT("contact"), TEXT("CONTACT DOSSIER")},
-	                                             {TEXT("damage"), TEXT("DAMAGE REPORT")}, {TEXT("fleet"), TEXT("THE FLEET")}, {TEXT("orders"), TEXT("ORDERS IN FORCE")}};
+	                                             {TEXT("damage"), TEXT("DAMAGE REPORT")}, {TEXT("fleet"), TEXT("THE FLEET")}, {TEXT("orders"), TEXT("ORDERS IN FORCE")},
+	                                             {TEXT("log"), TEXT("THE BRIDGE'S LOG")}};
 	if (AASTRAPlayerController* PC = Cast<AASTRAPlayerController>(GetWorld()->GetFirstPlayerController()))
 	{
 		PC->ShowNotice(FString::Printf(TEXT("%s  ›  DATAPAD:  %s%s   ·   Tab"), *By.ToUpper(), *Names[Pg], PadFocus.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" %s"), *PadFocus)), 8.f);
@@ -1576,6 +1647,7 @@ void UAstraScreensSubsystem::DrawPad(UCanvas* C, int32 W, int32 H)
 	else if (PadPage == TEXT("damage")) { DrawPadDamage(C, W, H); }
 	else if (PadPage == TEXT("fleet")) { DrawPadFleet(C, W, H); }
 	else if (PadPage == TEXT("orders")) { DrawPadOrders(C, W, H); }
+	else if (PadPage == TEXT("log")) { DrawPadLog(C, W, H); }
 	else { DrawPadOverview(C, W, H); }
 	DrawPadTabs(C, W, H);
 }
@@ -2009,6 +2081,41 @@ void UAstraScreensSubsystem::DrawPadOrders(UCanvas* C, int32 W, int32 H)
 	}
 }
 
+void UAstraScreensSubsystem::DrawPadLog(UCanvas* C, int32 W, int32 H)
+{
+	// the bridge's log: what the officers wrote silently on their consoles' logs (the `console_log` tool) and what the radio nets said that the Captain has not necessarily heard
+	// (the fleet, flight and marine nets are the listening officers' to relay: docs/protocollo_voce.md §5ter), newest at the bottom; what he heard aloud is dim
+	const UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>();
+	const UAstraMindSubsystem* Mind = GetWorld()->GetGameInstance() ? GetWorld()->GetGameInstance()->GetSubsystem<UAstraMindSubsystem>() : nullptr;
+	if (!Ship)
+	{
+		return;
+	}
+	FPaint P{C, TitleFont, MonoFont, Time};
+	P.Rect(0, 0, W, H, BG);
+	PadHeader(P, W, Ship->GetHullNumber(), Time, TEXT("THE BRIDGE'S LOG"), CYAN);
+	const float MX = 46.f, RX = W - 46.f;
+	const FLinearColor SOFT = RGB(120, 160, 205);
+	FString OnSpeaker;
+	for (const TCHAR* Net : {TEXT("fleet"), TEXT("flight"), TEXT("marines")})
+	{
+		if (Mind && Mind->IsNetOnSpeaker(Net))
+		{
+			OnSpeaker += (OnSpeaker.IsEmpty() ? FString() : FString(TEXT(" · "))) + FString(Net).ToUpper() + TEXT(" NET");
+		}
+	}
+	P.Text(MX, 60, OnSpeaker.IsEmpty() ? FString(TEXT("THE NETS ARE OFF THE SPEAKER: THE OFFICERS TELL YOU WHAT YOU MUST KNOW, THE REST IS HERE"))
+	                                   : FString::Printf(TEXT("ON THE BRIDGE SPEAKER: %s"), *OnSpeaker), true, 14, OnSpeaker.IsEmpty() ? SOFT : AMBER);
+	P.Line(MX, 84, RX, 84, DIM);
+	const float Top = 94.f, Bottom = H - 40.f;
+	if (!Mind || Mind->GetNetLines().Num() == 0)
+	{
+		P.Text(MX, Top, TEXT("NOTHING HAS BEEN LOGGED YET"), true, 16, SOFT);
+		return;
+	}
+	DrawNetRows(P, Mind->GetNetLines(), MX, Top, MX + 112.f, RX, 78, FMath::Max(1, int32((Bottom - Top) / 21.f)), true);
+}
+
 void UAstraScreensSubsystem::DrawComms(UCanvas* C, int32 W, int32 H, const FString& Slot)
 {
 	const UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>();
@@ -2041,18 +2148,20 @@ void UAstraScreensSubsystem::DrawComms(UCanvas* C, int32 W, int32 H, const FStri
 		}
 		return;
 	}
-	// A: the traffic heard, newest at the bottom; then the ship's recent events
-	P.Panel(20, 60, W - 20, H * 0.62f, TEXT("Heard"));
+	// A: what was said aloud on the bridge (newest at the bottom); the fleet net's traffic the Captain has not necessarily heard, and the communications officer's own log lines
+	// (docs/protocollo_voce.md §5ter: the officer relays what matters, the rest is read here); then the ship's recent events
+	const float HeardBottom = H * 0.34f, NetBottom = H * 0.76f;
+	P.Panel(20, 60, W - 20, HeardBottom, TEXT("Heard on the bridge"));
 	TArray<TPair<FString, FString>> Lines;
 	if (Mind)
 	{
 		const TArray<TPair<FString, FString>>& Heard = Mind->GetHeardLines();
-		for (int32 i = FMath::Max(0, Heard.Num() - 7); i < Heard.Num(); ++i)
+		for (int32 i = FMath::Max(0, Heard.Num() - 3); i < Heard.Num(); ++i)
 		{
 			Lines.Add(Heard[i]);
 		}
 	}
-	float Y = 100.f;
+	float Y = 96.f;
 	for (const TPair<FString, FString>& L : Lines)
 	{
 		FString Who = L.Key;
@@ -2071,20 +2180,34 @@ void UAstraScreensSubsystem::DrawComms(UCanvas* C, int32 W, int32 H, const FStri
 				Y += 20.f;
 			}
 		}
-		Y += 6.f;
-		if (Y > H * 0.62f - 24.f)
+		Y += 4.f;
+		if (Y > HeardBottom - 24.f)
 		{
 			break;
 		}
 	}
 	if (Lines.Num() == 0)
 	{
-		P.Text(40, 100, TEXT("QUIET ON ALL CHANNELS"), true, 16, DIM);
+		P.Text(40, 96, TEXT("QUIET ON ALL CHANNELS"), true, 16, DIM);
 	}
-	P.Panel(20, H * 0.62f + 16.f, W - 20, H - 20, TEXT("Log"));
+	P.Panel(20, HeardBottom + 10.f, W - 20, NetBottom, Mind && Mind->IsNetOnSpeaker(TEXT("fleet")) ? TEXT("Fleet net · on the speaker · log") : TEXT("Fleet net · log"));
+	TArray<UAstraMindSubsystem::FNetLine> NetRows;
+	if (Mind)
+	{
+		Mind->GetConsoleLines(TEXT("comms"), 12, NetRows);
+	}
+	if (NetRows.Num() == 0)
+	{
+		P.Text(40, HeardBottom + 48.f, TEXT("NO TRAFFIC ON THE FLEET NET"), true, 15, DIM);
+	}
+	else
+	{
+		DrawNetRows(P, NetRows, 40.f, HeardBottom + 46.f, 130.f, W - 40.f, 80, FMath::Max(1, int32((NetBottom - HeardBottom - 56.f) / 21.f)), false);
+	}
+	P.Panel(20, NetBottom + 10.f, W - 20, H - 20, TEXT("Ship's log"));
 	const TArray<FString>& Ev = Ship->GetRecentEvents();
-	float EY = H * 0.62f + 56.f;
-	for (int32 i = FMath::Max(0, Ev.Num() - 5); i < Ev.Num(); ++i)
+	float EY = NetBottom + 46.f;
+	for (int32 i = FMath::Max(0, Ev.Num() - 3); i < Ev.Num(); ++i)
 	{
 		P.Text(40, EY, Ev[i].Left(110), true, 14, i == Ev.Num() - 1 ? TEXTC : DIM);
 		EY += 20.f;
@@ -2148,13 +2271,30 @@ void UAstraScreensSubsystem::DrawFlight(UCanvas* C, int32 W, int32 H, const FStr
 	P.Text(40, 176, TEXT("OURS IN FLIGHT"), true, 16, CYAN);
 	P.Text(W - 40, 100, FString::Printf(TEXT("%d"), Theirs), false, 64, Theirs ? RED : DIM, 2);
 	P.Text(W - 40, 176, TEXT("ENEMY CRAFT"), true, 16, Theirs ? RED : DIM, 2);
-	P.Panel(20, 240, W - 20, H - 20, TEXT("Flight line"));
+	const float LineBottom = H * 0.55f;
+	P.Panel(20, 240, W - 20, LineBottom, TEXT("Flight line"));
 	int32 k = 0;
 	for (const FString& Seg : Wrap(Battle->FlightLine(), 60))
 	{
-		if (k < 12)
+		if (k < 4)
 		{
 			P.Text(40, 280 + 22.f * k++, Seg, true, 16, TEXTC);
 		}
+	}
+	// the flight net's traffic the Captain has not necessarily heard, and Flight Control's own log lines (docs/protocollo_voce.md §5ter: Price relays what matters, the rest is read here)
+	const UAstraMindSubsystem* Mind = GetWorld()->GetGameInstance() ? GetWorld()->GetGameInstance()->GetSubsystem<UAstraMindSubsystem>() : nullptr;
+	P.Panel(20, LineBottom + 10.f, W - 20, H - 20, Mind && Mind->IsNetOnSpeaker(TEXT("flight")) ? TEXT("Flight net · on the speaker · log") : TEXT("Flight net · log"));
+	TArray<UAstraMindSubsystem::FNetLine> NetRows;
+	if (Mind)
+	{
+		Mind->GetConsoleLines(TEXT("flight"), 12, NetRows);
+	}
+	if (NetRows.Num() == 0)
+	{
+		P.Text(40, LineBottom + 48.f, TEXT("NO TRAFFIC ON THE FLIGHT NET"), true, 15, DIM);
+	}
+	else
+	{
+		DrawNetRows(P, NetRows, 40.f, LineBottom + 46.f, 130.f, W - 40.f, 80, FMath::Max(1, int32((H - 20.f - LineBottom - 56.f) / 21.f)), false);
 	}
 }
