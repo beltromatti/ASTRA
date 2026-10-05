@@ -37,11 +37,20 @@ abbordaggi contro l'Aquila, chiesto da ABBORDAGGI).
   tace da 4; la dottrina dell'iniziativa per entrambi); lo schermo principale che non cambia risoluzione a ogni sguardo. Uniti i rami finiti
   di ARTE-INTERNI-2, ABBORDAGGI-3 e SPAZIO-VIVO-2 (M7–M9: il Falcon raccoglie le capsule con R, i getti dei velivoli, convogli e pattuglie);
   in corso nell'editor la ricostruzione degli interni e l'importazione del kit dei ponti nemici.
-- **Credito OpenRouter: 3,78 $** (le partite del 5/10 ~1,8 $): segnalato in RICHIESTE.
+- **Credito OpenRouter: 3,55 $** (le partite del 5/10 ~1,8 $): segnalato in RICHIESTE.
 - **Che cosa arriva dal Gate** (il lead, `AstraGateWatch.cpp`): il tavolo olografico mostra il Janus Gate e, per una forza annunciata (il transito
   visto da Keeper Station, i rinforzi di Fleet, le flotte della Marcia dirette qui), un anello che pulsa dove uscirà con quante navi e fra quanto;
   lo schermo principale lo mette in testa («GATE · 4 HOSTILE INBOUND · IN 1:32»); un'incursione oscura resta una sorpresa. Provato nel gioco
   (dall'avviso all'arrivo, poi i contatti al loro posto). Dalla domanda dell'utente «dove sono le altre navi nemiche?».
+- **Unita VOCI-3 tappa 1** (b6c4051) e provata nel gioco con la mente vera: le reti (flotta, volo, marine) hanno chi le ascolta e riferisce in
+  una riga o scrive sul registro della console; niente di ciò che è rivolto al Capitano si perde; la ruota degli ordini è confermata
+  dall'ufficiale giusto in 0,6 s («Allarme rosso, posti di combattimento.»); «Comunicazioni, cosa dicono gli alleati?» risponde dal registro;
+  la pagina THE BRIDGE'S LOG sul datapad. ~4 battute al minuto nell'avvicinamento di Solm (prima 6,8). Resta: tre soccorsi di mercantili in
+  80 s durante l'avvicinamento (VOCI-3 tappa 3), la dottrina dell'equipaggio (tappa 2). Rourke che chiama il Capitano ora si sente con la sua
+  voce (tell_captain e task_aquila diretti).
+- **Da indagare (PRESTAZIONI-GPU)**: nel gioco di prova (1600x900, 60 fps di obiettivo) la risoluzione dinamica sta al minimo (33–34 %) e
+  alcuni fotogrammi escono a blocchi (MetalFX attivo; in battaglia e con la ruota aperta: `Saved/Play/fx2.png`, `wheel1.png`, `gatelive.png`),
+  altri lisci; non riprodotto a comando con r.AstraMetalFX 0/1.
 - **Il ritmo** (il lead): il regista sa che la guerra si gioca per i suoi scontri (respiro di un minuto o due, una quiete già lunga si risponde con
   la mossa successiva della guerra, mai con un'altra calma) ed è interpellato dopo 150 s di niente invece di 420; l'apertura della campagna
   manda il gruppo di Solm a 90 s invece di 150 (avviso del Gate a ~2,5 min, arrivo prima dei 4; il 5/10 il primo colpo era a 8 minuti).

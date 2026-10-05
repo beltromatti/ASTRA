@@ -4,8 +4,8 @@ Qui scrivo solo ciò che **non posso fare io** (per regole di sicurezza: creare 
 
 ## Aperte
 
-### 2026-10-05 — Credito OpenRouter quasi finito: 3,84 $ residui (16,16 $ usati su 20)
-Le tue partite di stanotte hanno speso circa 1,8 $ (70 minuti, l'equipaggio, gli alleati, i comandanti nemici, l'ammiraglio). Con 3,84 $
+### 2026-10-05 — Credito OpenRouter quasi finito: 3,55 $ residui (16,45 $ usati su 20; aggiornato alle 03:15)
+Le tue partite di stanotte hanno speso circa 1,8 $ (70 minuti, l'equipaggio, gli alleati, i comandanti nemici, l'ammiraglio). Con 3,55 $
 restano un paio d'ore di gioco con la mente accesa, più le prove dei moduli nuovi (le tengo al minimo e quasi tutte senza modelli). Io
 non posso ricaricare (niente pagamenti): quando puoi, una ricarica su openrouter.ai (Credits). Intanto VOCI-3 riduce anche il costo per ora
 (meno battute, meno turni inutili).
