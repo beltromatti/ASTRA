@@ -884,7 +884,7 @@ tiene con l'aritmetica del suo record. **Nessuno è vivo a bordo e nulla la dife
 ### 15.5 Chiusura di ABBORDAGGI-4: che cosa è fatto, che cosa manca, come riprendere
 
 **Fatto e provato offline** (branch `worktree-agent-a70889a4b3fc590e9`; tutti i banchi di `tools/boarding.py` e le prove delle menti sono verdi; le prove nel gioco sono del lead):
-1. *Il ritmo* (§15.1): dall'ordine all'aggancio da un minuto e mezzo a tre minuti e mezzo a 3-80 km, il Capitano con i marine (`ride`, `join`, il teletrasporto), il «Numero Uno» all'XO.
+1. *Il ritmo* (§15.1): dall'ordine al taglio 1 min 19 s a 3 km, 1 min 34 s a 10, 3 min 39 s a 80 (le barche a 560-640 m/s, l'attesa dei marine dalle posizioni vere), il Capitano con i marine (`ride`, `join`, il teletrasporto), il «Numero Uno» all'XO.
 2. *La fanteria si comanda* (§15.2): `sweep`, `breach`, `take`, `ambush`, `escort_captain`, `seal_behind`, `cover`, `sync`, con numeri misurati con e senza e i loro banchi (`run --scenario drills|escort|fuzz`), la mente dei marine, la rete (`captain_with_marines`, `to_captain`).
 3. *Il Capitano in prima persona* (§15.3): la sporgenza (Z X), il corpo vero nella simulazione (accovacciato, sdraiato, il petto), gli archi ambra, la scheda dei tasti in tre colonne, le squadre dei marine sullo schermo; il banco `run --scenario lean`.
 4. *I relitti* (§15.4): i pezzi come bersagli, con il banco `wreck` e sei prove in gioco nel mondo dello spazio.
