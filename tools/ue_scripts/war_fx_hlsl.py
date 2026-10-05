@@ -115,6 +115,7 @@ float pulse = 1.0;
 if (Style > 0.5 && Style < 1.5)
 {
     pulse = 0.82 + 0.18 * sin(t * L / 7.0 - Tm * 42.0 + Seed * 6.2831853);
+    c = lerp(Col * 1.15, white, saturate(core * 0.85));
 }
 else if (Style > 1.5 && Style < 2.5)
 {
@@ -131,7 +132,7 @@ else if (Style > 4.5)
 {
     fade = lerp(exp(-0.5 * P2), exp(-P2 * (1.0 - t)), side);
     ends = lerp(1.0, smoothstep(0.0, 0.04, tt), side);
-    c = lerp(Col, c, 0.35 + 0.65 * t);
+    c = lerp(Col * 1.1, white, saturate(core * 0.5) * lerp(0.5, t, side));
 }
 float edge = smoothstep(0.0, 0.18, ndv);
 return c * Inten * (halo * 0.45 + core * 1.5) * ends * pulse * fade * edge;
@@ -174,7 +175,7 @@ else if (Kind < 2.5)
 }
 else
 {
-    float qs = (ndv - 0.16) / 0.11;
+    float qs = (ndv - 0.16) / 0.065;
     float limb = exp(-qs * qs);
     float body = pow(ndv, 3.0) * 0.05;
     rgb = lerp(Col, white, 0.3) * (limb + body) * pow(fade, 1.3) * smoothstep(0.0, 0.08, ndv);

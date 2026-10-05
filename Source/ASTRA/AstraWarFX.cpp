@@ -37,8 +37,8 @@ namespace AstraFx
 			return X;
 		}
 
-		constexpr float WakeSeconds = 1.3f;     // how far back a slug's line is drawn, in seconds of its flight
-		constexpr float WakeTau = 0.5f;         // and how fast it dies: e^-t/tau
+		constexpr float WakeSeconds = 1.1f;     // how far back a slug's line is drawn, in seconds of its flight
+		constexpr float WakeTau = 0.42f;        // and how fast it dies: e^-t/tau (seen at the bridge a battle's worth of these is a starburst: long enough to be a line, short enough to be a line and not a net)
 	}
 
 	// -------------------------------------------------------------------------------------------------------------- layers
@@ -524,7 +524,9 @@ void UAstraWarFX::Tick(float InDt)
 			Blasts.RemoveAtSwap(i, EAllowShrinking::No);
 		}
 	}
+	const double TestT0 = FPlatformTime::Seconds();
 	RunTests();                            // what astra.fx.* asked for (AstraWarFXTest.cpp)
+	const double TestMs = (FPlatformTime::Seconds() - TestT0) * 1000.0;       // (its pictures cost what they cost: not the effects')
 	TickShips();
 	TickPieces();
 	DrawShots();
@@ -537,7 +539,7 @@ void UAstraWarFX::Tick(float InDt)
 	TickLights();
 	TickScars();
 	EndFrame();
-	const double Ms = (FPlatformTime::Seconds() - T0) * 1000.0;
+	const double Ms = (FPlatformTime::Seconds() - T0) * 1000.0 - TestMs;
 	TickMs += Ms;
 	TickMsMax = FMath::Max(TickMsMax, Ms);
 	++TickCount;
@@ -759,6 +761,75 @@ void UAstraWarFX::DrawShots()
 				}
 			}
 			Newer = Older;
+		}
+		if (WakeGain > 0.f)
+		{
+			// the engine: a short, hot flame behind the head (the bright end of a wake, at the nozzle)
+			{
+				FTransform* X;
+				if (float* D = Tubes.Next(X))
+				{
+					const float FlameLen = (T.Style == 2 ? 28.f : 18.f) + (float)Speed * 0.012f;
+					const float FlameW = T.Style == 2 ? 4.5f : 3.f;
+					*X = FTransform(FQuat::FindBetweenNormals(FVector::ZAxisVector, DirW), HeadW - DirW * (FlameLen * 50.0), FVector(FlameW, FlameW, FlameLen));
+					Fill(D, T.Style == 2 ? FLinearColor(0.8f, 0.95f, 1.f) : FLinearColor(1.f, 0.78f, 0.5f), 320.f * Intensity * Hot * WakeGain, 0.f, 5.f, 2.2f, (float)(Pr.FxSlot & 255) / 255.f, FlameW, FlameLen);
+				}
+			}
+			// the long smoke: a point every half second, a pale line through them that dies away (where the missile has been, so also where it turned)
+			T.LongAcc += Dt;
+			if (T.LongAcc >= 0.5f)
+			{
+				T.LongAcc = FMath::Fmod(T.LongAcc, 0.5f);
+				for (int32 i = FTrack::LongPts - 1; i > 0; --i)
+				{
+					T.LongHist[i] = T.LongHist[i - 1];
+				}
+				T.LongHist[0] = Head;
+				T.LongN = FMath::Min(T.LongN + 1, (int32)FTrack::LongPts);
+			}
+			const int32 LSegs = Dist < 40000.0 ? T.LongN : FMath::Min(T.LongN, 3);
+			const FLinearColor Pale = Mix(T.Col, FLinearColor::White, 0.5f);
+			FVector LNewer = Head;
+			for (int32 i = 0; i < LSegs; ++i)
+			{
+				const FVector LOlder = T.LongHist[i];
+				const FVector A = F.ToWorld(LNewer), B = F.ToWorld(LOlder);
+				const double L = FVector::Dist(A, B);
+				FTransform* X;
+				if (L > 200.0)
+				{
+					if (float* D = Tubes.Next(X))
+					{
+						const float AgeTail = (float)(i + 1) / (float)(FTrack::LongPts + 1), AgeHead = (float)i / (float)(FTrack::LongPts + 1);
+						const float Width = (T.Style == 2 ? 4.f : 2.6f) * (1.f + 1.6f * AgeTail);
+						const FVector Dir = (A - B) / L;
+						const float Len = (float)(L / 100.0);
+						*X = FTransform(FQuat::FindBetweenNormals(FVector::ZAxisVector, Dir), (A + B) * 0.5, FVector(Width, Width, Len));
+						Fill(D, Pale, 34.f * Intensity * Hot * WakeGain, AgeTail, 2.f, AgeHead, (float)(Pr.FxSlot & 255) / 255.f, Width, Len);
+					}
+				}
+				LNewer = LOlder;
+			}
+			// the seeker's turns: a puff of attitude gas on the side opposite to the push, while it turns hard (a missile that curves in the sky is a thing with a mind)
+			if (T.bPrevVel && Dt > 1.e-4f && Dist < 60000.0)
+			{
+				const FVector Acc = (Pr.Vel - T.PrevVel) / (double)Dt;
+				const FVector Dir0 = Pr.Vel.GetSafeNormal();
+				const FVector Lat = Acc - Dir0 * FVector::DotProduct(Acc, Dir0);
+				const double LatMag = Lat.Size();
+				T.RcsAcc += Dt;
+				if (LatMag > 40.0 && T.RcsAcc >= 0.09f)
+				{
+					T.RcsAcc = 0.f;
+					const FVector Side = -Lat / LatMag;
+					if (FPuff* Rc = AddPuff(Pr.Pos + Side * 3.f, Pr.Vel * 0.3 + Side * 30.f, 0.15f, 0.8f, 3.2f, Mix(T.Col, FLinearColor::White, 0.5f), 300.f * Hot, LGlow))
+					{
+						Rc->P1 = 0.f;
+					}
+				}
+			}
+			T.PrevVel = Pr.Vel;
+			T.bPrevVel = true;
 		}
 	}
 	// a track not seen this frame belongs to a shot that is gone: its trail stays a moment, fading

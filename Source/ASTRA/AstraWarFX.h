@@ -26,6 +26,7 @@ class UMaterialInstanceDynamic;
 class UMaterialInterface;
 class UPointLightComponent;
 class UStaticMesh;
+class UTextureRenderTarget2D;
 class UWorld;
 struct FAstraBattleShip;
 struct FAstraProjectile;
@@ -73,7 +74,7 @@ namespace AstraFx
 	constexpr int32 Stride = 12;              // floats of per-instance custom data (colour 0-2, intensity 3, age 4, P1 5, P2 6, seed 7, width 8, length 9)
 
 	/** Capacity of each layer (instances) and of the particle lists: the budget of the effects. */
-	constexpr int32 CapDarts = 1500, CapTubes = 1200, CapGlows = 700, CapFires = 200, CapSmokes = 220, CapPlumes = 220, CapDebris = 140;
+	constexpr int32 CapDarts = 1500, CapTubes = 2000, CapGlows = 700, CapFires = 200, CapSmokes = 220, CapPlumes = 220, CapDebris = 140;
 	constexpr int32 CapPuffs = 900, CapSparks = 1800, CapBeams = 360, CapDebrisSim = CapDebris, CapPieces = 36, CapWakes = 160;
 	constexpr int32 MaxLights = 8;
 	constexpr float GlowK = 1.7f;             // a glow's soft falloff reaches ~0.6 of its sphere: spheres are drawn this much larger than the glow they stand for
@@ -144,6 +145,7 @@ namespace AstraFx
 	struct FTrack
 	{
 		static constexpr int32 TrailPts = 9;
+		static constexpr int32 LongPts = 8;    // the long smoke of a missile: a point every half second
 		int32 Frame = -1;                      // the last frame it was seen alive (a slot not seen is freed)
 		float Age = 0.f;
 		FVector Offset = FVector::ZeroVector;  // the muzzle's offset from the true path at birth (m), fading to zero
@@ -156,6 +158,12 @@ namespace AstraFx
 		FVector Hist[TrailPts];                // where the trail has been (system frame), newest first
 		int32 HistN = 0;
 		float SampleAcc = 0.f;
+		FVector LongHist[LongPts];             // where a missile has been, every half second (system frame), newest first: the long smoke behind the beads
+		int32 LongN = 0;
+		float LongAcc = 0.f;
+		FVector PrevVel = FVector::ZeroVector; // its velocity a frame ago (the seeker's turns are read from it)
+		bool bPrevVel = false;
+		float RcsAcc = 0.f;                    // seconds since its last puff of attitude gas
 		uint8 Style = 0;                       // 0 rail slug, 1 missile, 2 torpedo, 3 rocket
 		FLinearColor Col = FLinearColor::White;
 	};
@@ -165,6 +173,8 @@ namespace AstraFx
 	{
 		FVector Pts[FTrack::TrailPts + 1];    // newest first (system frame)
 		int32 N = 0;
+		FVector Long[FTrack::LongPts + 1];    // the long smoke, newest first
+		int32 LongN = 0;
 		float Age = 0.f, Life = 1.4f;
 		uint8 Style = 1;
 		FLinearColor Col = FLinearColor::White;
@@ -226,6 +236,7 @@ namespace AstraFx
 		float Emit[3] = {0.f, 0.f, 0.f};       // per section: fire/smoke emission accumulators
 		float EmitVent[3] = {0.f, 0.f, 0.f};
 		float BlastT[3] = {2.f, 4.f, 6.f};     // per section: seconds to the next secondary blast of a burning one
+		bool bGutSeen[3] = {false, false, false};   // per section: its going has been drawn (the burst of the moment it is gutted)
 		float BreakBlast = 0.f;                // secondary blasts while the hull is breaking
 		FShield Shield;
 		int32 Scars = 0;
@@ -387,6 +398,8 @@ private:
 
 	UPROPERTY() TObjectPtr<UAstraBattleSubsystem> Owner;
 	UPROPERTY() TObjectPtr<AActor> Host;
+	UPROPERTY() TObjectPtr<AActor> TestCamera;                 // astra.fx.cam: a free camera for the tests (AstraWarFXTest.cpp)
+	UPROPERTY() TObjectPtr<UTextureRenderTarget2D> TestTarget;
 	UPROPERTY() TObjectPtr<UStaticMesh> SphereMesh;
 	UPROPERTY() TObjectPtr<UStaticMesh> BallMesh;          // a smoother sphere for the shields (if the project has it)
 	UPROPERTY() TObjectPtr<UStaticMesh> CylinderMesh;
@@ -495,6 +508,8 @@ private:
 	// ---- hulls (AstraWarFXHull.cpp)
 	void AddScar(const FAstraBattleShip& S, const FAstraFxHit& Hit);
 	void HullEmitters(const FAstraBattleShip& S, AstraFx::FShipFx& Fx);
+	/** A section of a warship has just been gutted (it went to zero): the burst of its going. */
+	void GutBurst(const FAstraBattleShip& S, int32 Section);
 	void PowerDown(const FAstraBattleShip& S, AstraFx::FShipFx& Fx);
 	/** The inside of a ship that has one (FLOTTA-VIVA): where it burns and vents, and how lit its windows are (refreshed a few times a second). */
 	void FleetFxRefresh(const FAstraBattleShip& S, AstraFx::FShipFx& Fx);

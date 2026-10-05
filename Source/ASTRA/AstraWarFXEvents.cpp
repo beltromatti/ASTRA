@@ -70,7 +70,7 @@ void UAstraWarFX::Smoke(const FVector& Pos, const FVector& Vel, float Radius, fl
 	{
 		return;                              // the smoke is thick enough already, or too far to be more than a dot that no light picks out
 	}
-	if (FPuff* P = AddPuff(Pos, Vel * 0.8f + FMath::VRand() * Radius * 0.12f, Life, Radius * 0.5f, Radius * 1.5f, FLinearColor(0.5f, 0.48f, 0.46f), ASTRA_FX_TUNE("smoke", 55.f), LSmoke, Delay))
+	if (FPuff* P = AddPuff(Pos, Vel * 0.8f + FMath::VRand() * Radius * 0.12f, Life, Radius * 0.5f, Radius * 1.5f, FLinearColor(0.42f, 0.4f, 0.38f), ASTRA_FX_TUNE("smoke", 45.f), LSmoke, Delay))
 	{
 		P->P1 = Dark;
 		P->P2 = 0.4f;                       // an ember glow inside it, fading
@@ -450,6 +450,12 @@ bool UAstraWarFX::OnShipDestroyed(FAstraBattleShip& S, const FAstraDeathEvent& E
 		{
 			Explosion(Centre + Axis * FMath::FRandRange(-0.7f, 0.7f) * R + FMath::VRand() * R * 0.1f, S.Vel, R * FMath::FRandRange(0.12f, 0.26f), bAstra, 0.6f,
 			          0.25f + 0.45f * i);
+		}
+		// and the loose ends of both halves going one after another while they drift apart (the blasts of what was inside: magazines, lines, cells)
+		for (int32 i = 0; i < 5; ++i)
+		{
+			Explosion(Centre + Axis * FMath::FRandRange(-0.9f, 0.9f) * R + FMath::VRand() * R * 0.12f, S.Vel, R * FMath::FRandRange(0.05f, 0.11f), bAstra, 0.4f,
+			          1.5f + 0.5f * i + FMath::FRand() * 0.3f);
 		}
 	}
 	// (the main viewscreen's director may frame it: GetBlasts)
