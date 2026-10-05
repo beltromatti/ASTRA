@@ -1740,7 +1740,7 @@ class March:
             if f is None:
                 continue
             eta = round(max(0.0, tr.seen_t + self.pace["hop_base_s"] + self.pace["hop_per_ship_s"] * tr.n - self.t)) if tr.moving_to else None
-            fleets.append({"id": tr.fid, "side": f.side, "name": f"enemy force {tr.fid}", "system": tr.system, "to": tr.moving_to, "eta_s": eta, "ships": tr.n,
+            fleets.append({"id": tr.fid, "side": f.side, "name": f"enemy force {tr.fid}", "system": tr.system, "to": tr.moving_to, "next": tr.moving_to, "eta_s": eta, "ships": tr.n,
                            "classes": tr.classes or {}, "strength": round(self.track_power(tr), 1), "order": "", "state": "tracked", "known": False,
                            "age_s": round(self.t - tr.seen_t), "level": tr.level})
         battles = [{"system": b.system, "age_s": round(self.t - b.t0)} for b in self.battles.values() if self.known_threat(side, b.system) >= 2 or self.sees(side, b.system) >= 1]
@@ -1750,7 +1750,8 @@ class March:
     def _fleet_row(self, f: Fleet, own: bool) -> dict[str, Any]:
         eta = round(max(0.0, f.arrive_at - self.t)) if f.in_gate else None
         to = f.route[-1] if f.route else ""
-        return {"id": f.id, "side": f.side, "name": f.name, "system": f.where or f.hop_from, "to": to, "eta_s": eta, "ships": f.n, "classes": f.classes,
+        nxt = f.route[0] if (f.in_gate and f.route) else ""             # the system it comes out in (eta_s is to there; `to` may lie hops beyond)
+        return {"id": f.id, "side": f.side, "name": f.name, "system": f.where or f.hop_from, "to": to, "next": nxt, "eta_s": eta, "ships": f.n, "classes": f.classes,
                 "strength": round(f.power, 1), "order": f"{f.order.kind} {f.order.target}".strip(), "state": f.status, "known": True, "hull": round(f.hull, 2),
                 "supply": round(f.supply, 2), "morale": round(f.morale, 2), "commander": f.commander.get("name") or f.commander.get("key", "")}
 

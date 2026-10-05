@@ -551,6 +551,19 @@ public:
 	FString GateStatus() const;
 	/** How far the Aquila is from the system's Janus Gate (km), or -1 when there is none (TELETRASPORTO: no beam crosses a Gate's field). */
 	double GateDistanceKm() const;
+	/** The Janus Gate on the plot, and what the bridge knows is coming through it (AstraGateWatch.cpp): a force whose transit was seen (the Gate's
+	 *  cycling, Keeper Station's word; a dark raid stays a surprise), our own that Fleet sends, and the March's fleets due here (ASTRA's high command's
+	 *  picture). False when the system has no Gate. Positions in the holo blips' frame (cm, bridge-world axes, from the Aquila's centre). */
+	struct FGateWatch
+	{
+		FVector GateRel = FVector::ZeroVector;
+		float GateKm = 0.f;
+		int32 Hostile = 0, Friendly = 0;                 // ships on their way in
+		float HostileEtaS = -1.f, FriendlyEtaS = -1.f;   // the soonest of each (-1: none)
+		FVector HostileRel = FVector::ZeroVector;        // where the soonest comes out (the Gate's mouth, or far out on its bearing)
+		FVector FriendlyRel = FVector::ZeroVector;
+	};
+	bool GetGateWatch(FGateWatch& Out) const;
 	/** The system the gate is tuned to: the run under way, else Fleet's orders ("" = none). */
 	FString GetGateDestination() const { return GateRun != EAstraGateRun::None ? GateDest : FleetOrderedDest; }
 	/** Where a live contact is from the Aquila, aimed at its lead point (for the helm's intercept). */

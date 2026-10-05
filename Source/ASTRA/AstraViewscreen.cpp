@@ -1409,7 +1409,27 @@ void AAstraViewscreen::DrawOverlay(UCanvas* Canvas, int32 Width, int32 Height)
 			Hostile += C.Side == EAstraSide::Mandate && !C.bCraft;
 			Friendly += C.Side == EAstraSide::Astra && !C.bCraft;
 		}
-		D.Text(16.f * S, By, FString::Printf(TEXT("PLOT  %d HOSTILE  ·  %d FRIENDLY  ·  %d CONTACTS"), Hostile, Friendly, Plot().Num()), true, PxData, ColDim);
+		// what is coming through the Gate (AstraGateWatch.cpp): a hostile force on its way in is the headline until it is here
+		UAstraBattleSubsystem::FGateWatch Gate;
+		const bool bGate = B->GetGateWatch(Gate);
+		const auto Eta = [](float Sec)
+		{
+			const int32 T = FMath::CeilToInt(FMath::Max(0.f, Sec));
+			return T <= 0 ? FString(TEXT("COMING THROUGH")) : FString::Printf(TEXT("IN %d:%02d"), T / 60, T % 60);
+		};
+		if (bGate && Gate.Hostile > 0 && Gate.HostileEtaS >= 0.f)
+		{
+			D.Text(16.f * S, By, FString::Printf(TEXT(">> GATE  ·  %d HOSTILE INBOUND  ·  %s"), Gate.Hostile, *Eta(Gate.HostileEtaS)), true, PxData, ColAlarm);
+		}
+		else
+		{
+			FString Line = FString::Printf(TEXT("PLOT  %d HOSTILE  ·  %d FRIENDLY  ·  %d CONTACTS"), Hostile, Friendly, Plot().Num());
+			if (bGate && Gate.Friendly > 0 && Gate.FriendlyEtaS >= 0.f)
+			{
+				Line += FString::Printf(TEXT("  ·  GATE: %d ASTRA INBOUND %s"), Gate.Friendly, *Eta(Gate.FriendlyEtaS));
+			}
+			D.Text(16.f * S, By, Line, true, PxData, ColDim);
+		}
 	}
 	if (Ship)
 	{
