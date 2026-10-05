@@ -41,6 +41,22 @@ COMMANDER_VOICES = ["stuart_bell", "michael", "juergen", "lola", "anna", "paul",
 # the voices for the allied captains the story invents (not used by the bridge, the admiral or the Mandate's fixed captains)
 ALLY_VOICES = {"f": ["cosette", "fantine", "azelma", "eponine", "anna"], "m": ["michael", "juergen", "marius", "stuart_bell", "paul"]}
 
+def ship_label(cls: str, name: str, prefix: str = "") -> str:
+    """How a commander's ship is named on the screen and to the crew: «the Styx-class Tartarus», «the Acheron» (a ship named for her class), «a Styx-class
+    warship» (no name). It was «the styx Tartarus» and «the acheron Acheron»."""
+    c = str(cls or "").strip()
+    n = str(name or "").strip()
+    if prefix and n and not n.startswith(prefix):
+        n = f"{prefix}{n}"
+    cc = c[:1].upper() + c[1:] if c else ""
+    if not n:
+        return f"a {cc}-class warship" if cc else "a warship"
+    bare = n.split(" ", 1)[1] if prefix and n.startswith(prefix) and " " in n else n
+    if not cc or bare.lower() == c.lower():
+        return f"the {n}"
+    return f"the {cc}-class {n}"
+
+
 MANDATE_CLASSES = ("acheron", "styx", "lethe", "cruiser", "frigate")
 ASTRA_CLASSES = ("praetorian", "vigilant", "battleship", "destroyer")
 
@@ -813,7 +829,7 @@ class Director:
             first = (beat.get("ships") or beat.get("attackers") or beat.get("ambush") or [{}])[0]
             leader_id = ids[1] if beat.get("type") in ("distress", "investigate") and len(ids) > 1 else ids[0]
             self.register(leader_id, {"name": cmd["name"], "rank": cmd.get("rank", "Ferryman (ship captain)"),
-                                      "bio": cmd.get("bio", ""), "ship": f"the {first.get('class', 'warship')} {first.get('name', '')}".strip(),
+                                      "bio": cmd.get("bio", ""), "ship": ship_label(first.get("class", ""), first.get("name", "")),
                                       "voice": COMMANDER_VOICES[self.voice_i % len(COMMANDER_VOICES)],
                                       "mission": cmd.get("orders") or beat.get("why", "")})
             self.voice_i += 1
@@ -849,7 +865,7 @@ class Director:
                 continue                                       # (no commander written: the war minds draw one when the group thinks)
             first = ships[0] if ships else {}
             self.register(gids[0], {"name": cmd["name"], "rank": cmd.get("rank", "Ferryman (ship captain)"), "bio": cmd.get("bio", ""),
-                                    "ship": f"the {first.get('class', 'warship')} {first.get('name', '')}".strip(),
+                                    "ship": ship_label(first.get("class", ""), first.get("name", "")),
                                     "voice": cmd.get("voice") or COMMANDER_VOICES[self.voice_i % len(COMMANDER_VOICES)],
                                     "mission": cmd.get("orders") or why})
             self.voice_i += 1
@@ -868,7 +884,7 @@ class Director:
             voice = cap.get("voice") or voices[self.ally_voice_i[g] % len(voices)]
             self.ally_voice_i[g] += 1
             self.war_minds.register_ally(cid, {"name": cap["name"], "rank": cap.get("rank", "Captain"), "bio": cap.get("bio", ""), "gender": g, "voice": voice,
-                                               "ship": f"the {ship.get('class', 'warship')} ASN {str(ship.get('name', '')).replace('ASN ', '')}".strip(),
+                                               "ship": ship_label(ship.get("class", ""), str(ship.get("name", "")).replace("ASN ", ""), "ASN "),
                                                "precedence": 5})
             self.note(f"{cap['name']} ({cap.get('rank', '')}) commands the ASN {str(ship.get('name', '?')).replace('ASN ', '')} ({cid})")
 
@@ -916,7 +932,7 @@ class Director:
         elif ids and cmd.get("name"):
             first = (beat.get("ships") or [{}])[0]
             self.register(ids[0], {"name": cmd["name"], "rank": cmd.get("rank", "Archon"), "bio": cmd.get("bio", ""),
-                                   "ship": f"the {first.get('class', 'warship')} {first.get('name', '')}".strip(),
+                                   "ship": ship_label(first.get("class", ""), first.get("name", "")),
                                    "voice": COMMANDER_VOICES[self.voice_i % len(COMMANDER_VOICES)],
                                    "mission": cmd.get("orders") or beat.get("why", "")})
             self.voice_i += 1
