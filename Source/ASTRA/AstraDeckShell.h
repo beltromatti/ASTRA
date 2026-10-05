@@ -48,6 +48,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Deck")
 	int32 NumDistinctMeshes() const;
 
+protected:
+	virtual void BeginPlay() override;
+
 private:
 	UPROPERTY() TObjectPtr<USceneComponent> Root;
 };

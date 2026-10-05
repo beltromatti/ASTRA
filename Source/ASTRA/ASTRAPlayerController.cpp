@@ -3,6 +3,7 @@
 
 #include "ASTRAPlayerController.h"
 #include "AstraFonts.h"
+#include "AstraRoomLift.h"
 #include "Widgets/SBoxPanel.h"
 #include "Styling/CoreStyle.h"
 #include "Widgets/Text/STextBlock.h"
@@ -289,6 +290,17 @@ void AASTRAPlayerController::ToggleSeat()
 	if (APawn* Me = GetPawn())
 	{
 		for (TActorIterator<AAstraArmoryRack> It(GetWorld()); It; ++It)
+		{
+			if (It->TryUse(Me))
+			{
+				return;
+			}
+		}
+	}
+	// the lifts of the ship's first rooms: the Flight Deck's and Main Engineering's alcoves, and the doors at the corridors' ends (AstraRoomLift.h)
+	if (APawn* Me = GetPawn())
+	{
+		for (TActorIterator<AAstraRoomLift> It(GetWorld()); It; ++It)
 		{
 			if (It->TryUse(Me))
 			{

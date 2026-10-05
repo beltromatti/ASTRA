@@ -123,6 +123,8 @@ public:
 	// ---- for the lamp pool and the deck streaming (docs/NAVE.md §7bis)
 	const TArray<FAstraPlanCompartment>& GetCompartments() const { EnsureLoaded(); return Comps; }
 	const TArray<FAstraPlanLamp>& GetLamps() const { EnsureLoaded(); return Lamps; }
+	/** Every door of the plan (the interior's self-check walks through each: astra.check.map). */
+	const TArray<FAstraPlanDoor>& GetDoors() const { EnsureLoaded(); return Doors; }
 	/** The index in GetCompartments() of the smallest compartment containing a point (world cm), or INDEX_NONE. */
 	int32 CompartmentIndexAt(const FVector& Cm) const;
 	/** The compartments next to a compartment by an open way: a corridor into the next section (cost 0) or a room's doorway (a few metres of cost). */

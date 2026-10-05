@@ -568,7 +568,59 @@ void UAstraTransporterSubsystem::PlaceCaptain(const FVector& FeetCm, float YawDe
 	{
 		A->ResetPosture();
 	}
-	const FVector At = FeetCm + FVector(0.0, 0.0, P->GetDefaultHalfHeight() + 2.0);
+	// never inside something: a console, a bed, a chair, a person, the step of the command pit, and always on a floor (5 Oct: beamed to the
+	// bridge or the medbay at a crew member's work place, the Captain could look round but not take a step). The nearest clear spot, ring
+	// by ring out to three metres; none (a deck still streaming in): where the beam put him, as before
+	FVector Feet = FeetCm;
+	if (UWorld* W = GetWorld())
+	{
+		const UCapsuleComponent* Cap = Cast<ACharacter>(P) ? Cast<ACharacter>(P)->GetCapsuleComponent() : nullptr;
+		const float R = Cap ? Cap->GetScaledCapsuleRadius() : 34.f;
+		const float HH = Cap ? Cap->GetScaledCapsuleHalfHeight() : (float)P->GetDefaultHalfHeight();
+		FCollisionQueryParams Q(SCENE_QUERY_STAT(AstraXportArrival), false, P);
+		const auto Clear = [&](const FVector& F) -> bool
+		{
+			if (W->OverlapBlockingTestByChannel(F + FVector(0.0, 0.0, HH + 4.0), FQuat::Identity, ECC_Pawn, FCollisionShape::MakeCapsule(R, HH), Q))
+			{
+				return false;
+			}
+			FHitResult Floor;
+			return W->LineTraceSingleByChannel(Floor, F + FVector(0.0, 0.0, 40.0), F - FVector(0.0, 0.0, 60.0), ECC_Pawn, Q) && Floor.ImpactNormal.Z > 0.7f;
+		};
+		FHitResult Any;
+		const bool bLoaded = W->LineTraceSingleByChannel(Any, FeetCm + FVector(0.0, 0.0, 200.0), FeetCm - FVector(0.0, 0.0, 400.0), ECC_Pawn, Q);
+		FHitResult Under;
+		if (bLoaded && W->LineTraceSingleByChannel(Under, FeetCm + FVector(0.0, 0.0, 60.0), FeetCm - FVector(0.0, 0.0, 80.0), ECC_Pawn, Q) && Under.ImpactNormal.Z > 0.7f)
+		{
+			Feet.Z = Under.ImpactPoint.Z;                       // (on the floor that is there, not on the plan's idea of it: the bridge's pit is lower)
+		}
+		if (bLoaded && !Clear(Feet))
+		{
+			bool bFound = false;
+			for (int32 Ring = 1; Ring <= 6 && !bFound; ++Ring)
+			{
+				for (int32 k = 0; k < 12 && !bFound; ++k)
+				{
+					const double A = (k + 0.5 * (Ring & 1)) * UE_DOUBLE_PI / 6.0;
+					FVector F = FeetCm + FVector(FMath::Cos(A), FMath::Sin(A), 0.0) * 50.0 * Ring;
+					// (onto the floor that is there: a step up or down of the pit)
+					FHitResult Down;
+					if (W->LineTraceSingleByChannel(Down, F + FVector(0.0, 0.0, 60.0), F - FVector(0.0, 0.0, 80.0), ECC_Pawn, Q) && Down.ImpactNormal.Z > 0.7f)
+					{
+						F.Z = Down.ImpactPoint.Z;
+					}
+					if (Clear(F))
+					{
+						Feet = F;
+						bFound = true;
+					}
+				}
+			}
+			UE_LOG(LogASTRA, Log, TEXT("[Transport] the arrival spot was not clear: %s (%.0f cm away)"), bFound ? TEXT("moved to the nearest clear floor") : TEXT("nothing clear within 3 m, left as beamed"),
+			       FVector::Dist(Feet, FeetCm));
+		}
+	}
+	const FVector At = Feet + FVector(0.0, 0.0, P->GetDefaultHalfHeight() + 2.0);
 	P->SetActorLocationAndRotation(At, FRotator(0.f, YawDeg, 0.f), false, nullptr, ETeleportType::TeleportPhysics);
 	if (AController* C = P->GetController())
 	{

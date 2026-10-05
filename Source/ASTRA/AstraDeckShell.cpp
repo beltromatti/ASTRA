@@ -14,6 +14,66 @@ AAstraDeckShell::AAstraDeckShell()
 	SetRootComponent(Root);
 }
 
+void AAstraDeckShell::BeginPlay()
+{
+	Super::BeginPlay();
+	// The interior's self-check (astra.check.map, 5 Oct) found floors that flicker: lift lobbies and holds the builder had placed twice, two coplanar
+	// copies of one mesh fighting over every pixel, and rooms of two meshes that overlap at a joint. The copies are dropped, and each mesh's instances
+	// are lifted by up to 3 mm each (by the mesh and the instance's place), so that no two surfaces ever share a plane.
+	TArray<UInstancedStaticMeshComponent*> Comps;
+	GetComponents<UInstancedStaticMeshComponent>(Comps);
+	TMap<const UStaticMesh*, TArray<UInstancedStaticMeshComponent*>> ByMesh;
+	for (UInstancedStaticMeshComponent* C : Comps)
+	{
+		if (C && C->GetStaticMesh())
+		{
+			ByMesh.FindOrAdd(C->GetStaticMesh()).Add(C);
+		}
+	}
+	int32 Dropped = 0, Lifted = 0;
+	for (TPair<const UStaticMesh*, TArray<UInstancedStaticMeshComponent*>>& KV : ByMesh)
+	{
+		TSet<FString> Seen;
+		const uint32 MeshHash = GetTypeHash(KV.Key->GetName());
+		for (UInstancedStaticMeshComponent* C : KV.Value)
+		{
+			TArray<int32> Copies;
+			TArray<FTransform> Moved;
+			const int32 N = C->GetInstanceCount();
+			Moved.Reserve(N);
+			for (int32 i = 0; i < N; ++i)
+			{
+				FTransform T;
+				C->GetInstanceTransform(i, T, true);
+				const FVector L = T.GetLocation();
+				const FString Key = FString::Printf(TEXT("%d,%d,%d,%d"), FMath::RoundToInt(L.X), FMath::RoundToInt(L.Y), FMath::RoundToInt(L.Z),
+				                                    FMath::RoundToInt(T.Rotator().Yaw));
+				bool bAlready = false;
+				Seen.Add(Key, &bAlready);
+				if (bAlready)
+				{
+					Copies.Add(i);
+				}
+				// (by the mesh and by the instance's own place: two neighbours of one mesh that overlap at a joint are kept apart too)
+				const uint32 H = HashCombine(MeshHash, GetTypeHash(Key));
+				T.AddToTranslation(FVector(0.0, 0.0, (double)(H % 97u) * 0.003));
+				Moved.Add(T);
+			}
+			if (N > 0)
+			{
+				C->BatchUpdateInstancesTransforms(0, Moved, true, true, true);
+				Lifted += N;
+			}
+			if (Copies.Num())
+			{
+				C->RemoveInstances(Copies);
+				Dropped += Copies.Num();
+			}
+		}
+	}
+	UE_LOG(LogTemp, Log, TEXT("[DeckShell] deck %d: %d duplicate instances dropped, %d lifted apart"), Deck, Dropped, Lifted);
+}
+
 int32 AAstraDeckShell::AddInstancesChunked(UStaticMesh* Mesh, const TArray<FTransform>& WorldTransforms, float ChunkCm)
 {
 	if (!Mesh || WorldTransforms.Num() == 0)

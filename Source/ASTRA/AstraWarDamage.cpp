@@ -528,8 +528,14 @@ void UAstraBattleSubsystem::ApplyHitModel(FAstraBattleShip& To, const FVector& F
 	float Rem = Damage, ShieldTook = 0.f;
 	if (To.bShieldsUp && !To.bDisabled && D.Sector[F] > 0.f)
 	{
+		// a sector at full charge takes nearly all of a blow; as it weakens it lets more through (a heavy slug the most, down to the
+		// profile's share), and once it is down nothing stops it (5 Oct: the leak of a full shield kept it at 100% while fires and
+		// breaches spread under it, which no player believed)
+		static AstraWar::FTuneVar KShieldFull(TEXT("shield_full"), 0.85f);
+		const float Charge = D.SectorMax[F] > 0.f ? FMath::Clamp(D.Sector[F] / D.SectorMax[F], 0.f, 1.f) : 0.f;
+		const float Eff = FMath::Lerp(P.ShieldEff, FMath::Max(P.ShieldEff, KShieldFull.Get()), Charge);
 		const float PowerK = FMath::Clamp(0.7f + 0.3f * To.ShieldPower, 0.5f, 1.f);
-		const float Absorbed = FMath::Min(D.Sector[F], Damage * P.ShieldEff * PowerK);
+		const float Absorbed = FMath::Min(D.Sector[F], Damage * Eff * PowerK);
 		D.Sector[F] -= Absorbed;
 		Rem = Damage - Absorbed;
 		ShieldTook = Absorbed;
@@ -1020,10 +1026,13 @@ void UAstraBattleSubsystem::TickShields(FAstraBattleShip& S, float Dt)
 			D.Buffer += Give;
 		}
 	}
-	// the buffer and the generator's regeneration fill the deficits, in proportion to the allocation
-	float Avail = FMath::Min(D.Buffer, 2.f * Rate);
+	// the buffer and the generator's regeneration fill the deficits, in proportion to the allocation (both slower than a fight's fire,
+	// so that a face under sustained fire is seen to go down: `shield_regen`, `shield_shift`)
+	static AstraWar::FTuneVar KShieldRegen(TEXT("shield_regen"), 1.0f);
+	static AstraWar::FTuneVar KShieldShift(TEXT("shield_shift"), 0.5f);
+	float Avail = FMath::Min(D.Buffer, 2.f * Rate * KShieldShift.Get());
 	D.Buffer -= Avail;
-	const float Regen = S.ShieldRegen * D.ShieldScale * S.ShieldPower * PowerFactorOf(S) * Dt;
+	const float Regen = S.ShieldRegen * D.ShieldScale * S.ShieldPower * PowerFactorOf(S) * Dt * KShieldRegen.Get();
 	Avail += Regen;
 	for (int32 Pass = 0; Pass < 3 && Avail > 1e-4f; ++Pass)
 	{
