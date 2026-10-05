@@ -532,6 +532,20 @@ class Voice:
         except RuntimeError:
             pass
 
+    def _read_instead(self, line: Line, why: str) -> None:
+        """A warning of danger whose voice could not be made in time (the machine was busy): the Captain reads it at once, a subtitle with no voice. Asking the
+        voice again would only make it later (5 Oct: two warnings in a battle were lost to `synth_timeout`)."""
+        if line in self._queue:
+            self._queue.remove(line)
+        line.state = "noticed"
+        self._reset_synth(line, keep_lines=True)
+        if self._synth_line is line:
+            self._synth_line = None
+        try:
+            asyncio.get_running_loop().create_task(self._notice(line, why))
+        except RuntimeError:
+            pass
+
     async def _notice(self, line: Line, why: str) -> None:
         """Send a line the voice could not make as text only: the game shows it as a subtitle (the Captain reads it). The officers' record of what was said aloud has it too:
         he has it."""
@@ -554,12 +568,16 @@ class Voice:
             elif l.gen_error and not l.chunks:
                 if l.protected:
                     self._ask_again(l, "its voice could not be made")
+                elif l.prio == Prio.URGENT:
+                    self._read_instead(l, "its voice could not be made")
                 else:
                     self._drop(l, "synth_failed")
             elif l.stream is not None and not l.first_ready.is_set() and now - l.synth_t > SYNTH_TIMEOUT_S:
                 log.error("line %d: no audio within %.0f s", l.id, SYNTH_TIMEOUT_S)
                 if l.protected:
                     self._ask_again(l, f"no audio within {SYNTH_TIMEOUT_S:.0f} s")
+                elif l.prio == Prio.URGENT:
+                    self._read_instead(l, f"no audio within {SYNTH_TIMEOUT_S:.0f} s")
                 else:
                     self._drop(l, "synth_timeout")
             elif l.stale_if is not None and not l.protected:
