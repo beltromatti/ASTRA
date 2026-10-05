@@ -24,6 +24,10 @@
 
 using namespace AstraBoardDress;
 
+// the light of the dressed decks (ABBORDAGGI-4, from the first play of a powered ship's corridors, which were too dark to read): the lamps near the Captain give a point light each; these say how much, how far and how many
+static TAutoConsoleVariable<float> CVarBoardLampLumens(TEXT("astra.board.lamp_lumens"), 1.8f, TEXT("The dressed decks' lamps: how many times the base light of a lit lamp (2300-2600 lumens; a red one 650) each of the lights near the Captain gives. 1 is what the decks had at first."), ECVF_Default);
+static TAutoConsoleVariable<float> CVarBoardLampRadius(TEXT("astra.board.lamp_radius"), 1.4f, TEXT("The dressed decks' lamps: how many times the reach of a lamp's light (11 m, a red one 9.5 m). 1 is what the decks had at first."), ECVF_Default);
+static TAutoConsoleVariable<int32> CVarBoardLampCount(TEXT("astra.board.lamp_count"), 12, TEXT("The dressed decks' lamps: how many of the nearest lamps on the Captain's deck give light at once (1 to 16; the pool of lights is made when the decks are dressed). Each costs a movable light without shadows."), ECVF_Default);
 static TAutoConsoleVariable<int32> CVarBoardDress(TEXT("astra.board.dress"), 2,
                                                   TEXT("The decks of a boarded ship: 0 plain boxes, 1 the structure of the kit (bays, ceilings, floors, frames, lamps), 2 also props, banners, signs, debris, the fallen, flames, smoke and sparks; "
                                                        "3 as 2 with the engine's cube for every piece (the bench's: the content of a headless run has none of the kit). Read when the decks are made."),
@@ -80,16 +84,17 @@ namespace
 	/** How a lamp lights the room under it (colour, lumens, radius) by its state and its side's hand. */
 	void LampLook(EDressSide Side, ELamp State, FLinearColor& Col, float& Lumens, float& Radius)
 	{
+		const float Scale = FMath::Clamp(CVarBoardLampLumens.GetValueOnGameThread(), 0.2f, 12.f), Reach = FMath::Clamp(CVarBoardLampRadius.GetValueOnGameThread(), 0.4f, 4.f);
 		if (State == ELamp::Red)
 		{
 			Col = FLinearColor(1.f, 0.14f, 0.06f);
-			Lumens = 650.f;
-			Radius = 950.f;
+			Lumens = 650.f * Scale;
+			Radius = 950.f * Reach;
 			return;
 		}
 		Col = Side == EDressSide::Mandate ? FLinearColor(1.f, 0.74f, 0.42f) : (Side == EDressSide::Guild ? FLinearColor(1.f, 0.85f, 0.6f) : FLinearColor(1.f, 0.95f, 0.88f));
-		Lumens = Side == EDressSide::Astra ? 2600.f : 2300.f;
-		Radius = 1100.f;
+		Lumens = (Side == EDressSide::Astra ? 2600.f : 2300.f) * Scale;
+		Radius = 1100.f * Reach;
 	}
 }
 
@@ -272,8 +277,8 @@ bool AAstraBoardInterior::DressBegin(const TArray<FFallen>* InFallen)
 			KitKeep.Add(K->SignMid);
 		}
 	}
-	// the lights of the lamps near him: a few more than the plain rooms' (a corridor's lamps are three metres apart)
-	while (Lights.Num() < 8)
+	// the lights of the lamps near him: more than the plain rooms' (a corridor's lamps are three metres apart: the pool is the most the cvar lets; astra.board.lamp_count says how many of them are on)
+	while (Lights.Num() < 16)
 	{
 		UPointLightComponent* L = NewObject<UPointLightComponent>(this, *FString::Printf(TEXT("Light%d"), Lights.Num()));
 		L->SetupAttachment(GetRootComponent());
@@ -451,6 +456,7 @@ void AAstraBoardInterior::DressLights(const FVector& Eye)
 		}
 	}
 	Ns.Sort([](const FNear& A, const FNear& B) { return A.D < B.D; });
+	const int32 On = FMath::Clamp(CVarBoardLampCount.GetValueOnGameThread(), 1, Lights.Num());
 	for (int32 k = 0; k < Lights.Num(); ++k)
 	{
 		UPointLightComponent* L = Lights[k];
@@ -458,13 +464,13 @@ void AAstraBoardInterior::DressLights(const FVector& Eye)
 		{
 			continue;
 		}
-		if (k < Ns.Num())
+		if (k < Ns.Num() && k < On)
 		{
 			const FLamp& Lp = K.Lamps[Ns[k].I];
 			FLinearColor Col;
 			float Lumens, Radius;
 			LampLook(Side, Lp.State, Col, Lumens, Radius);
-			if (K.LightCol.IsValidIndex(k) && (!K.LightCol[k].Equals(Col) || K.LightLumens[k] != Lumens))
+			if (K.LightCol.IsValidIndex(k) && (!K.LightCol[k].Equals(Col) || K.LightLumens[k] != Lumens || !FMath::IsNearlyEqual(L->AttenuationRadius, Radius)))
 			{
 				K.LightCol[k] = Col;
 				K.LightLumens[k] = Lumens;

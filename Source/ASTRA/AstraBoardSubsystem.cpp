@@ -864,6 +864,7 @@ void UAstraBoardSubsystem::Tick(float DeltaTime)
 		if (AfterEnd > (Mode == EMode::Remote ? 6.f : BdCleanUpS))
 		{
 			ClearBodies();
+			BenchOrders.Reset();                             // (a test's orders that waited for a fight that ended without them are not for the next one)
 			Phase = EPhase::Idle;
 			if (Mode == EMode::Remote)
 			{
