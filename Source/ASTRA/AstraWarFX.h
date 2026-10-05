@@ -74,7 +74,7 @@ namespace AstraFx
 	constexpr int32 Stride = 12;              // floats of per-instance custom data (colour 0-2, intensity 3, age 4, P1 5, P2 6, seed 7, width 8, length 9)
 
 	/** Capacity of each layer (instances) and of the particle lists: the budget of the effects. */
-	constexpr int32 CapDarts = 1500, CapTubes = 2000, CapGlows = 700, CapFires = 200, CapSmokes = 220, CapPlumes = 220, CapDebris = 140;
+	constexpr int32 CapDarts = 2000, CapTubes = 2000, CapGlows = 900, CapFires = 200, CapSmokes = 220, CapPlumes = 220, CapDebris = 140;
 	constexpr int32 CapPuffs = 900, CapSparks = 1800, CapBeams = 360, CapDebrisSim = CapDebris, CapPieces = 36, CapWakes = 160;
 	constexpr int32 MaxLights = 8;
 	constexpr float GlowK = 1.7f;             // a glow's soft falloff reaches ~0.6 of its sphere: spheres are drawn this much larger than the glow they stand for
@@ -401,6 +401,7 @@ private:
 	UPROPERTY() TObjectPtr<UAstraBattleSubsystem> Owner;
 	UPROPERTY() TObjectPtr<AActor> Host;
 	UPROPERTY() TObjectPtr<AActor> TestCamera;                 // astra.fx.cam: a free camera for the tests (AstraWarFXTest.cpp)
+	int32 TestScarKind = -1;                                   // astra.fx.scar: the kind of mark to leave (-1: as the blow says)
 	UPROPERTY() TObjectPtr<UTextureRenderTarget2D> TestTarget;
 	UPROPERTY() TObjectPtr<UStaticMesh> SphereMesh;
 	UPROPERTY() TObjectPtr<UStaticMesh> BallMesh;          // a smoother sphere for the shields (if the project has it)

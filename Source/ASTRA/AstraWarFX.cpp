@@ -990,7 +990,7 @@ void UAstraWarFX::OnBeam(EAstraFxShot Kind, const FVector& A, const FVector& B, 
 	{
 	case EAstraFxShot::Laser:
 		Bm.Width = Src ? FMath::Clamp(Src->Radius * 0.016f, 2.5f, 7.f) : 3.f;
-		Bm.Inten = 520.f;
+		Bm.Inten = ASTRA_FX_TUNE("laser", 240.f);              // (a white-hot core with the beam's own colour at its edges: at 520 the whole width was over the exposure's white, 5 Oct, from the broadside)
 		break;
 	case EAstraFxShot::Cannon:
 		Bm.Width = 1.1f;

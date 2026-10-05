@@ -51,8 +51,9 @@ namespace AstraFx
 
 namespace
 {
-	const FLinearColor FxWhite(1.f, 0.97f, 0.9f);
-	const FLinearColor FxMetal(1.f, 0.7f, 0.32f);
+	// (named apart from AstraWarFXEvents.cpp's: the two files meet in one unity block)
+	const FLinearColor HullFxWhite(1.f, 0.97f, 0.9f);
+	const FLinearColor HullFxMetal(1.f, 0.7f, 0.32f);
 
 	/** The mesh a ship is drawn with (the Aquila's is the level's, not the battle's). */
 	FString FxMeshOf(const FAstraBattleShip& S)
@@ -216,6 +217,10 @@ void UAstraWarFX::AddScar(const FAstraBattleShip& S, const FAstraFxHit& H)
 		Kind = H.Felt > 70.f ? 2 : (FMath::RandBool() ? 3 : 6);   // torn, impact, gouge
 		break;
 	}
+	if (TestScarKind >= 0)
+	{
+		Kind = FMath::Clamp(TestScarKind, 0, 7);                 // (astra.fx.scar: the one asked for)
+	}
 	UMaterialInterface* Mat = DamageMats[Kind];
 	if (!Mat)
 	{
@@ -271,6 +276,12 @@ void UAstraWarFX::AddScar(const FAstraBattleShip& S, const FAstraFxHit& H)
 		// the scar goes where the blow struck the hull box, along the face's normal, reaching 30 m in
 		N = F.DirToWorld(S.Att.RotateVector(AstraWar::FacingVector(H.Facing)));
 		Loc = W;
+		if (S.Box.Valid())
+		{
+			// the plating is somewhere under the box's face (a tapered hull is far from it in places): the decal reaches down to the middle of the hull, so that it meets whatever is there
+			const float Half = H.Facing == AstraWar::Bow || H.Facing == AstraWar::Stern ? S.Box.Hx : (H.Facing == AstraWar::Port || H.Facing == AstraWar::Starboard ? S.Box.Hy : S.Box.Hz);
+			HalfDepth = FMath::Clamp((5.f + Half) * 100.f, 3000.f, 12000.f);
+		}
 	}
 	FShipFx& Fx = ShipOf(S.Id);
 	const int32 MaxHere = 8 + 4 * FMath::Clamp((int32)S.SizeTier, 0, 3);
@@ -320,6 +331,20 @@ void UAstraWarFX::AddScar(const FAstraBattleShip& S, const FAstraFxHit& H)
 	Scars.Add(X);
 	++Fx.Scars;
 	++Made;
+	static int32 Logged = 0;
+	if (Logged < 12)
+	{
+		++Logged;
+		int32 Receivers = 0, Prims = 0;
+		TInlineComponentArray<UPrimitiveComponent*> Pc(On);
+		for (const UPrimitiveComponent* C : Pc)
+		{
+			++Prims;
+			Receivers += C->bReceivesDecals ? 1 : 0;
+		}
+		UE_LOG(LogASTRA, Log, TEXT("[WarFX] scar %d on %s: kind %d, felt %.0f, %.0f m across and %.0f m deep at %s (the hull's box face), %d of %d components receive decals, material %s"),
+		       Logged, S.bPlayer ? TEXT("the Aquila") : *S.ContactId, Kind, H.Felt, Half * 0.02f, HalfDepth * 0.02f, *Loc.ToString(), Receivers, Prims, *Mat->GetName());
+	}
 }
 
 void UAstraWarFX::TickScars()
@@ -496,12 +521,12 @@ void UAstraWarFX::GutBurst(const FAstraBattleShip& S, int32 Section)
 	const FVector Pt = HullPoint(S, Section, FMath::FRandRange(0.3f, 0.7f), FMath::FRandRange(-0.5f, 0.5f), FMath::RandBool() ? 1.f : FMath::FRandRange(-0.5f, 0.5f), true);
 	const FVector Out = (Pt - S.Pos).GetSafeNormal();
 	Explosion(Pt + Out * R * 0.03f, S.Vel, FMath::Clamp(R * 0.16f, 14.f, 90.f), bAstra, 1.1f, 0.f);
-	if (FPuff* W = AddPuff(Pt, S.Vel, 0.22f, 0.3f * R * 0.16f, R * 0.22f, FxWhite, ASTRA_FX_TUNE("cut_flash", 520.f) * 0.8f * Bright, LGlow))
+	if (FPuff* W = AddPuff(Pt, S.Vel, 0.22f, 0.3f * R * 0.16f, R * 0.22f, HullFxWhite, ASTRA_FX_TUNE("cut_flash", 520.f) * 0.8f * Bright, LGlow))
 	{
 		W->P1 = 1.f;
 	}
 	Shockwave(Pt, S.Vel, R * 0.7f, 1.0f, FLinearColor(1.f, 0.72f, 0.42f), 0.03f);
-	SparkBurst(Pt, Out, 0.9f, 40, 40.f, 190.f, 0.8f, 2.6f, 14.f, FxMetal, 280.f, S.Vel);
+	SparkBurst(Pt, Out, 0.9f, 40, 40.f, 190.f, 0.8f, 2.6f, 14.f, HullFxMetal, 280.f, S.Vel);
 	const int32 Chunks = FMath::RoundToInt(10.f * FMath::Clamp(Density, 0.2f, 2.f));
 	for (int32 i = 0; i < Chunks; ++i)
 	{
