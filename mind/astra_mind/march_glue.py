@@ -223,6 +223,10 @@ class MarchGlue:
                 self._over_told = True
                 self._tell_the_end()
             self._bring_in()
+            # what Fleet knows of the Aquila's own state, from her reports (a high command that does not know her magazines are empty sends no tender)
+            wp = state.get("weapons") or {}
+            m.aquila["hull_pct"] = state.get("hull_pct")
+            m.aquila["missiles"] = wp.get("missiles") if isinstance(wp, dict) else None
             self._read_back(state)
             self._transit_again(now)
             if self.minds is not None:

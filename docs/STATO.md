@@ -37,7 +37,7 @@ abbordaggi contro l'Aquila, chiesto da ABBORDAGGI).
   tace da 4; la dottrina dell'iniziativa per entrambi); lo schermo principale che non cambia risoluzione a ogni sguardo. Uniti i rami finiti
   di ARTE-INTERNI-2, ABBORDAGGI-3 e SPAZIO-VIVO-2 (M7–M9: il Falcon raccoglie le capsule con R, i getti dei velivoli, convogli e pattuglie);
   in corso nell'editor la ricostruzione degli interni e l'importazione del kit dei ponti nemici.
-- **Credito OpenRouter: 13,27 $** (ricaricato dall'utente il 5/10) (le partite del 5/10 ~1,8 $): segnalato in RICHIESTE.
+- **Credito OpenRouter: 11,47 $** (ricaricato dall'utente il 5/10) (le partite del 5/10 ~1,8 $): segnalato in RICHIESTE.
 - **Che cosa arriva dal Gate** (il lead, `AstraGateWatch.cpp`): il tavolo olografico mostra il Janus Gate e, per una forza annunciata (il transito
   visto da Keeper Station, i rinforzi di Fleet, le flotte della Marcia dirette qui), un anello che pulsa dove uscirà con quante navi e fra quanto;
   lo schermo principale lo mette in testa («GATE · 4 HOSTILE INBOUND · IN 1:32»); un'incursione oscura resta una sorpresa. Provato nel gioco
@@ -97,6 +97,26 @@ abbordaggi contro l'Aquila, chiesto da ABBORDAGGI).
   - la mente vecchia nelle prove.
 
   Nella terza prova la battaglia per il Gate c'è stata: 17 navi del Mandato, 4 distrutte in 90 s di fuoco pesante, l'Aquila al 67 %, ritirata del Mandato all'arrivo dei soccorsi.
+- **Unita VFX-2 tappe 1-2** (2be4022) e vista nel gioco:
+  - il fuoco si legge (le scie azzurre delle rotaie dalle torrette al bersaglio a 25 km, i lampi alla bocca, il fumo dei missili, gli scarichi dei caccia);
+  - un reattore che salta a 5 km dà anelli, palla di fuoco con forma, detriti, fumo e braci, senza più il bianco pieno (2,4 % dei pixel al picco invece del 96-99 %).
+
+  La regia inquadra la morte di una nave con tutta la sua palla di fuoco (GetBlasts).
+- **Partita lunga da Capitano** (20 min, mente vera):
+  - prima la ritirata del Mandato all'apertura (corretta: la dottrina del Mandato ora si batte a forze vicine), poi l'inseguimento;
+  - a ~12 min il grosso del Mandato in due gruppi e una battaglia di 2,5 min (Erebos, Avernus, Minos, Ixion distrutti, siluri dei bombardieri, esche);
+  - poi Fleet manda l'Aquila a Thule e cambia l'ordine per Cassia: azione continua.
+
+  Corretti:
+  - le ripetizioni in battaglia (una falla sigillata contava come pericolo e tagliava le battute; al più due riprese);
+  - i capitani nemici senza nome.
+
+  Da bilanciare: l'Aquila esce quasi intatta dalla battaglia col grosso (98 %, zero missili).
+- **Quinta prova dell'apertura** (dopo la dottrina che si batte). Il Mandato attacca davvero.
+  - Da ~325 s a ~420 s scontro vero, con siluri dei bombardieri, esche e scudi che cedono: Acheron, Hecate, Hypnos, Phlegethon e Styx distrutti.
+  - Poi il Mandato si ritira «dopo aver combattuto» (morale 0, 26 % della forza persa). Warden Thale chiede la resa, poi una tregua per recuperare i naufraghi.
+  - Resta: l'Aquila esce al 99 % (troppo forte, BATTAGLIA-3); le chiamate dei comandanti nemici tagliate dagli avvisi e ripetute.
+- **Unita ABBORDAGGI-4 tappa 3** (e3a2f22): il Capitano in prima persona (sporgersi con Z/X, il corpo vero nella simulazione, l'arco ambra di chi lo vede, la scheda dei tasti). Da provare a mano nel gioco.
 - **Uniti** BATTAGLIA-3 tappa 5 (la prua non più sventrata, la mira del Capitano) e ABBORDAGGI-4 tappa 2 (la fanteria si comanda: prendere, sfondare, rastrellare, imboscata, scortare il Capitano, chiudere dietro).
 - **Lo schermo principale racconta lo scontro a tagli** (il lead): il bersaglio, poi «ASN AQUILA · FIRING ON …» (l'Aquila da fuori che spara,
   `astra.viewscreen.broadside`), poi il bersaglio. Provato nel gioco. Brief pronti: **VFX-2**, **PRESTAZIONI-GPU** (oltre ad ARTE-SCAFI).

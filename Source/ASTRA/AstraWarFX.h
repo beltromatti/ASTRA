@@ -26,6 +26,7 @@ class UMaterialInstanceDynamic;
 class UMaterialInterface;
 class UPointLightComponent;
 class UStaticMesh;
+class UTextureRenderTarget2D;
 class UWorld;
 struct FAstraBattleShip;
 struct FAstraProjectile;
@@ -65,13 +66,16 @@ struct FAstraFxHit
 	bool bSectorFell = false;                 // this blow took the sector to nothing
 };
 
+/** A number the look of the effects hangs on: its default, or what `astra.war.tune fx_<name> <value>` set since (the war's own live tuning table: no build, no restart). */
+#define ASTRA_FX_TUNE(NAME, DEFAULT) ([]() -> float { static AstraWar::FTuneVar V(TEXT("fx_" NAME), (DEFAULT)); return V.Get(); }())
+
 namespace AstraFx
 {
 	constexpr int32 Stride = 12;              // floats of per-instance custom data (colour 0-2, intensity 3, age 4, P1 5, P2 6, seed 7, width 8, length 9)
 
 	/** Capacity of each layer (instances) and of the particle lists: the budget of the effects. */
-	constexpr int32 CapDarts = 1500, CapTubes = 1200, CapGlows = 700, CapFires = 200, CapSmokes = 220, CapPlumes = 220, CapDebris = 140;
-	constexpr int32 CapPuffs = 900, CapSparks = 1800, CapBeams = 360, CapDebrisSim = CapDebris, CapPieces = 36;
+	constexpr int32 CapDarts = 1500, CapTubes = 2000, CapGlows = 700, CapFires = 200, CapSmokes = 220, CapPlumes = 220, CapDebris = 140;
+	constexpr int32 CapPuffs = 900, CapSparks = 1800, CapBeams = 360, CapDebrisSim = CapDebris, CapPieces = 36, CapWakes = 160;
 	constexpr int32 MaxLights = 8;
 	constexpr float GlowK = 1.7f;             // a glow's soft falloff reaches ~0.6 of its sphere: spheres are drawn this much larger than the glow they stand for
 
@@ -141,14 +145,26 @@ namespace AstraFx
 	struct FTrack
 	{
 		static constexpr int32 TrailPts = 9;
+		static constexpr int32 LongPts = 8;    // the long smoke of a missile: a point every half second
 		int32 Frame = -1;                      // the last frame it was seen alive (a slot not seen is freed)
 		float Age = 0.f;
 		FVector Offset = FVector::ZeroVector;  // the muzzle's offset from the true path at birth (m), fading to zero
 		float OffsetTau = 0.25f;
 		FVector Last = FVector::ZeroVector;    // where it was drawn last (its head)
+		FVector Start = FVector::ZeroVector;   // where its path began: the muzzle (system frame)
+		FVector WakeTail = FVector::ZeroVector;// the far end of the wake it drew last (a slug's wake: Wake below), system frame
+		float WakeKappa = 0.f;                 // and its decay
+		float WakeWidth = 1.8f;                // and its width (m)
+		bool bWake = false;                    // it has drawn a wake
 		FVector Hist[TrailPts];                // where the trail has been (system frame), newest first
 		int32 HistN = 0;
 		float SampleAcc = 0.f;
+		FVector LongHist[LongPts];             // where a missile has been, every half second (system frame), newest first: the long smoke behind the beads
+		int32 LongN = 0;
+		float LongAcc = 0.f;
+		FVector PrevVel = FVector::ZeroVector; // its velocity a frame ago (the seeker's turns are read from it)
+		bool bPrevVel = false;
+		float RcsAcc = 0.f;                    // seconds since its last puff of attitude gas
 		uint8 Style = 0;                       // 0 rail slug, 1 missile, 2 torpedo, 3 rocket
 		FLinearColor Col = FLinearColor::White;
 	};
@@ -158,10 +174,35 @@ namespace AstraFx
 	{
 		FVector Pts[FTrack::TrailPts + 1];    // newest first (system frame)
 		int32 N = 0;
-		float Age = 0.f, Life = 1.4f;
+		FVector Long[FTrack::LongPts + 1];    // the long smoke, newest first
+		int32 LongN = 0;
+		float Age = 0.f, Life = 1.4f;         // Life: the whole ghost's (the long smoke hangs longer than the beads)
+		float BeadLife = 1.4f;                // the beads' own
 		uint8 Style = 1;
 		FLinearColor Col = FLinearColor::White;
 		uint8 Seed = 0;
+	};
+
+	/** A big explosion, as the main viewscreen's director may want to know it (UAstraWarFX::GetBlasts). */
+	struct FBlastView
+	{
+		FVector Pos = FVector::ZeroVector;     // system frame, m
+		float Radius = 0.f;                    // m: the fireball's
+		float Age = 0.f;                       // s since it went
+		int32 ShipId = -1;
+		bool bAstra = false;
+		bool bReactor = false;                 // the reactor went (else the hull broke apart)
+	};
+
+	/** The wake a slug left when it ended (it struck, it missed, it ran out of life): the line it drew, hanging there and fading as it would have if the slug had gone on. */
+	struct FWake
+	{
+		FVector Tail = FVector::ZeroVector, Head = FVector::ZeroVector;   // system frame
+		float Age = 0.f;
+		float Kappa = 2.f;                     // the decay along it: e^-Kappa at the tail against 1 at the head
+		float Width = 1.8f;                    // m
+		float Seed = 0.f;
+		FLinearColor Col = FLinearColor::White;
 	};
 
 	/** One ripple of a shield: where a blow landed on it and how it spreads. */
@@ -197,6 +238,7 @@ namespace AstraFx
 		float Emit[3] = {0.f, 0.f, 0.f};       // per section: fire/smoke emission accumulators
 		float EmitVent[3] = {0.f, 0.f, 0.f};
 		float BlastT[3] = {2.f, 4.f, 6.f};     // per section: seconds to the next secondary blast of a burning one
+		bool bGutSeen[3] = {false, false, false};   // per section: its going has been drawn (the burst of the moment it is gutted)
 		float BreakBlast = 0.f;                // secondary blasts while the hull is breaking
 		FShield Shield;
 		int32 Scars = 0;
@@ -342,6 +384,11 @@ public:
 	/** Lets one ship's piece go (its actor is destroyed): the wrecks module draws it from its own record from this frame on. Nothing happens if the effects no longer hold it. */
 	void ReleasePiece(int32 ShipId, uint8 Section);
 
+	// ---- for the main viewscreen's director (read only)
+	/** The big explosions of the last seconds (a ship's death: the reactor going, the hull breaking): where, how big, how long ago. A shot that cuts to a death can frame the fireball (the
+	 *  camera that zooms on a piece inside a fireball sees only the cloud) and hold on it for as long as it burns. Nothing in the war reads them. */
+	void GetBlasts(TArray<AstraFx::FBlastView>& Out) const { Out = Blasts; }
+
 	// ---- the console (AstraWarFXTest.cpp)
 	void Stats(FString& Out) const;
 	/** Runs what astra.fx.* asked for since the last frame. */
@@ -353,6 +400,8 @@ private:
 
 	UPROPERTY() TObjectPtr<UAstraBattleSubsystem> Owner;
 	UPROPERTY() TObjectPtr<AActor> Host;
+	UPROPERTY() TObjectPtr<AActor> TestCamera;                 // astra.fx.cam: a free camera for the tests (AstraWarFXTest.cpp)
+	UPROPERTY() TObjectPtr<UTextureRenderTarget2D> TestTarget;
 	UPROPERTY() TObjectPtr<UStaticMesh> SphereMesh;
 	UPROPERTY() TObjectPtr<UStaticMesh> BallMesh;          // a smoother sphere for the shields (if the project has it)
 	UPROPERTY() TObjectPtr<UStaticMesh> CylinderMesh;
@@ -383,6 +432,8 @@ private:
 	TArray<AstraFx::FTrack> Tracks;
 	TArray<int32> FreeTracks;
 	TArray<AstraFx::FGhost> Ghosts;
+	TArray<AstraFx::FWake> Wakes;
+	TArray<AstraFx::FBlastView> Blasts;
 	TMap<int32, AstraFx::FShipFx> ShipFx;
 	TArray<AstraFx::FPiece> Pieces;
 	TArray<AstraFx::FDebris> Debris;
@@ -412,6 +463,8 @@ private:
 	float Intensity = 1.f;        // astra.fx.intensity
 	float Density = 1.f;          // astra.fx.density: how many particles (0.25..2)
 	float LightScale = 1.f;       // astra.fx.lights
+	float WakeGain = 1.f;         // astra.fx.wake: the brightness of the line a slug draws behind it (0 none)
+	float MuzzleGain = 1.f;       // astra.fx.muzzle: the size of the flash at a gun's mouth
 
 	// ---- internals (AstraWarFX.cpp)
 	bool LoadAssets();
@@ -457,6 +510,8 @@ private:
 	// ---- hulls (AstraWarFXHull.cpp)
 	void AddScar(const FAstraBattleShip& S, const FAstraFxHit& Hit);
 	void HullEmitters(const FAstraBattleShip& S, AstraFx::FShipFx& Fx);
+	/** A section of a warship has just been gutted (it went to zero): the burst of its going. */
+	void GutBurst(const FAstraBattleShip& S, int32 Section);
 	void PowerDown(const FAstraBattleShip& S, AstraFx::FShipFx& Fx);
 	/** The inside of a ship that has one (FLOTTA-VIVA): where it burns and vents, and how lit its windows are (refreshed a few times a second). */
 	void FleetFxRefresh(const FAstraBattleShip& S, AstraFx::FShipFx& Fx);

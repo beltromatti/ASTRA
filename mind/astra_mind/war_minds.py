@@ -72,6 +72,25 @@ LASER_KM = 9.0
 LOG_LINES = 16                                          # what a commander remembers of the last orders, words and news
 LOG_KEEP = 80
 
+# The Mandate's captains the order of battle does not name (the war builds more ships than the story has people for): a name of the Outer Worlds, the
+# same for the same ship every time (5 Oct: the captains of the Interdiction Fleet's main body spoke as «the commander of the raid group»)
+_MANDATE_FIRST = ("Aldric", "Bera", "Caspian", "Dagny", "Elric", "Fenna", "Garrick", "Hesper", "Idris", "Jorun", "Kael", "Liesl", "Marek", "Nadia", "Oren",
+                  "Petra", "Quill", "Rhiannon", "Soren", "Talia", "Ulric", "Vesna", "Wren", "Yara", "Zoltan", "Anouk", "Bastian", "Celine", "Darius", "Elin",
+                  "Florin", "Greta", "Hakon", "Isolde", "Jarek", "Katya", "Lorcan", "Mira", "Nikolai", "Odessa")
+_MANDATE_LAST = ("Arkwright", "Balloch", "Cerny", "Drago", "Eskel", "Falk", "Grimsby", "Halvard", "Ivers", "Jansky", "Kessler", "Lorne", "Marsh", "Norland",
+                 "Osric", "Pell", "Quarry", "Rask", "Strand", "Thorne", "Ulven", "Varga", "Wexley", "Yarrow", "Zane", "Ashdown", "Brack", "Coldwell", "Dunmore",
+                 "Ember", "Flint", "Gale", "Hask", "Ironside", "Jory", "Kade", "Lisle", "Merrow", "Nyle", "Orme")
+_MANDATE_VOICES = ("stuart_bell", "michael", "juergen", "lola", "anna", "paul", "marius")
+
+
+def drawn_mandate_officer(contact: str, ship: str = "") -> dict[str, str]:
+    """A Mandate ship's captain whom no story names: a person of the Outer Worlds with a name of their own, fixed by the ship (its contact id and name)."""
+    import zlib
+    h = zlib.crc32(f"{contact}|{ship}".encode("utf-8"))
+    first, last = _MANDATE_FIRST[h % len(_MANDATE_FIRST)], _MANDATE_LAST[(h // len(_MANDATE_FIRST)) % len(_MANDATE_LAST)]
+    return {"name": f"Ferryman {first} {last}", "rank": "Ferryman (ship captain)", "voice": _MANDATE_VOICES[(h >> 8) % len(_MANDATE_VOICES)],
+            "bio": "A hard, tired officer of the Outer Worlds who has lost friends to the Core's guns and wants the Gates for his people; proud, laconic, honest."}
+
 ORDERS = ("auto", "attack", "pin", "flank_left", "flank_right", "screen", "withdraw", "regroup", "reinforce", "hold")
 FORMATIONS = ("line", "wedge", "column", "screen")
 
@@ -924,8 +943,9 @@ class WarMinds:
         """Who commands the ship `contact` (a Mandate captain from enemy.py; an ASTRA captain registered, fixed or drawn from the pool)."""
         if side == "mandate":
             p = self.mandate_persona(contact) or {}
+            drawn = drawn_mandate_officer(contact, cls)
             c = Commander(key=p.get("key", "cmdr_" + re.sub(r"\W", "", contact.lower())), contact=contact,
-                          name=p.get("name", f"the commander of {contact}"), rank=p.get("rank", "Ferryman (ship captain)"),
+                          name=p.get("name") or drawn["name"], rank=p.get("rank", "Ferryman (ship captain)"),
                           ship=p.get("ship", "a Mandate warship"), bio=p.get("bio", "A hard, tired officer of the Outer Worlds."),
                           voice=p.get("voice", "stuart_bell"), side="mandate", mission=p.get("mission", ""))
             if p.get("name"):

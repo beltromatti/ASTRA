@@ -1831,7 +1831,10 @@ class March:
             out.append("BATTLES UNDER WAY")
             out.extend(fights)
         if side == "astra":
-            out.append("THE AQUILA: " + (f"in the Gate's lane to {self.aquila['lane']}" if self.aquila["lane"] else f"at {self.aquila['where']}") + (f" (since {fmt_s(self.t - self.aquila['since'])})" if self.aquila["since"] else "")
+            hull, mis = self.aquila.get("hull_pct"), self.aquila.get("missiles")
+            state = "".join([f"; her hull {hull}%" if hull is not None else "", f", {mis} missiles in her magazines" if mis is not None else "",
+                             " (EMPTY: she cannot fight a missile battle until she is rearmed)" if mis == 0 else ""])
+            out.append("THE AQUILA: " + (f"in the Gate's lane to {self.aquila['lane']}" if self.aquila["lane"] else f"at {self.aquila['where']}") + (f" (since {fmt_s(self.t - self.aquila['since'])})" if self.aquila["since"] else "") + state
                        + (f"; {self.aquila_gate_km:.0f} km from the Janus Gate there (a force that comes through needs minutes to reach her)" if (self.aquila_gate_km and self.aquila_gate_km >= 20.0 and self.real_system and not self.aquila["lane"]) else ""))
         else:
             if self.aquila_seen[0]:

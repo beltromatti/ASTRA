@@ -46,7 +46,7 @@ from .speech import REPORT_LATE_S, Prio, Voice
 from .flight_minds import CAST as FLIGHT_CAST, PARTY as FLIGHT_PARTY, PARTY_ALIASES as FLIGHT_ALIASES, FlightMinds, flying as _flying, on_flight_deck as _on_flight_deck
 from .marines import PARTY as MARINES_PARTY, MarineMinds, with_marines
 from .nets import CALL_MARK, NET_EVENT, URGENT_MARK, Nets
-from .war_minds import ALLIES, WarMinds
+from .war_minds import ALLIES, WarMinds, drawn_mandate_officer
 from .march import March
 from .march_glue import MarchGlue
 from .strategy import StrategicMinds
@@ -146,8 +146,11 @@ EXTERNAL_SPEAKERS["computer"] = ("Ship's computer", "estelle")          # the li
 # the player talking to the story itself (game master mode): "Regista, ...", "Director, ...", "Narratore, ..."
 import re as _re  # noqa: E402
 # events whose report is a warning of danger: the crew says them before any routine talk (voice priority URGENT)
+# (our hull breach is danger when it opens, not when it is sealed: 5 Oct, «the breach at the Reaction-Mass Tank is sealed» was told as a warning and cut,
+# in a battle, the same report three times in a row)
 _URGENT_EVENT = _re.compile(r"missiles? inbound|rockets? inbound|torpedoes away|hull integrity critical|containment failing|abandon ship|"
-                           r"breach|new contacts|is cycling|coming through|" + _re.escape(URGENT_MARK), _re.I)    # (URGENT_MARK: a net's sender said it is danger now, nets.py)
+                           r"hull breach(?![^.;]*\b(?:sealed|closed|patched|held)\b)|to the reactor breach|main reactor has breached|new contacts|is cycling|"
+                           r"coming through|" + _re.escape(URGENT_MARK), _re.I)    # (an enemy's «reactor breached» is her death, not our danger: it cut a hail, 5 Oct)    # (URGENT_MARK: a net's sender said it is danger now, nets.py)
 URGENT_GATHER_S = 0.6          # what comes with a warning of danger joins it (a hit: its breach, fire and wounded arrive together)
 URGENT_WAIT_S = 3.0            # ... and it waits for the line being said to end, this long at most
 ROUTINE_WAIT_S = 25.0          # routine news waits for a quiet bridge this long at most: in a fleet battle the bridge is never quiet,
@@ -1013,13 +1016,9 @@ class Mind:
                         m = _re.match(r"transmission:\s*(T-\d+)\s*—\s*(.*)", tr)
                         if m and m.group(1) not in COMMANDERS:
                             # nobody gave this captain a mind yet: a Mandate officer with the ship's name on the call sign
-                            ship = _re.search(r"aboard the ([\w' -]+)", m.group(2))
-                            self._register_commander(m.group(1), {
-                                "name": f"the commander of the {ship.group(1) if ship else 'raid group'}",
-                                "rank": "Ferryman (ship captain)", "ship": f"the {ship.group(1) if ship else 'Mandate warship'}",
-                                "bio": "A hard, tired officer of the Outer Worlds who has lost friends to the Core's guns and "
-                                       "wants the Gates for his people; proud, laconic, honest.",
-                                "voice": "stuart_bell"})
+                            ship = _re.search(r"aboard the ([\w' -]+)", m.group(2)) or _re.search(r"— the ([\w' -]+?) \(", m.group(2))
+                            drawn = drawn_mandate_officer(m.group(1), ship.group(1) if ship else "")
+                            self._register_commander(m.group(1), {**drawn, "ship": f"the {ship.group(1) if ship else 'Mandate warship'}"})
                         if m and self.enemy.open_channel(m.group(1)):
                             written = await self.voice.preemptible(self.enemy.respond(
                                 f"[Situation: {m.group(2)}. You are the one opening this channel: make "

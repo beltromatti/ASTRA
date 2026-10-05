@@ -28,12 +28,17 @@ namespace AstraFx
 		TAutoConsoleVariable<float> CVarLights(TEXT("astra.fx.lights"), 1.f, TEXT("Strength of the flash lights of explosions (0 none)"));
 		TAutoConsoleVariable<int32> CVarSim(TEXT("astra.fx.sim"), 1, TEXT("The effects' simulation also runs where nothing is drawn (the war bench), so its cost is measured: 1 yes"));
 		TAutoConsoleVariable<int32> CVarLog(TEXT("astra.fx.log"), 0, TEXT("Log the effects' counters every N seconds (0 never)"));
+		TAutoConsoleVariable<float> CVarWake(TEXT("astra.fx.wake"), 1.f, TEXT("Brightness of the line a rail slug draws behind it (0 none, 0.2..3)"));
+		TAutoConsoleVariable<float> CVarMuzzle(TEXT("astra.fx.muzzle"), 1.f, TEXT("Size of the flash at a gun's mouth (0.2..3)"));
 
 		const FTransform& HiddenXf()
 		{
 			static const FTransform X(FQuat::Identity, FVector::ZeroVector, FVector(0.0001));
 			return X;
 		}
+
+		constexpr float WakeSeconds = 1.1f;     // how far back a slug's line is drawn, in seconds of its flight
+		constexpr float WakeTau = 0.42f;        // and how fast it dies: e^-t/tau (seen at the bridge a battle's worth of these is a starburst: long enough to be a line, short enough to be a line and not a net)
 	}
 
 	// -------------------------------------------------------------------------------------------------------------- layers
@@ -238,7 +243,7 @@ void UAstraWarFX::Init(UAstraBattleSubsystem* InOwner)
 	MakeLayer(Fires, TEXT("FxFire"), SphereMesh, MatFire, CapFires, 0, false, Stride);
 	MakeLayer(Plumes, TEXT("FxPlume"), CylinderMesh, MatPlume, CapPlumes, 1, false, Stride);
 	MakeLayer(Tubes, TEXT("FxTube"), CylinderMesh, MatTube, CapTubes, 2, false, Stride);
-	MakeLayer(Darts, TEXT("FxDart"), SphereMesh, MatDart, CapDarts, 3, false, Stride);
+	MakeLayer(Darts, TEXT("FxDart"), CylinderMesh, MatDart, CapDarts, 3, false, Stride);       // (a cylinder shaded as a spindle: M_WAR_Dart; a stretched sphere was dark seen end-on)
 	MakeLayer(Glows, TEXT("FxGlow"), SphereMesh, MatGlow, CapGlows, 4, false, Stride);
 	// chunks of metal: lit, with their colour and glow per instance (M_WAR_Debris), or in the engine's plain material until that exists
 	UMaterialInterface* DebrisMat = MatDebris ? MatDebris.Get() : LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
@@ -283,6 +288,8 @@ void UAstraWarFX::ClearAll()
 	Tracks.Reset();
 	FreeTracks.Reset();
 	Ghosts.Reset();
+	Wakes.Reset();
+	Blasts.Reset();
 	FlashLights.Reset();
 	for (FScar& S : Scars)
 	{
@@ -473,6 +480,8 @@ void UAstraWarFX::BeginFrame()
 	Intensity = FMath::Clamp(CVarIntensity.GetValueOnGameThread(), 0.1f, 6.f);
 	Density = FMath::Clamp(CVarDensity.GetValueOnGameThread(), 0.2f, 2.f);
 	LightScale = FMath::Clamp(CVarLights.GetValueOnGameThread(), 0.f, 4.f);
+	WakeGain = FMath::Clamp(CVarWake.GetValueOnGameThread(), 0.f, 3.f);
+	MuzzleGain = FMath::Clamp(CVarMuzzle.GetValueOnGameThread(), 0.2f, 3.f);
 	for (FLayer* L : {&Darts, &Tubes, &Glows, &Fires, &Smokes, &Plumes, &DebrisL})
 	{
 		L->Begin();
@@ -507,7 +516,17 @@ void UAstraWarFX::Tick(float InDt)
 	Clock += Dt;
 	++Frame;
 	BeginFrame();
+	for (int32 i = Blasts.Num() - 1; i >= 0; --i)
+	{
+		Blasts[i].Age += Dt;
+		if (Blasts[i].Age > 8.f)
+		{
+			Blasts.RemoveAtSwap(i, EAllowShrinking::No);
+		}
+	}
+	const double TestT0 = FPlatformTime::Seconds();
 	RunTests();                            // what astra.fx.* asked for (AstraWarFXTest.cpp)
+	const double TestMs = (FPlatformTime::Seconds() - TestT0) * 1000.0;       // (its pictures cost what they cost: not the effects')
 	TickShips();
 	TickPieces();
 	DrawShots();
@@ -520,7 +539,7 @@ void UAstraWarFX::Tick(float InDt)
 	TickLights();
 	TickScars();
 	EndFrame();
-	const double Ms = (FPlatformTime::Seconds() - T0) * 1000.0;
+	const double Ms = (FPlatformTime::Seconds() - T0) * 1000.0 - TestMs;
 	TickMs += Ms;
 	TickMsMax = FMath::Max(TickMsMax, Ms);
 	++TickCount;
@@ -537,11 +556,11 @@ void UAstraWarFX::Tick(float InDt)
 void UAstraWarFX::Stats(FString& Out) const
 {
 	Out = FString::Printf(TEXT("%s | %.3f ms/frame (max %.2f) over %d frames | instances now/peak: darts %d/%d tubes %d/%d glows %d/%d fire %d/%d smoke %d/%d plumes %d/%d debris %d | "
-	                           "dropped (full): darts %d tubes %d glows %d fire %d smoke %d | puffs %d sparks %d beams %d tracks %d pieces %d scars %d lights %d"),
+	                           "dropped (full): darts %d tubes %d glows %d fire %d smoke %d | puffs %d sparks %d beams %d tracks %d wakes %d pieces %d scars %d lights %d"),
 	                      bLive ? TEXT("drawing") : (bSim ? TEXT("bench (not drawn)") : TEXT("off")), TickCount ? TickMs / TickCount : 0.0, TickMsMax, TickCount,
 	                      Darts.Prev, Darts.Peak, Tubes.Prev, Tubes.Peak, Glows.Prev, Glows.Peak, Fires.Prev, Fires.Peak, Smokes.Prev, Smokes.Peak,
 	                      Plumes.Prev, Plumes.Peak, DebrisL.Prev, Darts.Dropped, Tubes.Dropped, Glows.Dropped, Fires.Dropped, Smokes.Dropped,
-	                      Puffs.Num(), Sparks.Num(), Beams.Num(), Tracks.Num() - FreeTracks.Num(), Pieces.Num(), Scars.Num(), FlashLights.Num());
+	                      Puffs.Num(), Sparks.Num(), Beams.Num(), Tracks.Num() - FreeTracks.Num(), Wakes.Num(), Pieces.Num(), Scars.Num(), FlashLights.Num());
 }
 
 // ------------------------------------------------------------------------------------------------------------------ the shots
@@ -581,6 +600,7 @@ int32 UAstraWarFX::OnProjectile(const FAstraBattleShip& From, const FAstraBattle
 	T->Offset = Off.Size() < 1.5 * FMath::Max(From.Radius, 50.f) ? Off : FVector::ZeroVector;
 	T->OffsetTau = bRail ? 0.22f : (Pr.bTorpedo ? 0.9f : 0.55f);
 	T->Hist[0] = Muzzle;
+	T->Start = Muzzle;
 	T->HistN = 1;
 	// the muzzle's flash
 	if (FVector::DistSquared(Muzzle, F.Origin) < FMath::Square(90000.0))
@@ -588,11 +608,18 @@ int32 UAstraWarFX::OnProjectile(const FAstraBattleShip& From, const FAstraBattle
 		const float Heavy = FMath::Clamp(Pr.Damage / 60.f, 0.5f, 1.8f);
 		if (bRail)
 		{
-			if (FPuff* Pf = AddPuff(Muzzle, From.Vel, 0.16f, 3.f * Heavy, 9.f * Heavy, T->Col, 320.f, LGlow))
+			// the discharge, in the size of the gun (a destroyer's mount is small, the Aquila's is not): a white-hot core inside a bloom of the shot's colour with its streaks, a hot jet
+			// along the aim, a ring that spreads off the barrel, a spray of sparks, and the light of it on the hull round the mouth
+			const float Gun = FMath::Clamp(From.Radius * 0.03f, 3.f, 14.f) * Heavy * MuzzleGain;
+			if (FPuff* Pf = AddPuff(Muzzle, From.Vel, 0.24f, 0.5f * Gun, 1.9f * Gun, T->Col, 420.f, LGlow))
 			{
 				Pf->P1 = 1.f;
 			}
-			SparkBurst(Muzzle, Aim, 0.5f, 5, 60.f, 220.f, 0.12f, 0.3f, 14.f, T->Col, 260.f, From.Vel);
+			AddPuff(Muzzle, From.Vel, 0.1f, 0.25f * Gun, 0.8f * Gun, FLinearColor(1.f, 0.97f, 0.9f), 560.f, LGlow);
+			AddSpark(Muzzle + Aim * (Gun * 2.f), From.Vel + Aim * 120.f, 0.16f, Gun * 7.f, 0.4f + 0.16f * Gun, T->Col, 420.f, 0.f);
+			Shockwave(Muzzle + Aim * Gun, From.Vel, Gun * 2.6f, 0.3f, T->Col, 0.02f);
+			SparkBurst(Muzzle, Aim, 0.6f, 6, 60.f, 260.f, 0.14f, 0.4f, 10.f + Gun, T->Col, 300.f, From.Vel);
+			AddLight(Muzzle + Aim * Gun, 0.18f, Gun * 20.f, 6500.f * Gun * Gun * 0.6f, Mix(T->Col, FLinearColor::White, 0.35f), From.Vel);
 		}
 		else
 		{
@@ -662,6 +689,33 @@ void UAstraWarFX::DrawShots()
 				*X = FTransform(FQuat::FindBetweenNormals(FVector::ZAxisVector, DirW), Centre, FVector(Width, Width, Len));
 				Fill(D, T.Col, 700.f * Intensity, 0.f, 0.f, 0.f, (float)(Pr.FxSlot & 255) / 255.f, Width, Len);
 			}
+			// and the line it has drawn from the gun, bright at the slug and gone at the far end: a slug at 12 km/s is a dot that crosses the sky in a few frames, the line is what
+			// says where the fire is going (seen from behind, from the side, from 40 km)
+			T.bWake = false;
+			if (WakeGain > 0.f)
+			{
+				const FVector Path = Head - T.Start;
+				const double PathLen = Path.Size();
+				const double WakeLen = FMath::Min(PathLen, Speed * (double)WakeSeconds);
+				if (WakeLen > 40.0)
+				{
+					const FVector Dir = Path / PathLen;
+					const FVector TailS = Head - Dir * WakeLen;
+					const FVector TailW = F.ToWorld(TailS);
+					const FVector Along = (HeadW - TailW).GetSafeNormal();
+					T.WakeTail = TailS;
+					T.WakeKappa = (float)(WakeLen / (Speed * (double)WakeTau));
+					T.WakeWidth = 1.6f + Pr.Damage * 0.012f;
+					T.bWake = true;
+					FTransform* Xw;
+					if (float* Dw = Tubes.Next(Xw))
+					{
+						const float WakeW = T.WakeWidth;
+						*Xw = FTransform(FQuat::FindBetweenNormals(FVector::ZAxisVector, Along), (TailW + HeadW) * 0.5, FVector(WakeW, WakeW, (float)WakeLen));
+						Fill(Dw, T.Col, 190.f * Intensity * WakeGain, 0.f, 5.f, T.WakeKappa, (float)(Pr.FxSlot & 255) / 255.f, WakeW, (float)WakeLen);
+					}
+				}
+			}
 			continue;
 		}
 		// a missile, a torpedo, a rocket: a glowing head, a trail laid down behind it
@@ -709,6 +763,75 @@ void UAstraWarFX::DrawShots()
 			}
 			Newer = Older;
 		}
+		if (WakeGain > 0.f)
+		{
+			// the engine: a short, hot flame behind the head (the bright end of a wake, at the nozzle)
+			{
+				FTransform* X;
+				if (float* D = Tubes.Next(X))
+				{
+					const float FlameLen = (T.Style == 2 ? 28.f : 18.f) + (float)Speed * 0.012f;
+					const float FlameW = T.Style == 2 ? 4.5f : 3.f;
+					*X = FTransform(FQuat::FindBetweenNormals(FVector::ZAxisVector, DirW), HeadW - DirW * (FlameLen * 50.0), FVector(FlameW, FlameW, FlameLen));
+					Fill(D, T.Style == 2 ? FLinearColor(0.8f, 0.95f, 1.f) : FLinearColor(1.f, 0.78f, 0.5f), 320.f * Intensity * Hot * WakeGain, 0.f, 5.f, 2.2f, (float)(Pr.FxSlot & 255) / 255.f, FlameW, FlameLen);
+				}
+			}
+			// the long smoke: a point every half second, a pale line through them that dies away (where the missile has been, so also where it turned)
+			T.LongAcc += Dt;
+			if (T.LongAcc >= 0.5f)
+			{
+				T.LongAcc = FMath::Fmod(T.LongAcc, 0.5f);
+				for (int32 i = FTrack::LongPts - 1; i > 0; --i)
+				{
+					T.LongHist[i] = T.LongHist[i - 1];
+				}
+				T.LongHist[0] = Head;
+				T.LongN = FMath::Min(T.LongN + 1, (int32)FTrack::LongPts);
+			}
+			const int32 LSegs = Dist < 40000.0 ? T.LongN : FMath::Min(T.LongN, 3);
+			const FLinearColor Pale = Mix(T.Col, FLinearColor::White, 0.5f);
+			FVector LNewer = Head;
+			for (int32 i = 0; i < LSegs; ++i)
+			{
+				const FVector LOlder = T.LongHist[i];
+				const FVector A = F.ToWorld(LNewer), B = F.ToWorld(LOlder);
+				const double L = FVector::Dist(A, B);
+				FTransform* X;
+				if (L > 200.0)
+				{
+					if (float* D = Tubes.Next(X))
+					{
+						const float AgeTail = (float)(i + 1) / (float)(FTrack::LongPts + 1), AgeHead = (float)i / (float)(FTrack::LongPts + 1);
+						const float Width = (T.Style == 2 ? 4.f : 2.6f) * (1.f + 1.6f * AgeTail);
+						const FVector Dir = (A - B) / L;
+						const float Len = (float)(L / 100.0);
+						*X = FTransform(FQuat::FindBetweenNormals(FVector::ZAxisVector, Dir), (A + B) * 0.5, FVector(Width, Width, Len));
+						Fill(D, Pale, 34.f * Intensity * Hot * WakeGain, AgeTail, 2.f, AgeHead, (float)(Pr.FxSlot & 255) / 255.f, Width, Len);
+					}
+				}
+				LNewer = LOlder;
+			}
+			// the seeker's turns: a puff of attitude gas on the side opposite to the push, while it turns hard (a missile that curves in the sky is a thing with a mind)
+			if (T.bPrevVel && Dt > 1.e-4f && Dist < 60000.0)
+			{
+				const FVector Acc = (Pr.Vel - T.PrevVel) / (double)Dt;
+				const FVector Dir0 = Pr.Vel.GetSafeNormal();
+				const FVector Lat = Acc - Dir0 * FVector::DotProduct(Acc, Dir0);
+				const double LatMag = Lat.Size();
+				T.RcsAcc += Dt;
+				if (LatMag > 40.0 && T.RcsAcc >= 0.09f)
+				{
+					T.RcsAcc = 0.f;
+					const FVector Side = -Lat / LatMag;
+					if (FPuff* Rc = AddPuff(Pr.Pos + Side * 3.f, Pr.Vel * 0.3 + Side * 30.f, 0.15f, 0.8f, 3.2f, Mix(T.Col, FLinearColor::White, 0.5f), 300.f * Hot, LGlow))
+					{
+						Rc->P1 = 0.f;
+					}
+				}
+			}
+			T.PrevVel = Pr.Vel;
+			T.bPrevVel = true;
+		}
 	}
 	// a track not seen this frame belongs to a shot that is gone: its trail stays a moment, fading
 	for (int32 i = 0; i < Tracks.Num(); ++i)
@@ -716,6 +839,17 @@ void UAstraWarFX::DrawShots()
 		FTrack& T = Tracks[i];
 		if (T.Frame >= 0 && T.Frame != Frame)
 		{
+			if (T.Style == 0 && T.bWake && Wakes.Num() < CapWakes)
+			{
+				// the slug is gone (it struck, it missed): the line it drew stays a moment, fading as it would have behind the slug
+				FWake& Wk = Wakes.AddDefaulted_GetRef();
+				Wk.Head = T.Last;
+				Wk.Tail = T.WakeTail;
+				Wk.Kappa = T.WakeKappa;
+				Wk.Width = T.WakeWidth;
+				Wk.Col = T.Col;
+				Wk.Seed = (float)(i & 255) / 255.f;
+			}
 			if (T.Style >= 1 && T.HistN >= 2 && Ghosts.Num() < 120)
 			{
 				FGhost& G = Ghosts.AddDefaulted_GetRef();
@@ -728,10 +862,47 @@ void UAstraWarFX::DrawShots()
 				G.Style = T.Style;
 				G.Col = T.Col;
 				G.Seed = (uint8)(i & 255);
-				G.Life = 1.0f + 0.5f * (T.Style == 2);
+				G.BeadLife = 1.0f + 0.5f * (T.Style == 2);
+				G.Life = G.BeadLife;
+				if (T.LongN > 0)
+				{
+					// the long smoke stays where the missile drew it and thins away over a few seconds (the head's end first)
+					G.Long[0] = T.Last;
+					G.LongN = FMath::Min(T.LongN + 1, (int32)FTrack::LongPts + 1);
+					for (int32 k = 1; k < G.LongN; ++k)
+					{
+						G.Long[k] = T.LongHist[k - 1];
+					}
+					G.Life = 3.2f;
+				}
 			}
 			T.Frame = -2;
 			FreeTracks.Add(i);
+		}
+	}
+	// the wakes the ended slugs left: the line hangs where it was and dims as it would have (e^-t/tau everywhere on it)
+	for (int32 g = Wakes.Num() - 1; g >= 0; --g)
+	{
+		FWake& Wk = Wakes[g];
+		Wk.Age += Dt;
+		const float K = FMath::Exp(-Wk.Age / WakeTau);
+		if (K < 0.05f)
+		{
+			Wakes.RemoveAtSwap(g, EAllowShrinking::No);
+			continue;
+		}
+		const FVector TailW = F.ToWorld(Wk.Tail), HeadW = F.ToWorld(Wk.Head);
+		const double LenCm = FVector::Dist(TailW, HeadW);
+		FTransform* Xw;
+		if (LenCm < 4000.0 || WakeGain <= 0.f)
+		{
+			continue;
+		}
+		if (float* Dw = Tubes.Next(Xw))
+		{
+			const FVector Along = (HeadW - TailW) / LenCm;
+			*Xw = FTransform(FQuat::FindBetweenNormals(FVector::ZAxisVector, Along), (TailW + HeadW) * 0.5, FVector(Wk.Width, Wk.Width, (float)(LenCm / 100.0)));
+			Fill(Dw, Wk.Col, 190.f * Intensity * WakeGain * K, 0.f, 5.f, Wk.Kappa, Wk.Seed, Wk.Width, (float)(LenCm / 100.0));
 		}
 	}
 	// the trails the ended shots left: the same beads, ageing together
@@ -744,9 +915,9 @@ void UAstraWarFX::DrawShots()
 			Ghosts.RemoveAtSwap(g, EAllowShrinking::No);
 			continue;
 		}
-		const float Shift = G.Age / G.Life;
+		const float Shift = FMath::Min(1.f, G.Age / G.BeadLife);
 		const float Hot = G.Style == 2 ? 1.5f : (G.Style == 3 ? 0.7f : 1.f);
-		for (int32 k = 0; k + 1 < G.N; ++k)
+		for (int32 k = 0; k + 1 < G.N && Shift < 1.f; ++k)
 		{
 			const FVector A = F.ToWorld(G.Pts[k]), B = F.ToWorld(G.Pts[k + 1]);
 			const double L = FVector::Dist(A, B);
@@ -764,6 +935,30 @@ void UAstraWarFX::DrawShots()
 				const float Len = (float)(L / 100.0) * 1.7f;
 				*X = FTransform(FQuat::FindBetweenNormals(FVector::ZAxisVector, Dir), (A + B) * 0.5, FVector(Width, Width, Len));
 				Fill(D, G.Col, 65.f * Intensity * Hot, AgeTail, 2.f, AgeHead, (float)G.Seed / 255.f, Width, Len);
+			}
+		}
+		if (G.LongN > 1 && WakeGain > 0.f)
+		{
+			// the long smoke of the missile that has ended, thinning where it was drawn (the same tubes as the living one, their ages running on)
+			const float LShift = G.Age / G.Life;
+			const FLinearColor Pale = Mix(G.Col, FLinearColor::White, 0.5f);
+			for (int32 k = 0; k + 1 < G.LongN; ++k)
+			{
+				const FVector A = F.ToWorld(G.Long[k]), B = F.ToWorld(G.Long[k + 1]);
+				const double L = FVector::Dist(A, B);
+				FTransform* X;
+				if (L > 200.0)
+				{
+					if (float* D = Tubes.Next(X))
+					{
+						const float AgeTail = FMath::Min(1.f, (float)(k + 1) / (float)(FTrack::LongPts + 1) + LShift), AgeHead = FMath::Min(1.f, (float)k / (float)(FTrack::LongPts + 1) + LShift);
+						const float Width = (G.Style == 2 ? 4.f : 2.6f) * (1.f + 1.6f * AgeTail);
+						const FVector Dir = (A - B) / L;
+						const float Len = (float)(L / 100.0);
+						*X = FTransform(FQuat::FindBetweenNormals(FVector::ZAxisVector, Dir), (A + B) * 0.5, FVector(Width, Width, Len));
+						Fill(D, Pale, 34.f * Intensity * Hot * WakeGain, AgeTail, 2.f, AgeHead, (float)G.Seed / 255.f, Width, Len);
+					}
+				}
 			}
 		}
 	}
@@ -812,6 +1007,10 @@ void UAstraWarFX::OnBeam(EAstraFxShot Kind, const FVector& A, const FVector& B, 
 		const FVector P = MuzzleOf(*Src, EAstraMountKind::Laser, B - A, (int32)(Frame + Beams.Num()));
 		Bm.FromLoc = Src->Att.UnrotateVector(P - Src->Pos);
 		Bm.A = P;
+		if (Kind != EAstraFxShot::Laser && FVector::DistSquared(P, F.Origin) < FMath::Square(30000.0))
+		{
+			AddPuff(P, Src->Vel, 0.07f, 0.6f, 2.4f * MuzzleGain, Col, 240.f, LGlow);      // (a gun's mouth, for the instant a burst leaves it)
+		}
 	}
 	else
 	{

@@ -9,14 +9,35 @@
 //   astra.fx.burn [on T]                            fires and venting in every section, one gutted
 //   astra.fx.break <bow|mid|stern|reactor|disable> [on T]   the ship's end, the way the war ends ships
 //   astra.fx.clear                                  the scene's ships go (no explosion)
+//   astra.fx.reset                                  everything the effects hold goes (the pieces of the last break, particles, scars, shells)
 //   astra.fx.swatch [seconds 40]                    a lineup of every kind of effect 1.2 km ahead of the bridge, in both sides' colours: the material check
 //                                                   (needs no ships; if one of these looks wrong, the material is what is wrong, not the war)
 //   astra.fx.stats                                  what the effects hold and what they cost
+//   astra.fx.series <prefix> [n 8] [every_s 0.25] [vs] [do <command>]   n pictures of the game's view (no UI), every_s apart on the effects' own clock, from the frame the
+//                                                   command ran (with "vs" the main viewscreen's feed too: Saved/Play/<prefix>_NN.png, <prefix>_NN_vs.png); the command
+//                                                   after "do" runs first (astra.fx.series b4 12 0.1 vs do fire rail 3 aquila T): a blast or a volley in steps, the way
+//                                                   the bench of the war cannot show it; with "cam" the free camera too (_cam.png)
+//   astra.fx.cam <x> <y> <z> <yaw> <pitch> [fov 60]  a free camera for the tests, a pose in the bridge's frame (metres: x ahead, y to starboard, z up; the Aquila's hull is
+//                                                   centred 172 m aft of and 62 m below the bridge); astra.fx.cam broadside [T] is the main viewscreen's «ASN AQUILA · FIRING
+//                                                   ON ...» camera (320 m behind her centre, 210 m aside, 100 m up, looking down the line of fire to the target, 46 degrees);
+//                                                   astra.fx.cam off. Its pictures come with astra.fx.series ... cam
 
 #include "AstraWarFX.h"
 #include "AstraBattleSubsystem.h"
 #include "ASTRA.h"
+#include "Components/SceneCaptureComponent2D.h"
+#include "Engine/Engine.h"
+#include "Engine/PostProcessVolume.h"
+#include "Engine/SceneCapture2D.h"
 #include "Engine/StaticMeshActor.h"
+#include "Engine/TextureRenderTarget2D.h"
+#include "Engine/World.h"
+#include "EngineUtils.h"
+#include "ImageUtils.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
+#include "TextureResource.h"
+#include "UnrealClient.h"
 
 struct FAstraWarFXTest
 {
@@ -26,11 +47,33 @@ struct FAstraWarFXTest
 	static TArray<int32> SceneIds;
 	static float SwatchT;                  // seconds the lineup has left (0: none)
 	static float SwatchRespawn;            // until the particles that live and die are thrown again
+	static int32 SeriesLeft, SeriesIdx;    // astra.fx.series: pictures still to take, and the number of the next
+	static float SeriesGap, SeriesNext;
+	static FString SeriesPrefix;
+	static bool bSeriesVs, bSeriesCam;
+	static bool bCamOn, bCamBroadside;     // astra.fx.cam: the free camera is kept at its pose (a fixed one, or the Aquila's broadside)
+	static FVector CamPos, BroadSide;      // bridge frame, cm
+	static float CamYaw, CamPitch, CamFov;
+	static int32 CamW, CamH;
+	static FString CamTarget;
 
 	static FVector Polar(double RangeM, double BearingDeg, double MarkDeg)
 	{
 		const double B = FMath::DegreesToRadians(BearingDeg), M = FMath::DegreesToRadians(MarkDeg);
 		return FVector(RangeM * FMath::Cos(M) * FMath::Cos(B), RangeM * FMath::Cos(M) * FMath::Sin(B), RangeM * FMath::Sin(M));
+	}
+
+	/** The living ship with that contact id (a scene made again leaves the old one's dead ship in the list under the same id: FindByContact would find that). */
+	static FAstraBattleShip* Living(UAstraBattleSubsystem* B, const TCHAR* Contact)
+	{
+		for (FAstraBattleShip& S : B->Ships)
+		{
+			if (S.bAlive && S.ContactId.Equals(Contact, ESearchCase::IgnoreCase))
+			{
+				return &S;
+			}
+		}
+		return nullptr;
 	}
 
 	static FAstraBattleShip* Pick(UAstraWarFX& Fx, const FString& Key)
@@ -43,17 +86,17 @@ struct FAstraWarFXTest
 		}
 		if (K == TEXT("a"))
 		{
-			return B->FindByContact(TEXT("FX-A"));
+			return Living(B, TEXT("FX-A"));
 		}
 		if (K == TEXT("s"))
 		{
-			return B->FindByContact(TEXT("FX-S"));
+			return Living(B, TEXT("FX-S"));
 		}
 		if (K == TEXT("t") || K.IsEmpty())
 		{
-			return B->FindByContact(TEXT("FX-T"));
+			return Living(B, TEXT("FX-T"));
 		}
-		return B->FindByContact(Key.ToUpper());
+		return Living(B, *Key.ToUpper());
 	}
 
 	static void Hold(FAstraBattleShip& S)
@@ -208,6 +251,10 @@ struct FAstraWarFXTest
 		{
 			Clear(Fx);
 		}
+		else if (Name == TEXT("reset"))
+		{
+			Fx.ClearAll();                       // (the pieces of the last break, the particles, the scars, the shells: a clean sky for the next try)
+		}
 		else if (Name == TEXT("stats"))
 		{
 			FString S;
@@ -294,6 +341,64 @@ struct FAstraWarFXTest
 				                               "Mandate flare, blast-wave ring, Mandate ball, ASTRA laser flash, Mandate laser flash. At eye level: ASTRA slug, Mandate slug, spark, "
 				                               "missile with its trail, ASTRA laser, Mandate laser, ASTRA cannon tracer, point-defence tracer. Below: ASTRA plume, Mandate plume, cold chunk, "
 				                               "hot chunk, two fireballs, a dark and a pale smoke (thrown every 3.4 s)"), SwatchT);
+			}
+		}
+		else if (Name == TEXT("cam"))
+		{
+			const FString A0 = Arg(0, TEXT("off")).ToLower();
+			if (A0 == TEXT("off"))
+			{
+				bCamOn = false;
+				return;
+			}
+			CamW = 1280;
+			CamH = 720;
+			BroadSide = FVector::ZeroVector;
+			if (A0 == TEXT("broadside"))
+			{
+				bCamBroadside = true;
+				CamTarget = Arg(1, TEXT("T"));
+			}
+			else
+			{
+				bCamBroadside = false;
+				CamPos = FVector(FCString::Atod(*A0), FCString::Atod(*Arg(1, TEXT("0"))), FCString::Atod(*Arg(2, TEXT("0")))) * 100.0;
+				CamYaw = FCString::Atof(*Arg(3, TEXT("0")));
+				CamPitch = FCString::Atof(*Arg(4, TEXT("0")));
+				CamFov = FCString::Atof(*Arg(5, TEXT("60")));
+			}
+			bCamOn = true;
+			MakeCamera(Fx);
+		}
+		else if (Name == TEXT("series"))
+		{
+			SeriesPrefix = Arg(0, TEXT("series"));
+			SeriesLeft = FMath::Clamp(FCString::Atoi(*Arg(1, TEXT("8"))), 1, 400);
+			SeriesGap = FMath::Clamp(FCString::Atof(*Arg(2, TEXT("0.25"))), 0.02f, 10.f);
+			SeriesIdx = 0;
+			SeriesNext = 0.f;
+			bSeriesVs = false;
+			bSeriesCam = false;
+			for (int32 i = 3; i < A.Num(); ++i)
+			{
+				if (A[i] == TEXT("vs"))
+				{
+					bSeriesVs = true;
+				}
+				else if (A[i] == TEXT("cam"))
+				{
+					bSeriesCam = true;
+					if (!bCamOn)
+					{
+						Run(Fx, TEXT("cam"), {TEXT("broadside")});            // (none set: the Aquila's broadside shot)
+					}
+				}
+				else if (A[i] == TEXT("do"))
+				{
+					// what the series is about, run on the frame after the first picture is asked for
+					Queue.Add(FString::Join(TArrayView<const FString>(A).Mid(i + 1), TEXT(" ")));
+					break;
+				}
 			}
 		}
 		else if (Name == TEXT("burn"))
@@ -456,6 +561,156 @@ struct FAstraWarFXTest
 		}
 	}
 
+	/** The free camera of astra.fx.cam: an engine scene capture that renders everything the bridge's own view would, from wherever it is put, at the bridge's exposure. */
+	static void MakeCamera(UAstraWarFX& Fx)
+	{
+		UWorld* World = Fx.Owner ? Fx.Owner->GetWorld() : nullptr;
+		if (!World || !FApp::CanEverRender())
+		{
+			return;
+		}
+		ASceneCapture2D* A = Cast<ASceneCapture2D>(Fx.TestCamera);
+		if (!A)
+		{
+			FActorSpawnParameters P;
+			P.ObjectFlags |= RF_Transient;
+			P.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+			A = World->SpawnActor<ASceneCapture2D>(FVector::ZeroVector, FRotator::ZeroRotator, P);
+			Fx.TestCamera = A;
+			if (!A)
+			{
+				return;
+			}
+			USceneCaptureComponent2D* C = A->GetCaptureComponent2D();
+			C->bCaptureEveryFrame = false;
+			C->bCaptureOnMovement = false;
+			C->bAlwaysPersistRenderingState = true;
+			C->CaptureSource = ESceneCaptureSource::SCS_FinalColorLDR;
+			C->PrimitiveRenderMode = ESceneCapturePrimitiveRenderMode::PRM_RenderScenePrimitives;
+			for (TActorIterator<APostProcessVolume> It(World); It; ++It)
+			{
+				if (It->bUnbound && It->Settings.bOverride_AutoExposureMinBrightness)
+				{
+					C->PostProcessSettings = It->Settings;            // (the bridge's own fixed exposure, EV100 6.6)
+					break;
+				}
+			}
+			C->PostProcessBlendWeight = 1.f;
+			FEngineShowFlags& SF = C->ShowFlags;
+			SF.SetTemporalAA(true);
+			SF.SetMotionBlur(false);
+			SF.SetAmbientOcclusion(false);
+			SF.SetDistanceFieldAO(false);
+			SF.SetScreenSpaceReflections(false);
+			SF.SetFog(false);
+			SF.SetVolumetricFog(false);
+			SF.SetLumenGlobalIllumination(false);
+			SF.SetLumenReflections(false);
+		}
+		if (!Fx.TestTarget || Fx.TestTarget->SizeX != CamW || Fx.TestTarget->SizeY != CamH)
+		{
+			UTextureRenderTarget2D* RT = NewObject<UTextureRenderTarget2D>(Fx.Owner, TEXT("RT_FxTestCam"));
+			RT->RenderTargetFormat = ETextureRenderTargetFormat::RTF_RGBA8;
+			RT->ClearColor = FLinearColor::Black;
+			RT->InitAutoFormat(CamW, CamH);
+			RT->UpdateResourceImmediate(true);
+			Fx.TestTarget = RT;
+			A->GetCaptureComponent2D()->TextureTarget = RT;
+		}
+	}
+
+	/** Keeps the free camera at its pose (the broadside shot follows the target as the main viewscreen's does, with the side it chose at the start). */
+	static void UpdateCamera(UAstraWarFX& Fx)
+	{
+		ASceneCapture2D* A = bCamOn ? Cast<ASceneCapture2D>(Fx.TestCamera) : nullptr;
+		if (!A)
+		{
+			return;
+		}
+		FVector Pos = CamPos;
+		FRotator Rot(CamPitch, CamYaw, 0.f);
+		float Fov = CamFov;
+		if (bCamBroadside)
+		{
+			const FVector Hull(-17200.0, 0.0, -6200.0);                   // her centre in the bridge's frame (cm)
+			const FAstraBattleShip* T = Pick(Fx, CamTarget);
+			const FVector TgtW = T ? Fx.F.ToWorld(T->Pos) : Hull + FVector(1.0e7, 0.0, 0.0);
+			const FVector Dir = (TgtW - Hull).GetSafeNormal();
+			if (BroadSide.IsNearlyZero())
+			{
+				BroadSide = FVector::CrossProduct(FVector::UpVector, Dir).GetSafeNormal();
+				if (BroadSide.IsNearlyZero())
+				{
+					BroadSide = FVector::RightVector;
+				}
+			}
+			Pos = Hull - Dir * 32000.0 + BroadSide * 21000.0 + FVector(0.0, 0.0, 10000.0);
+			Rot = (Hull + Dir * 250000.0 - Pos).GetSafeNormal().Rotation();
+			Fov = 46.f;
+		}
+		A->SetActorLocationAndRotation(Pos, Rot);
+		A->GetCaptureComponent2D()->FOVAngle = Fov;
+	}
+
+	static void CaptureCamera(UAstraWarFX& Fx, const FString& Path)
+	{
+		ASceneCapture2D* A = Cast<ASceneCapture2D>(Fx.TestCamera);
+		FTextureRenderTargetResource* R = Fx.TestTarget ? Fx.TestTarget->GameThread_GetRenderTargetResource() : nullptr;
+		if (!A || !R)
+		{
+			return;
+		}
+		A->GetCaptureComponent2D()->CaptureScene();
+		TArray<FColor> Px;
+		if (!R->ReadPixels(Px) || Px.Num() != CamW * CamH)
+		{
+			return;
+		}
+		for (FColor& C : Px)
+		{
+			C.A = 255;
+		}
+		TArray64<uint8> Png;
+		FImageUtils::PNGCompressImageArray(CamW, CamH, TArrayView64<const FColor>(Px.GetData(), Px.Num()), Png);
+		FFileHelper::SaveArrayToFile(Png, *Path);
+	}
+
+	/** One step of astra.fx.series: a picture of the game's view (and of the main viewscreen's feed) every SeriesGap seconds of the effects' clock. */
+	static void Series(UAstraWarFX& Fx)
+	{
+		UpdateCamera(Fx);
+		if (SeriesLeft <= 0)
+		{
+			return;
+		}
+		if (!FApp::CanEverRender() || !Fx.Owner || !Fx.Owner->GetWorld())
+		{
+			SeriesLeft = 0;
+			return;
+		}
+		SeriesNext -= Fx.Dt;
+		if (SeriesNext > 0.f)
+		{
+			return;
+		}
+		SeriesNext = SeriesGap;                // (a frame longer than the gap does not catch up)
+		const FString Base = FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir() / TEXT("Play") / FString::Printf(TEXT("%s_%02d"), *SeriesPrefix, SeriesIdx));
+		FScreenshotRequest::RequestScreenshot(Base + TEXT(".png"), false, false);
+		if (bSeriesVs)
+		{
+			GEngine->Exec(Fx.Owner->GetWorld(), *FString::Printf(TEXT("astra.viewscreen.dump %s_vs.png"), *Base));
+		}
+		if (bSeriesCam)
+		{
+			CaptureCamera(Fx, Base + TEXT("_cam.png"));
+		}
+		++SeriesIdx;
+		if (--SeriesLeft == 0)
+		{
+			UE_LOG(LogASTRA, Display, TEXT("[WarFX] series %s: %d pictures in Saved/Play"), *SeriesPrefix, SeriesIdx);
+		}
+	}
+
 	static void Pump(UAstraWarFX& Fx, float Dt)
 	{
 		TArray<FString> Lines = MoveTemp(Queue);
@@ -488,11 +743,29 @@ TArray<FAstraWarFXTest::FPending> FAstraWarFXTest::Pending;
 TArray<int32> FAstraWarFXTest::SceneIds;
 float FAstraWarFXTest::SwatchT = 0.f;
 float FAstraWarFXTest::SwatchRespawn = 0.f;
+int32 FAstraWarFXTest::SeriesLeft = 0;
+int32 FAstraWarFXTest::SeriesIdx = 0;
+float FAstraWarFXTest::SeriesGap = 0.25f;
+float FAstraWarFXTest::SeriesNext = 0.f;
+FString FAstraWarFXTest::SeriesPrefix;
+bool FAstraWarFXTest::bSeriesVs = false;
+bool FAstraWarFXTest::bSeriesCam = false;
+bool FAstraWarFXTest::bCamOn = false;
+bool FAstraWarFXTest::bCamBroadside = false;
+FVector FAstraWarFXTest::CamPos = FVector::ZeroVector;
+FVector FAstraWarFXTest::BroadSide = FVector::ZeroVector;
+float FAstraWarFXTest::CamYaw = 0.f;
+float FAstraWarFXTest::CamPitch = 0.f;
+float FAstraWarFXTest::CamFov = 60.f;
+int32 FAstraWarFXTest::CamW = 1280;
+int32 FAstraWarFXTest::CamH = 720;
+FString FAstraWarFXTest::CamTarget;
 
 void UAstraWarFX::RunTests()
 {
 	FAstraWarFXTest::Pump(*this, Dt);
 	FAstraWarFXTest::DrawSwatch(*this);
+	FAstraWarFXTest::Series(*this);
 }
 
 namespace
@@ -508,6 +781,7 @@ namespace
 
 ASTRA_FX_COMMAND(scene, "Effects test scene in front of the bridge: astra.fx.scene [range_km 6] [bearing 0] (a Mandate cruiser, an ASTRA battleship, a Mandate destroyer, held, guns silent)");
 ASTRA_FX_COMMAND(clear, "Remove the effects test scene's ships");
+ASTRA_FX_COMMAND(reset, "Everything the effects hold goes: the pieces of a broken ship, the particles, the scars, the shields' shells (a clean sky for the next test)");
 ASTRA_FX_COMMAND(fire, "Fire a weapon in the test scene: astra.fx.fire <rail|laser|missile|torpedo|pd|cannon|all> [n 1] [from S|A|T|aquila] [at T|A|S|aquila]");
 ASTRA_FX_COMMAND(shield, "Hit a shield sector in the test scene: astra.fx.shield [bow|stern|port|starboard|dorsal|ventral] [n 4] [on T|A|S|aquila] (enough hits and it falls)");
 ASTRA_FX_COMMAND(hit, "One blow that gets through, in the test scene: astra.fx.hit <rail|laser|missile|torpedo|cannon> [damage 40] [facing bow] [on T|A|S|aquila]");
@@ -515,3 +789,5 @@ ASTRA_FX_COMMAND(burn, "Fires and venting in every section of a test ship: astra
 ASTRA_FX_COMMAND(break, "End a test ship: astra.fx.break <bow|mid|stern|reactor|disable> [on T|A|S]");
 ASTRA_FX_COMMAND(swatch, "A lineup of every kind of effect 1.2 km ahead of the bridge, in both sides' colours (the material check): astra.fx.swatch [seconds 40]; 0 puts it away");
 ASTRA_FX_COMMAND(stats, "What the war's effects hold and what they cost");
+ASTRA_FX_COMMAND(series, "Pictures of the game's view in steps: astra.fx.series <prefix> [n 8] [every_s 0.25] [vs] [cam] [do <astra.fx command>] (Saved/Play/<prefix>_NN.png; vs: the main viewscreen's feed too; cam: the free camera's)");
+ASTRA_FX_COMMAND(cam, "A free camera for the tests: astra.fx.cam <x> <y> <z> <yaw> <pitch> [fov 60] (metres in the bridge's frame) | broadside [T] (the Aquila-firing shot of the main viewscreen) | off");

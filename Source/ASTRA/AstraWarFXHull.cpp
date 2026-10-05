@@ -51,6 +51,10 @@ namespace AstraFx
 
 namespace
 {
+	// (named apart from AstraWarFXEvents.cpp's: the two files meet in one unity block)
+	const FLinearColor HullFxWhite(1.f, 0.97f, 0.9f);
+	const FLinearColor HullFxMetal(1.f, 0.7f, 0.32f);
+
 	/** The mesh a ship is drawn with (the Aquila's is the level's, not the battle's). */
 	FString FxMeshOf(const FAstraBattleShip& S)
 	{
@@ -405,6 +409,14 @@ void UAstraWarFX::HullEmitters(const FAstraBattleShip& S, FShipFx& Fx)
 	for (int32 sec = 0; sec < AstraWar::NumSections; ++sec)
 	{
 		const bool bGut = D.GuttedT[sec] >= 0.f;
+		if (bGut && !Fx.bGutSeen[sec])
+		{
+			Fx.bGutSeen[sec] = true;
+			if (D.GuttedT[sec] < 2.f && bNear)
+			{
+				GutBurst(S, sec);                                                 // (the moment it goes: not a ship that was already gutted when it came into view)
+			}
+		}
 		const bool bBurn = D.Burn[sec] > 0.f || bGut;
 		const bool bVent = D.Breach[sec] > 0.f;
 		if (!bBurn && !bVent)
@@ -473,6 +485,30 @@ void UAstraWarFX::HullEmitters(const FAstraBattleShip& S, FShipFx& Fx)
 			Explosion(Pt, S.Vel, S.Radius * FMath::FRandRange(0.07f, 0.16f), bAstra, 0.5f, 0.f);
 		}
 	}
+}
+
+void UAstraWarFX::GutBurst(const FAstraBattleShip& S, int32 Section)
+{
+	// The heart of a section goes (its structure reached zero): the plating over it is blown out. A hard flash, a ball of fire that breaks into billows, a ring spreading over the hull,
+	// plating thrown off in slabs, a spray of sparks, and the light of it on the ships near; what is left burns and vents for the rest of the ship's life (HullEmitters).
+	const bool bAstra = S.Side == EAstraSide::Astra;
+	const float R = FMath::Max(S.Radius, 40.f);
+	const float Bright = ASTRA_FX_TUNE("blast", 1.f);
+	const FVector Pt = HullPoint(S, Section, FMath::FRandRange(0.3f, 0.7f), FMath::FRandRange(-0.5f, 0.5f), FMath::RandBool() ? 1.f : FMath::FRandRange(-0.5f, 0.5f), true);
+	const FVector Out = (Pt - S.Pos).GetSafeNormal();
+	Explosion(Pt + Out * R * 0.03f, S.Vel, FMath::Clamp(R * 0.16f, 14.f, 90.f), bAstra, 1.1f, 0.f);
+	if (FPuff* W = AddPuff(Pt, S.Vel, 0.22f, 0.3f * R * 0.16f, R * 0.22f, HullFxWhite, ASTRA_FX_TUNE("cut_flash", 520.f) * 0.8f * Bright, LGlow))
+	{
+		W->P1 = 1.f;
+	}
+	Shockwave(Pt, S.Vel, R * 0.7f, 1.0f, FLinearColor(1.f, 0.72f, 0.42f), 0.03f);
+	SparkBurst(Pt, Out, 0.9f, 40, 40.f, 190.f, 0.8f, 2.6f, 14.f, HullFxMetal, 280.f, S.Vel);
+	const int32 Chunks = FMath::RoundToInt(10.f * FMath::Clamp(Density, 0.2f, 2.f));
+	for (int32 i = 0; i < Chunks; ++i)
+	{
+		AddDebris(Pt + Out * 4.f + FMath::VRand() * R * 0.04f, S.Vel + (Out + FMath::VRand() * 0.8f).GetSafeNormal() * FMath::FRandRange(20.f, 85.f), FMath::FRandRange(1.f, 3.4f), bAstra, FMath::FRandRange(9.f, 18.f));
+	}
+	AddLight(Pt, 0.7f, R * 3.f, ASTRA_FX_TUNE("light", 4000.f) * R * R * 0.6f, FLinearColor(1.f, 0.72f, 0.42f), S.Vel);
 }
 
 void UAstraWarFX::FleetFxRefresh(const FAstraBattleShip& S, FShipFx& Fx)
@@ -1119,6 +1155,19 @@ void UAstraWarFX::DrawDrives()
 				const float R = FMath::Max(S.Radius * 0.25f, 1.1f) * GlowK;
 				*X = FTransform(FQuat::Identity, F.ToWorld(Back), FVector(R * 2.f));
 				Fill(D, Core, 110.f * Intensity * (0.35f + 0.65f * Thrust), 0.f, 0.f, 0.f, (float)(S.Id & 255) / 255.f, R * 2.f, 0.f);
+			}
+			// and the streak of its exhaust, along its heading (a wing that turns hard draws arcs across the sky): where a dogfight is, near enough to be seen as more than a point
+			if (WakeGain > 0.f && Dist2 < FMath::Square(14000.0))
+			{
+				const float Len = FMath::Clamp(30.f + 260.f * Thrust, 30.f, 320.f);
+				const float Wd = FMath::Clamp(S.Radius * 0.28f, 0.8f, 2.6f);
+				const FVector Fwd = F.DirToWorld(S.Att.GetForwardVector());           // (to the nozzle: the bright end of the streak)
+				const FVector BackW = F.ToWorld(Back);
+				if (float* Dw = Tubes.Next(X))
+				{
+					*X = FTransform(FQuat::FindBetweenNormals(FVector::ZAxisVector, Fwd), BackW - Fwd * (Len * 50.0), FVector(Wd, Wd, Len));
+					Fill(Dw, Core, 85.f * Intensity * WakeGain * (0.3f + 0.7f * Thrust), 0.f, 5.f, 2.4f, (float)(S.Id & 255) / 255.f, Wd, Len);
+				}
 			}
 			continue;
 		}

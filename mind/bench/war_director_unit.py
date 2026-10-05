@@ -175,7 +175,7 @@ class DirectorTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.minds.allies["T-42"].name, "Lieutenant Commander Piet Haas")
         self.assertIn(self.voices[self.minds.allies["T-41"].key][1], dr.ALLY_VOICES["f"])
         self.assertIn(self.voices[self.minds.allies["T-42"].key][1], dr.ALLY_VOICES["m"])
-        self.assertEqual(self.minds.allies["T-41"].ship, "the vigilant ASN Resolute")
+        self.assertEqual(self.minds.allies["T-41"].ship, "the Vigilant-class ASN Resolute")
         self.assertEqual(self.said[0], ("admiral", "Due cacciatorpediniere in arrivo."))
 
     async def test_a_mandate_commander_calls_to_talk_and_the_numbers_do_not_change(self) -> None:
@@ -248,7 +248,7 @@ class DirectorTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([g["name"] for g in beat["groups"]], ["Third Carrier Group", "Styx Line Dorn"])
         self.assertNotIn("commander", beat)                                  # (the people are the mind's; the game gets the ships)
         self.assertEqual([(c, p["name"]) for c, p in self.registered], [("T-41", "Archon Mira Kade"), ("T-43", "Warden Ilse Dorn")])
-        self.assertEqual(self.registered[1][1]["ship"], "the styx Asphodel")
+        self.assertEqual(self.registered[1][1]["ship"], "the Styx-class Asphodel")
 
     async def test_reinforcements_in_groups_register_every_captain(self) -> None:
         self.ids_reply(3)

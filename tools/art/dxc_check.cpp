@@ -54,6 +54,7 @@ int main(int argc, char** argv)
 	Buf.Size = Src.size();
 	Buf.Encoding = DXC_CP_UTF8;
 	std::vector<std::wstring> Args = {L"-E", std::wstring(Entry.begin(), Entry.end()), L"-T", std::wstring(Profile.begin(), Profile.end()), L"-HV", L"2021"};
+	const bool bStats = getenv("DXC_STATS") != nullptr;                      // DXC_STATS=1: also print the size of the compiled shader (a rough proxy for what a pixel of it costs)
 	std::vector<LPCWSTR> Raw;
 	for (const std::wstring& A : Args)
 	{
@@ -78,6 +79,56 @@ int main(int argc, char** argv)
 	{
 		printf("COMPILE FAILED\n");
 		return 1;
+	}
+	if (bStats)
+	{
+		// instructions of the entry point as the disassembly lists them: the ones that assign a value or call an op; texture reads and the transcendental ops (sin, cos, exp, log, sqrt, rsqrt...) apart
+		IDxcBlob* Obj = nullptr;
+		Res->GetOutput(DXC_OUT_OBJECT, __uuidof(IDxcBlob), (void**)&Obj, nullptr);
+		IDxcResult* DisRes = nullptr;
+		IDxcBlobUtf8* Dis = nullptr;
+		if (Obj)
+		{
+			DxcBuffer ObjBuf;
+			ObjBuf.Ptr = Obj->GetBufferPointer();
+			ObjBuf.Size = Obj->GetBufferSize();
+			ObjBuf.Encoding = 0;
+			if (SUCCEEDED(Comp->Disassemble(&ObjBuf, __uuidof(IDxcResult), (void**)&DisRes)) && DisRes)
+			{
+				DisRes->GetOutput(DXC_OUT_DISASSEMBLY, __uuidof(IDxcBlobUtf8), (void**)&Dis, nullptr);
+			}
+		}
+		if (Dis && Dis->GetStringLength() > 0)
+		{
+			std::istringstream Lines(Dis->GetStringPointer());
+			std::string L;
+			int Instr = 0, Tex = 0, Unary = 0;
+			bool bBody = false;
+			while (std::getline(Lines, L))
+			{
+				if (L.rfind("define ", 0) == 0)
+				{
+					bBody = true;
+					continue;
+				}
+				if (!bBody)
+				{
+					continue;
+				}
+				if (!L.empty() && L[0] == '}')
+				{
+					bBody = false;
+					continue;
+				}
+				if (L.size() > 2 && L[0] == ' ' && L[1] == ' ' && (L[2] == '%' || L.compare(2, 4, "call") == 0 || L.compare(2, 2, "br") == 0 || L.compare(2, 3, "ret") == 0))
+				{
+					++Instr;
+					Tex += (L.find("dx.op.sample") != std::string::npos || L.find("dx.op.textureLoad") != std::string::npos) ? 1 : 0;
+					Unary += L.find("dx.op.unary") != std::string::npos ? 1 : 0;
+				}
+			}
+			printf("STATS instructions=%d texture=%d unary=%d\n", Instr, Tex, Unary);
+		}
 	}
 	printf("COMPILED\n");
 	return 0;

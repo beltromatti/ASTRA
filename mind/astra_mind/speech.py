@@ -68,7 +68,8 @@ REPORT_MAX_AGE_S = {Prio.URGENT: 30.0, Prio.NORMAL: 18.0}
 REPORT_LATE_S = 8.0             # (for the producers of report turns) an item older than this says how old it is: the officer judges it
 RETHINK_AFTER_S = 8.0           # a line with a rethink hook that has waited this long (or was cut off) is thought again before it is said
 RETHINK_TIMEOUT_S = 4.0         # ... a re-think that does not answer in this time lets the line go (declared: `rethink_timeout`)
-MAX_RESUMES = 3                 # a line is taken up again at most this many times (a line addressed to the Captain: MAX_RESUMES_ADDRESSED)
+MAX_RESUMES = 2                 # a line is taken up again at most this many times (a line addressed to the Captain: MAX_RESUMES_ADDRESSED); in a busy battle a report
+                                # cut three times was heard starting four times, 5 Oct
 MAX_RESUMES_ADDRESSED = 8
 SYNTH_RETRIES = 2               # a line addressed to the Captain whose voice could not be made is asked for again this many times, then he reads it (`notice`)
 
