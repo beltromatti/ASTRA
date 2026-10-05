@@ -601,8 +601,9 @@ void AAstraViewscreen::Direct(float Dt)
 	else if (const FContact* E = FindC(Cs, Engaged); E && E->Track >= 2)
 	{
 		Best = {EShot::Contact, E->ContactId, E->Label, TEXT("TARGET"), 4, 8.0, FVector::ZeroVector, {}};
-		const UAstraBattleSubsystem::FFireControl FC = B->GetFireControl();
-		const bool bFiring = FC.Target == E->ContactId && (FC.RailVolleys > 0 || FC.LaserShots > 0);
+		// (her guns have fired on it in the last seconds: a fire-control order that waits for a target out of reach is not firing)
+		const UAstraBattleSubsystem::FPlayerFireState PF = B->GetPlayerFireState();
+		const bool bFiring = PF.bFiringNow && PF.ShotTarget == E->ContactId;
 		if (Shot == EShot::Broadside && ShotId == E->ContactId && bFiring && Now < HoldUntil)
 		{
 			Best = {EShot::Broadside, E->ContactId, E->Label, TEXT("OPEN FIRE"), 4, 5.0, FVector::ZeroVector, {}};   // (held while she fires, for its few seconds)

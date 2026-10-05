@@ -88,7 +88,11 @@ struct FAstraBattleGroup
 	float StartStrength = 0.f, Strength = 0.f, EnemyStrength = 0.f;
 	float AlliedStrength = 0.f;      // the other groups of its side fighting within 30 km: it is not alone against what the enemy has in sight
 	int32 StartCount = 0;
-	float Morale = 1.f;
+	float Morale = 1.f;              // 1 fresh .. 0 at the point where it breaks (1 minus what it has lost over what it will bear for the balance it is in)
+	float EnemyEngaged = 0.f;        // the enemy strength whose guns reach it now (the rest is still coming)
+	float Losses = 0.f;              // the share of its starting strength it has lost (ships and the damage on the rest)
+	float BreakAt = 0.6f;            // the share of losses at which it would break off by its own judgement, for the balance it is in
+	float FightSince = -1.f;         // it has had an enemy at its guns since (-1: none)
 	float WeakSince = -1.f;          // the time the balance turned against it (a retreat needs it to last)
 	FVector Rally = FVector::ZeroVector;
 	float RegroupSince = 0.f;

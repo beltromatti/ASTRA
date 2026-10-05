@@ -1,0 +1,8 @@
+{
+  "_doc": "BATTAGLIA-3: a cruiser and a destroyer a side across 55 km, the Mandate's the ASTRA side turned half a circle: the middle size of fight, where a cruiser takes minutes to die. The result over seeds should be level; the measure is the length of the fire and the ranges.",
+  "mirror": true,
+  "astra": [
+    {"name": "Picket", "formation": "wedge", "at_km": [-27.5, 0, 0], "heading": 0, "spacing_km": 1.8, "objective_km": [0, 0, 0],
+     "ships": [{"class": "acheron", "n": 1}, {"class": "styx", "n": 1}]}
+  ]
+}

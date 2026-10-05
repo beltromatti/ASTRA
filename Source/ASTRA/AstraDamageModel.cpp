@@ -23,6 +23,7 @@ namespace
 	float GDmCaptain = 1.f;          // 1: the air and the fire can hurt the Captain
 	float GDmBurn = 1.f;             // the structure the fires eat
 	float GDmDoctrine = 1.f;         // 1: pressure bulkheads and lockdowns close by themselves
+	float GDmMist = 1.f;             // 1: the rooms that have anything to burn but no gas system have the sprinklers' mist (BATTAGLIA-3); 0: only the machinery and stores have fixed suppression
 
 	FAutoConsoleVariableRef DmCVarHole(TEXT("astra.damage.hole"), GDmHole, TEXT("DISTRUZIONE: scale of the holes a blow punches through the hull"));
 	FAutoConsoleVariableRef DmCVarFire(TEXT("astra.damage.fire"), GDmFire, TEXT("DISTRUZIONE: how readily blows start fires"));
@@ -36,6 +37,7 @@ namespace
 	FAutoConsoleVariableRef DmCVarCaptain(TEXT("astra.damage.captain"), GDmCaptain, TEXT("DISTRUZIONE: 1 the air, the smoke and the fire can hurt (and kill) the Captain, 0 they cannot"));
 	FAutoConsoleVariableRef DmCVarBurn(TEXT("astra.damage.burn"), GDmBurn, TEXT("DISTRUZIONE: scale of the hull structure the fires eat"));
 	FAutoConsoleVariableRef DmCVarDoctrine(TEXT("astra.damage.auto_seal"), GDmDoctrine, TEXT("DISTRUZIONE: 1 pressure bulkheads and lockdowns close by themselves, 0 they do not"));
+	FAutoConsoleVariableRef DmCVarMist(TEXT("astra.damage.mist"), GDmMist, TEXT("BATTAGLIA-3: 1 the cabins, messes and offices have the sprinklers' mist (fixed suppression a few seconds later than the gas), 0 only the machinery and stores do"));
 
 	constexpr float DmStep = 0.2f;                 // s: the physics' step (the Aquila's: FAstraDamageModel::StepS, which a fleet ship's inside sets longer)
 	constexpr float DmHoleMin = 0.12f;             // m2: a hole big enough to be an incident (the smaller ones are sealed by the plating itself)
@@ -58,6 +60,25 @@ namespace
 	float DmKillRadius(uint8 Type) { return Type == 1 ? 1.8f : (Type == 2 ? 3.4f : 2.4f); }     // m: how far from the path of a blow it kills (kinetic, energy, explosive)
 	float DmHurtRadius(uint8 Type) { return Type == 1 ? 3.5f : (Type == 2 ? 7.0f : 5.0f); }
 	FString DmSystemsOf(const FAstraDamageMap& Map, int32 Comp);
+
+	/** A room whose fire is news for the bridge: it holds the reactor, the coolant, the weapons, the ordnance, the engines or the sensors, or it is a magazine, Main Engineering or the bridge. The rest of the
+	 *  ship burning is routine: the incident list, the damage board and the log carry it, and the crew reads them at its next turn (BATTAGLIA-3: in 23 minutes of play 53 "the fire has spread" and 25 "the fire is
+	 *  out" each woke a turn of the crew). */
+	bool DmIsVital(const FAstraDmgComp& C, const FAstraDmgProfile& P)
+	{
+		if (P.bExplosive || C.Kind == TEXT("bridge") || C.Kind == TEXT("engineering"))
+		{
+			return true;
+		}
+		for (const EAstraDmgSystem S : {EAstraDmgSystem::Reactor, EAstraDmgSystem::Coolant, EAstraDmgSystem::Weapons, EAstraDmgSystem::Ordnance, EAstraDmgSystem::Sensors, EAstraDmgSystem::Engines})
+		{
+			if (C.Systems.Contains((uint8)S))
+			{
+				return true;
+			}
+		}
+		return false;
+	}
 }
 
 // ================================================================================================================== set up
@@ -1189,8 +1210,12 @@ void FAstraDamageModel::StepFire(float Dt)
 					}
 				}
 			}
-			// fixed suppression: it discharges once the fire has stood a while (the people have had their warning), if the room has power
-			if (P.bSuppress && !S.bSuppressSpent && S.Suppress <= 0.f && S.Fire > 0.35f && S.FireAge > 6.f && S.Power > 0.3f)
+			// fixed suppression: it discharges once the fire has stood a while (the people have had their warning), if the room has power. The machinery and the stores have
+			// a gas system; the rest of the ship that has anything to burn (the cabins, the messes, the offices) has the sprinklers' mist, which comes a few seconds later and works the
+			// same way (BATTAGLIA-3: a ship in a long fight is lit in dozens of rooms, and four teams cannot walk to every one: the ship's own systems carry what they can); the
+			// corridors and shafts are bare and starve by themselves. A room is armed again when it has been calm a moment (it leaves the books).
+			const bool bMist = GDmMist > 0.5f && !P.bSuppress && P.Fuel >= 60.f;
+			if ((P.bSuppress || bMist) && !S.bSuppressSpent && S.Suppress <= 0.f && S.Fire > 0.35f && S.FireAge > (bMist ? 10.f : 6.f) && S.Power > 0.3f)
 			{
 				S.Suppress = 22.f;
 				S.bSuppressSpent = true;
@@ -1267,7 +1292,7 @@ void FAstraDamageModel::StepFire(float Dt)
 				if (Clock - Told > (CB.bCorridor ? 30.f : 4.f))
 				{
 					Told = Clock;
-					Report(FString::Printf(TEXT("damage report: the fire has spread to %s"), *Say(Sd.Comp)), true);
+					Report(FString::Printf(TEXT("damage report: the fire has spread to %s"), *Say(Sd.Comp)), DmIsVital(CB, Map->ProfileOf(Sd.Comp)));   // (told to the crew only where it matters: a system, a magazine, the bridge)
 				}
 			}
 		}
@@ -1534,7 +1559,7 @@ void FAstraDamageModel::StepPeople(float Dt)
 			if (Wounded) { Text += FString::Printf(TEXT(", %d wounded getting out"), Wounded); }
 			if (Rescued) { Text += FString::Printf(TEXT(", %d carried out alive"), Rescued); }
 			if (S->TeamT > 0.f) { Text += TEXT("; the damage-control team is there"); }
-			Report(Text, true);
+			Report(Text, Killed > 0 || Wounded + Rescued >= 3);          // (the dead and a handful hurt call the crew; one or two wounded getting out are in the log)
 		}
 	}
 }
@@ -1702,7 +1727,9 @@ void FAstraDamageModel::CloseIncident(FAstraDamage& D, const TCHAR* How)
 	const TCHAR* Done = Kind == 1 ? TEXT("is out") : (Kind == 0 ? TEXT("is sealed") : TEXT("is repaired, power restored"));
 	if (D.Team >= 0)
 	{
-		Report(FString::Printf(TEXT("damage control: the %s at %s %s (team %d free again)"), *D.Kind, *D.Where(), Done, D.Team + 1), Kind != 2);
+		// a breach sealed is news (the air stops going); a fire out only where the fire mattered (a system, a magazine, the bridge); a conduit mended is in the log
+		const bool bVital = Kind == 1 && Map.IsValid() && Map->Comps.IsValidIndex(D.Comp) && DmIsVital(Map->Comps[D.Comp], Map->ProfileOf(D.Comp));
+		Report(FString::Printf(TEXT("damage control: the %s at %s %s (team %d free again)"), *D.Kind, *D.Where(), Done, D.Team + 1), Kind == 0 || bVital);
 	}
 	else if (Kind == 1)
 	{

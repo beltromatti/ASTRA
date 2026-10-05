@@ -104,14 +104,14 @@ def _build() -> dict[str, Station]:
           "speed_pct 0", (P("heading_deg", NUM, "true bearing in the system plane, 0-359.99", lo=0, hi=359.99),
                           P("mark_deg", NUM, "pitch, -90..90", lo=-90, hi=90), _speed()), "order", "captain"),
         m("helm", "course", "intercept", "close on a contact and hold the standoff range, broadside inside it; the course follows the target",
-          (_target(), P("standoff_km", NUM, "range to hold: railguns reach 10 km, lasers 4 km", lo=0.5, hi=40, default=6), _speed()),
+          (_target(), P("standoff_km", NUM, "range to hold: the Aquila's band is 18-30 km (her railguns reach 45 km, a Styx's 28, lasers 6.5-9); 15-20 to cut off a ship that runs", lo=0.5, hi=45, default=22), _speed()),
           "target_lost", "engaged"),
         m("helm", "course", "keep_on_bow", "keep the bow on the target: the Captain sees it through the window; with target `action` the bow "
           "follows the fight from one target to the next by itself, and waits when there is none. It turns the ship; with standoff_km the "
           "console also holds that range by itself (closes, slows in time, matches the target's run, stops if it closes inside); "
           "otherwise her speed stays as it is unless speed_pct is given in the same order (pointing at an enemy at cruise speed "
           "closes on it and runs past)",
-          (_action_target(), _speed(), P("standoff_km", NUM, "range to hold: railguns reach 10 km, lasers 4 km", lo=0.5, hi=40)),
+          (_action_target(), _speed(), P("standoff_km", NUM, "range to hold: the Aquila's band is 18-30 km (her railguns reach 45 km, a Styx's 28, lasers 6.5-9)", lo=0.5, hi=45)),
           "target_lost"),
         m("helm", "course", "follow", "shadow a ship at a distance and on a side of it",
           (_target(), P("distance_km", NUM, "distance to keep", lo=0.3, hi=40, default=2),

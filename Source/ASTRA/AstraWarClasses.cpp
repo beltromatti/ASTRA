@@ -124,6 +124,12 @@ namespace AstraWar
 					C.LaserDamage = (float)NumField(*L, TEXT("damage"), C.LaserDamage);
 					C.LaserCd = (float)NumField(*L, TEXT("cd"), C.LaserCd);
 					C.LaserRange = (float)NumField(*L, TEXT("range"), C.LaserRange);
+					C.LaserFalloff = (float)NumField(*L, TEXT("falloff"), C.LaserFalloff);
+				}
+				if (const TSharedPtr<FJsonObject>* Gn = nullptr; O->TryGetObjectField(TEXT("gunnery"), Gn))
+				{
+					C.TrackMrad = (float)NumField(*Gn, TEXT("track_mrad"), C.TrackMrad);
+					C.DispMrad = (float)NumField(*Gn, TEXT("disp_mrad"), C.DispMrad);
 				}
 				if (const TSharedPtr<FJsonObject>* P = nullptr; O->TryGetObjectField(TEXT("pd"), P))
 				{

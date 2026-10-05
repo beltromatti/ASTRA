@@ -37,8 +37,8 @@ SHIP_TOOLS: list[dict[str, Any]] = [
     _fn("intercept", "Helm: continuous intercept of a contact — the course follows it; at the standoff range the ship "
                      "turns broadside (all turrets bear) and holds that range. A set_course cancels it.", {
         "contact_id": {"type": "string"},
-        "standoff_km": {"type": "number", "minimum": 1, "maximum": 30,
-                        "description": "range to hold: railguns reach 10 km, lasers 4 km"}}, ["contact_id", "standoff_km"]),
+        "standoff_km": {"type": "number", "minimum": 1, "maximum": 45,
+                        "description": "range to hold: the Aquila's band is 18-30 km (her railguns reach 45 km, a Styx's 28, lasers 6.5-9); 15-20 to cut off a ship that runs"}}, ["contact_id", "standoff_km"]),
     _fn("transit_gate", "Helm: take the Aquila through the system's Janus Gate to another star system. The helm flies at "
                         "full ahead to the gate's approach lane (see janus_gate in the state for where it is), then the "
                         "gate's field takes the ship and draws her through the ring: once in the lane there is no turning "
@@ -62,7 +62,7 @@ SHIP_TOOLS: list[dict[str, Any]] = [
         "percent": {"type": "number", "minimum": 0, "maximum": 150}}, ["system", "percent"]),
     _fn("set_target", "Tactical: designate the current target (a contact id from the state).", {
         "contact_id": {"type": "string"}}, ["contact_id"]),
-    _fn("fire_weapons", "Tactical: engage a contact with a weapon group (it needs a track: never a bearing-only contact — except missiles at a jammer). Railguns (range 10 km) and lasers (4 km) fire "
+    _fn("fire_weapons", "Tactical: engage a contact with a weapon group (it needs a track: never a bearing-only contact — except missiles at a jammer). Railguns (range 45 km; the farther, the fewer rounds strike) and lasers (6.5-9 km) fire "
                         "`salvo` volleys at their cadence (railguns one volley every 7 s; 12 = sustained fire, about 1.5 "
                         "minutes); if the target is still beyond range they stay assigned and open fire by themselves "
                         "once it closes. Missiles (25 km) launch `salvo` missiles at once (max 8; the VLS then cycles 14 s); at a "

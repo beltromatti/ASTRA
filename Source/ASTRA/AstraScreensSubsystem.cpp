@@ -903,18 +903,21 @@ void UAstraScreensSubsystem::DrawTactical(UCanvas* C, int32 W, int32 H)
 	const int32 Hostiles = Pc.HostileShips + Pc.HostileCraft;
 	struct FCell { FString K, V, S; FLinearColor Col; };
 	TArray<FCell> Cells;
+	// the reach is the war's own (classes.json, BATTAGLIA-3: rails to 45 km, lasers to 9), and «firing» is a gun that fired in the last seconds
+	const UAstraBattleSubsystem::FWeaponRanges Reach = Battle->GetWeaponRanges();
+	const UAstraBattleSubsystem::FPlayerFireState PF = Battle->GetPlayerFireState();
 	if (F.RailVolleys > 0 && !F.Target.IsEmpty())
 	{
-		const bool bIn = F.TargetRangeKm <= 10.f;
-		Cells.Add({TEXT("RAILGUNS"), bIn ? TEXT("ENGAGING") : TEXT("ASSIGNED"),
+		const bool bIn = F.TargetRangeKm <= Reach.RailKm;
+		Cells.Add({TEXT("RAILGUNS"), bIn ? (PF.bFiringNow ? TEXT("FIRING") : TEXT("ENGAGING")) : TEXT("ASSIGNED"),
 		           bIn ? FString::Printf(TEXT("%s · %d VOLLEYS · NEXT %.0f S"), *F.Target, F.RailVolleys, F.RailNext)
-		               : FString::Printf(TEXT("%s AT %.0f KM · OPEN AT 10"), *F.Target, F.TargetRangeKm), bIn ? RED : AMBER});
+		               : FString::Printf(TEXT("%s AT %.0f KM · OPEN AT %.0f"), *F.Target, F.TargetRangeKm, Reach.RailKm), bIn ? RED : AMBER});
 	}
 	else
 	{
-		Cells.Add({TEXT("RAILGUNS"), TEXT("READY"), TEXT("4 TWIN TURRETS · 10 KM"), GREEN});
+		Cells.Add({TEXT("RAILGUNS"), TEXT("READY"), FString::Printf(TEXT("6 TURRETS · %.0f KM"), Reach.RailKm), GREEN});
 	}
-	Cells.Add({TEXT("LASERS"), F.LaserShots > 0 ? TEXT("FIRING") : TEXT("ONLINE"), TEXT("12 BATTERIES · 4 KM"), F.LaserShots > 0 ? RED : GREEN});
+	Cells.Add({TEXT("LASERS"), F.LaserShots > 0 ? TEXT("FIRING") : TEXT("ONLINE"), FString::Printf(TEXT("6 BATTERIES · %.1f KM"), Reach.LaserKm), F.LaserShots > 0 ? RED : GREEN});
 	Cells.Add({TEXT("VLS"), FString::FromInt(F.Missiles), F.MissileCycle > 0.f ? FString::Printf(TEXT("CYCLING · %.0f S"), F.MissileCycle) : TEXT("READY · 8 PER SALVO"),
 	           F.MissileCycle > 0.f ? AMBER : CYAN});
 	Cells.Add({TEXT("IN FLIGHT"), FString::FromInt(F.OursInFlight), TEXT("OUR MISSILES"), F.OursInFlight ? CYAN : DIM});

@@ -132,7 +132,7 @@ class ToolsTest(unittest.TestCase):
         self.assertIsNone(cmd)
         self.assertIn("target", err)
         cmd, err = S.normalize({"station": "helm", "mode": "intercept", "params": {"target": "T-23", "standoff_km": 900}})
-        self.assertEqual(cmd["params"]["standoff_km"], 40)               # clamped
+        self.assertEqual(cmd["params"]["standoff_km"], 45)               # clamped (the rails reach 45 km since BATTAGLIA-3)
         cmd, err = S.normalize({"station": "tactical", "mode": "engagement.engage", "params": {"targets": "T-23"}})
         self.assertEqual(cmd["mode"], "engage")
         self.assertEqual(cmd["params"]["targets"], ["T-23"])

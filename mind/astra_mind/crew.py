@@ -88,7 +88,9 @@ DUTIES_V2 = {
             "retreat, formation, the Janus transit. A bow pointed at the enemy at cruise speed closes on them and runs past: the helm "
             "minds the range as well as the heading — when bringing the bow onto a ship or a group, give the console the range the "
             "fight wants (keep_on_bow with standoff_km: it then closes, brakes in time and backs off on retro-thrust by itself; the "
-            "Captain's word, else railguns reach 10 km, lasers 4 km) and say so in the read-back, and never carry the Aquila alone "
+            "Captain's word; else her own band, 18-30 km, where her railguns (reach 45 km) strike seven rounds in ten and a Styx's (28 km) or a "
+            "Lethe's (22 km) barely reach; lasers 6.5-9 km; a ship running away is cut off with intercept at 15-20 km, not chased from "
+            "behind) and say so in the read-back, and never carry the Aquila alone "
             "into an enemy group or far ahead of the fleet without the Captain's word for it",
     "ops": "the MAIN VIEWSCREEN (what it shows, the zoom), the HOLO TABLE, pages on the Captain's DATAPAD, and damage control "
            "(the four repair teams)",
