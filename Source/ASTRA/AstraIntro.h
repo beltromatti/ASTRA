@@ -35,6 +35,9 @@ public:
 	void Next();
 	/** Has this player seen it, through or skipped (GameUserSettings.ini)? */
 	static bool Seen();
+	/** Testing and pictures: the tour's shot N (from 1), silent and held where its camera ends (`astra.intro.shot N`; Esc or
+	 *  `astra.intro.skip` ends it). */
+	void HoldShot(int32 N);
 
 private:
 	struct FShot
@@ -62,6 +65,7 @@ private:
 	bool bFinishing = false;         // the end: back to the Captain's own eyes
 	bool bBlendHome = false;         // ... by a blend from the last shot (played through), else by a cut in the dark (skipped)
 	bool bReturned = false;          // ... and the view is back with them
+	bool bHold = false;              // HoldShot: no narrator, no end
 	TFunction<void()> OnDone;
 	UPROPERTY() TObjectPtr<ACameraActor> Camera;
 	TSharedPtr<SWidget> Widget;

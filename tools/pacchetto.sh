@@ -19,7 +19,7 @@ rm -rf "$OUT/Mac"          # (only our own build output: a previous app must not
   # (-WaitMutex: a support agent's build in its worktree holds UBT's mutex; without it UAT fails at once, "SDK not found".
   #  -nocompileeditor: UAT's own editor build ignores -ubtargs and fails the same way; the editor is built first with tools/ricompila.sh)
 if ! grep -q "BUILD SUCCESSFUL" "$LOG"; then echo "PACCHETTO FALLITO (log: $LOG)"; grep -E "Error|error:" "$LOG" | head -20; exit 1; fi
-APP=$(find "$OUT" -maxdepth 3 -name "*.app" -type d | head -1)
+APP=$(find "$OUT/Mac" -maxdepth 2 -name "*.app" -type d | head -1)     # (this build's own: Packaged/Release holds the last release's)
 [[ -z "$APP" ]] && { echo "app non trovata in $OUT"; exit 1; }
 # la mente: solo i sorgenti (il suo ambiente Python nasce al primo avvio in Application Support, con uv) e l'helper del
 # riconoscimento del parlato (Parakeet sul Neural Engine: mind/stt_server/bin/astra-stt, compilato qui se manca; la sua

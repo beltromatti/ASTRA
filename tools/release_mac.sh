@@ -44,6 +44,7 @@ if (( ! SKIP_BUILD )); then
 fi
 SRC=$(find Packaged/Mac -maxdepth 2 -name "*.app" -type d | head -1)
 [[ -d "$SRC" ]] || fail "no app in Packaged/Mac"
+[[ -f "$SRC/Contents/Resources/mind/pyproject.toml" && -d "$SRC/Contents/Resources/mind/astra_mind" ]] || fail "the crew's mind is not inside $SRC"
 APP="$OUT/ASTRA.app"
 rm -rf "$APP"
 ditto "$SRC" "$APP"

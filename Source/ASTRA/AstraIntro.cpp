@@ -260,6 +260,14 @@ namespace
 				I->Next();
 			}
 		}));
+	FAutoConsoleCommandWithWorldAndArgs CmdIntroShot(TEXT("astra.intro.shot"), TEXT("Testing and pictures: hold the introduction's shot N (from 1), silent"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* World)
+		{
+			if (UAstraIntroSubsystem* I = World ? World->GetSubsystem<UAstraIntroSubsystem>() : nullptr; I && A.Num())
+			{
+				I->HoldShot(FCString::Atoi(*A[0]));
+			}
+		}));
 	FAutoConsoleCommandWithWorld CmdIntroSkip(TEXT("astra.intro.skip"), TEXT("Testing: skip the introduction (Esc)"),
 		FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* World)
 		{
@@ -564,7 +572,7 @@ void UAstraIntroSubsystem::Play(TFunction<void()> Done)
 	}
 	OnDone = MoveTemp(Done);
 	bPlaying = true;
-	bFinishing = bLeaving = bNarrated = bVoiceHeard = bNextWanted = bSkipWanted = bReturned = false;
+	bFinishing = bLeaving = bNarrated = bVoiceHeard = bNextWanted = bSkipWanted = bReturned = bHold = false;
 	FActorSpawnParameters SP;
 	SP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	SP.ObjectFlags |= RF_Transient;
@@ -661,7 +669,7 @@ void UAstraIntroSubsystem::Begin(int32 I)
 	{
 		Caption->SetText(FText::FromString(Text));
 	}
-	if (UAstraMindSubsystem* Mind = GetMind(); Mind && Mind->IsConnected())
+	if (UAstraMindSubsystem* Mind = GetMind(); Mind && Mind->IsConnected() && !bHold)
 	{
 		Mind->Narrate(Text, AstraIntro::LangOf());
 		bNarrated = true;
@@ -679,6 +687,26 @@ void UAstraIntroSubsystem::Begin(int32 I)
 	}
 	BlackWant = 0.f;
 	UE_LOG(LogASTRA, Log, TEXT("[Intro] shot %d/%d: line %d"), I + 1, Shots.Num(), S.Line);
+}
+
+void UAstraIntroSubsystem::HoldShot(int32 N)
+{
+	if (!bPlaying)
+	{
+		Play([]() {});
+	}
+	if (!bPlaying || bFinishing || !Shots.IsValidIndex(N - 1))
+	{
+		return;
+	}
+	if (UAstraMindSubsystem* Mind = GetMind(); Mind && bNarrated)
+	{
+		Mind->StopNarration();
+	}
+	bHold = true;
+	Index = N - 2;                   // (the next shot, in the dark, is N)
+	bLeaving = true;
+	BlackWant = 1.f;
 }
 
 void UAstraIntroSubsystem::Next()
@@ -806,6 +834,10 @@ void UAstraIntroSubsystem::Tick(float DeltaTime)
 	{
 		bDone = T > ReadSeconds(S.Line);
 	}
+	if (bHold)
+	{
+		return;
+	}
 	if (bDone || T > 40.f)
 	{
 		if (Index == Shots.Num() - 1)
@@ -857,7 +889,7 @@ void UAstraIntroSubsystem::Teardown(bool bWorldGoing)
 	Shade.Reset();
 	Bars.Reset();
 	const bool bWas = bPlaying;
-	bPlaying = bFinishing = bLeaving = false;
+	bPlaying = bFinishing = bLeaving = bHold = false;
 	if (W && bWas && !bWorldGoing)
 	{
 		if (AASTRAPlayerController* APC = Cast<AASTRAPlayerController>(UGameplayStatics::GetPlayerController(W, 0)))
