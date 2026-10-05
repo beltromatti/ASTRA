@@ -95,16 +95,18 @@ dal cannone al bersaglio.
 | `Source/ASTRA/AstraWarFXHull.cpp` | tabella per nave, punti sullo scafo, la bocca dei cannoni, i segni di danno, fuochi e sfiati, spegnimento, pezzi, scudi, motori |
 | `Source/ASTRA/AstraWarFXTest.cpp` | i comandi `astra.fx.*` (anche `series`, `cam`, `reset`: §12) |
 | `Source/ASTRA/AstraWarFXData.inl` | **generato**: campane dei motori, pezzi e facce di taglio per ogni nave (non si modifica a mano) |
+| `Source/ASTRA/AstraWarFXSurface.inl` | **generato** (VFX-2): la pelle di ogni scafo capitale vista dalle sei facce del suo box (§9bis): dove stanno davvero lampi, fuochi, braci e segni |
 | `tools/ue_scripts/make_war_fx.py` | i materiali e le texture nell'editor |
 | `tools/ue_scripts/war_fx_hlsl.py` | gli shader (testo semplice, uno per Custom node) |
 | `tools/art/war_fx_textures.py` | i flipbook del fuoco e del fumo (`art/_cache/fx`, non in git) e le anteprime |
-| `tools/art/war_fx_nozzles.py`, `war_fx_data.py` | le campane dei motori (Blender, dai generatori delle navi: `data/war/fx_nozzles.json`) e la tabella C++ |
+| `tools/art/war_fx_nozzles.py`, `war_fx_hull_surface.py`, `war_fx_data.py` | le campane dei motori (`data/war/fx_nozzles.json`) e la pelle degli scafi (`data/war/fx_hull_surface.json`), tutte e due da Blender con i generatori delle navi; `war_fx_data.py` scrive le due tabelle C++ |
 | `tools/art/war_fx_shader_preview.py`, `war_fx_hlsl_check.py` + `dxc_check.cpp`, `war_fx_script_check.py` | le prove offline del §2 |
 | `tools/art/war_fx_view_angles.py` | dardo, fascio e scia visti da 90° a 0° (vecchio contro nuovo): la prova del §2bis |
 | `docs/progressi/vfx/vfx2_*.png` | le catture dal gioco di prova di VFX-2 (salve, missili, battaglia, reattore, rottura) |
 
-La tabella per nave si rigenera solo quando cambia uno scafo: `blender -b --factory-startup -P tools/art/war_fx_nozzles.py`
-e poi `python3 tools/art/war_fx_data.py` (il manifesto delle sezioni `art/export/ships_v3/manifest.json` non è in git).
+Le tabelle per nave si rigenerano solo quando cambia uno scafo (i generatori `art/blender/ship3_*.py`): `blender -b --factory-startup --python-exit-code 1 -P tools/art/war_fx_nozzles.py`
+(le campane), `blender -b --factory-startup --python-exit-code 1 -P tools/art/war_fx_hull_surface.py` (la pelle: un minuto per tutte le navi, nessuna esportazione) e poi `python3 tools/art/war_fx_data.py` (il manifesto delle sezioni
+`art/export/ships_v3/manifest.json` non è nel repository: si passa con `--manifest` dal checkout principale), poi si ricompila. Non c'è nulla da reimportare nell'editor: sono tabelle compilate nel gioco.
 
 ## 4. I livelli, i materiali, i dati per istanza
 
@@ -189,7 +191,9 @@ reattore dell'Aquila: cambiano raggio e potenza):
 
 Tutte le intensità e le durate di una esplosione si cambiano **a gioco acceso** con `astra.war.tune fx_<nome> <valore>` (la tabella di taratura della guerra, senza compilare):
 `fx_blast` (1: tutto insieme), `fx_flash` (420), `fx_fire` (85), `fx_halo` (12), `fx_smoke` (45), `fx_wave` (90), `fx_light` (4000: candele per R²), `fx_reactor_flash` (380),
-`fx_reactor_light` (4e9), `fx_cut_flash` (520: il lampo al taglio di una rottura), `fx_break_light` (1e9), `fx_laser` (240: il fascio laser, vale per i fasci nuovi). I valori scritti qui sono quelli di serie.
+`fx_reactor_light` (4e9), `fx_cut_flash` (520: il lampo al taglio di una rottura), `fx_break_light` (1e9), `fx_laser` (240: il fascio laser, vale per i fasci nuovi), `fx_far` (1: la crescita con la distanza delle morti lontane), `fx_wound`, `fx_wound_size`, `fx_wound_cool` (la brace-ferita, §9). I valori scritti qui sono quelli di serie.
+
+**Le morti lontane crescono con la distanza** (VFX-2, dopo la prova del lead: da 23–37 km lo schermo principale mostrava poco): a una nave che muore oltre i 10 km il raggio di tutto lo scoppio (palla di fuoco, lampo, onda, scoppi minori) si moltiplica per `1 + clamp((km − 10) / 15, 0, 1,5)`: uguale fino a 10 km, doppio a 25, due e mezzo da 32 km in su (una misura da artista, non da fisico). `astra.war.tune fx_far 0` la toglie. `GetBlasts` dà il raggio già moltiplicato, quindi la regia che lo usa inquadra quello che si vede davvero.
 
 **La sezione che va a zero** (`GutBurst`, quando `GuttedT` diventa 0): lo scoppio del suo cuore, il rivestimento che salta: un lampo, una palla di fuoco, un anello sullo scafo, dieci lastre di rivestimento e una pioggia di scintille, una luce. Poi brucia e sfiata (sotto).
 
@@ -229,6 +233,14 @@ laser → bruciatura/fusione (`Burn`, `Melt`); cannone → raffica (`Strafe`); m
 sullo scafo supera 90, `Blast`); rotaie → strappo, impatto, solco (`Torn` oltre 70, `Impact`, `Gouge`). Il decal parte con la brace
 (`Heat` 1) che si spegne in meno di un minuto. **Tetti**: 8 + 4 × classe per nave (il più vecchio di quello scafo se ne va), 150 in
 tutto, al massimo 3 per frame, e solo per i colpi che hanno passato scudo e corazza (`Felt > 8`).
+
+**La brace-ferita** (VFX-2): un decal è una chiazza scura, e a 20 km nessuno la vede. Ogni colpo che lascia il segno (`Felt > 8`) lascia anche **un bagliore sullo scafo, nel punto colpito, nel riferimento della nave** (segue la nave se ruota): un livello dei bagliori, bianco-arancio quando è fresco e rosso scuro quando si raffredda, in circa 45 s, fino a dodici per scafo (il più vecchio cede). È un primitivo dell'attore degli effetti, quindi lo schermo principale lo disegna come ogni altro bagliore. Manopole: `astra.war.tune fx_wound` (intensità, 40), `fx_wound_size` (1), `fx_wound_cool` (45 s).
+
+## 9bis. I colpi stanno sullo scafo, non sul piano del box (VFX-2)
+
+La simulazione conosce una nave come un box (docs/GUERRA.md): un colpo cade su una delle sue sei facce, un fuoco nasce su una sua superficie. La mesh non è il box: l'Acheron è alto 149 m con la torre, il box ha la stessa altezza ma è centrato a zero mentre lo scafo va da −57 a +92 m, e il ponte sta quaranta metri sotto il piano alto del box. Fino a VFX-2 lampi, fuochi, braci e decal stavano sul piano del box, quindi **galleggiavano sopra la nave** (visto il 5/10 nel feed dello schermo principale: esplosioni e fuochi dei colpi sospesi sopra l'Acheron). Ora `tools/art/war_fx_hull_surface.py` costruisce ogni nave con i generatori (Blender, quasi senza dettaglio sparso) e, dai vertici dello scafo, registra per ognuna delle sei facce una griglia grossolana di dove sta la pelle (48×16 celle: alto e basso su (x, y) → z, destra e sinistra su (x, z) → y, prua e poppa su (y, z) → x; ogni cella tiene un percentile alto dei suoi vertici, così un'antenna non fa una cella alta quanto l'antenna). `AstraWarFXSurface.inl` la porta nel gioco e `SnapToHull` ci appoggia i punti: il range del box su ogni asse è steso sul range della mesh (il box è centrato, la mesh no) e la coordinata lungo la normale della faccia diventa quella della pelle, più 0,4 m.
+
+Dove si usa: **`OnHit`** (il lampo, le scintille, l'esplosione, la brace-ferita e il decal di un colpo vanno dove sta la pelle; l'increspatura dello scudo resta dov'è, perché lo scudo è un guscio intorno al box), **`HullPoint`** quando il punto è di superficie (fuochi, sfiati, `GutBurst`), **`AddScar`** (un decal già sulla pelle non deve più "cercare" lo scafo: 40 m di profondità invece di fino a 240). Non toccati: la bocca dei cannoni (`MuzzleOf`, viene dagli affusti), la fine dei fasci laser sul bersaglio, i fuochi dei piani interni delle navi con un interno (`FleetFxPoint`), i punti interni al box (`bSurface` falso: scoppi dentro lo scafo). I fuochi di uno scafo si staccano e salgono (dorso) o scendono (chiglia) di qualche decina di metri nei loro secondi di vita: è il fuoco che esce, non un difetto.
 
 ## 10. I motori e le luci
 
