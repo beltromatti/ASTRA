@@ -191,6 +191,11 @@ def cmd_launch(a: argparse.Namespace) -> None:
                 "-astra_campaign=continue" if a.cont else "-astra_campaign=new"]
     if a.nomind:
         args.append("-astra_nomind")
+    elif sys.platform != "win32":
+        # the mind outlives the game (the next game connects to it): a mind started before the last change to its code would play the old code (5 Oct: a
+        # playtest of new prompts ran on a mind started half an hour before them); the game starts a fresh one
+        subprocess.run(["pkill", "-f", "astra-mind"], check=False)
+        time.sleep(1.0)
     # someone may be using the Mac (5 Oct: the test window took the focus and the user's typing walked the Captain off the bridge): no splash (it brings
     # the app to the front), the game ignores the Mac's keyboard and mouse (AstraHarness: -astra_harness_input lets them through), and the app in front
     # is given the focus back once the game is up

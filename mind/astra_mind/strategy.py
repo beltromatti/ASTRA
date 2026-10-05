@@ -147,9 +147,11 @@ NO_CHANGE = _fn("no_change", "You have read the picture and nothing needs changi
                              "instead of inventing an order.", {"reason": {"type": "string"}}, ["reason"])
 
 TELL_CAPTAIN = _fn("tell_captain", "Rourke speaks to the Captain of the ASN Aquila over the fleet net: radio speech, one to three short sentences, in the Captain's language (names in "
-                                   "English): what the Captain must know that he does not (a force seen, a Gate cycling, what Fleet is doing), an answer to what he said, a "
-                                   "decision. He hears you while he fights: say a thing once and briefly; what your log shows you already told him you do not say again "
-                                   "unless it has changed. Speak when it helps him, not to fill the net.", {
+                                   "English): what only Fleet command can tell him (what Fleet is doing and means to do, an order, a decision, what Fleet knows that his "
+                                   "sensors cannot), or an answer to what he said. The news on the fleet net (a Gate cycling, a force coming through, a battle's end) reaches "
+                                   "his bridge by itself, his Communications officer tells him: never repeat it, add what Fleet will do about it. He hears you while he "
+                                   "fights: say a thing once and briefly; what your log shows you already told him you do not say again unless it has changed. Speak when "
+                                   "it helps him, not to fill the net.", {
     "text": {"type": "string"}, "tone": {"type": "string", "enum": ["calm", "measured", "dry", "grave", "warm", "urgent"]}}, ["text"])
 
 TASK_AQUILA = _fn("task_aquila", "Fleet's order to the Aquila to GO somewhere else and what for (not for what she does where she is: for that, tell the Captain). It is an order of the "
