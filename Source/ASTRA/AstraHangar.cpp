@@ -230,6 +230,31 @@ float AAstraHangar::CatapultExitSpeed(float Seconds) const
 	return 2.f * ((TubeEndX + 300.f) - CradleX) / 100.f / FMath::Max(0.1f, Seconds);
 }
 
+bool AAstraHangar::GetAlphaView(FVector& OutCenter, FVector& OutAlong, FVector& OutAcross) const
+{
+	const TArray<FParked>* Alpha = Parked.Find(TEXT("alpha"));
+	FVector Sum = FVector::ZeroVector;
+	int32 N = 0;
+	for (const FParked& P : Alpha ? *Alpha : TArray<FParked>())
+	{
+		if (P.Actor && !P.bAway)
+		{
+			Sum += P.Home.GetLocation();
+			++N;
+		}
+	}
+	if (N == 0)
+	{
+		return false;
+	}
+	OutCenter = Sum / N;
+	const FTransform Me = GetActorTransform();
+	OutAlong = Me.GetUnitAxis(EAxis::X);
+	const double Y = Me.InverseTransformPosition(OutCenter).Y;
+	OutAcross = Me.GetUnitAxis(EAxis::Y) * (Y > 0.0 ? -1.0 : 1.0);
+	return true;
+}
+
 FTransform AAstraHangar::DeckSpot() const
 {
 	return FTransform(GetActorRotation(), GetActorTransform().TransformPosition(FVector(2800.f, -1150.f, 100.f)));
@@ -242,7 +267,7 @@ void AAstraHangar::Tick(float DeltaTime)
 	if ((CheckT -= DeltaTime) <= 0.f)
 	{
 		CheckT = 0.25f;
-		SetZoneLights(IsPawnInHangar(UGameplayStatics::GetPlayerPawn(this, 0)));
+		SetZoneLights(bShowcase || IsPawnInHangar(UGameplayStatics::GetPlayerPawn(this, 0)));
 		const APawn* Me = UGameplayStatics::GetPlayerPawn(this, 0);
 		auto Zone = [](TArray<TObjectPtr<ALight>>& Lights, bool& bOnNow, bool bIn) -> bool   // true: the Captain just came in
 		{

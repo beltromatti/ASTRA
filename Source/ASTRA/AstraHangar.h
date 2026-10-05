@@ -63,6 +63,11 @@ public:
 	/** Where the Captain stands after climbing down (beside Alpha's bays, facing the tubes). */
 	FTransform DeckSpot() const;
 	bool IsPawnInHangar(const APawn* Pawn) const;
+	/** The introduction's look at the flight deck (AstraIntro.cpp): its lights on as if the Captain were down there. */
+	void Showcase(bool bOn) { bShowcase = bOn; CheckT = 0.f; }
+	/** Where Alpha's Falcons wait in their bays (world cm, their middle), the deck's length axis and the way across it from the bays to the
+	 *  middle of the deck. False when none is home. */
+	bool GetAlphaView(FVector& OutCenter, FVector& OutAlong, FVector& OutAcross) const;
 
 private:
 	struct FParked
@@ -84,6 +89,7 @@ private:
 	bool bMedLightsOn = true;
 	UPROPERTY() TObjectPtr<USoundBase> CatapultSound;
 	bool bLightsOn = true;
+	bool bShowcase = false;
 	float CheckT = 0.f;
 
 	void SetZoneLights(bool bOn);

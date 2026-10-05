@@ -578,6 +578,11 @@ public:
 		FVector FriendlyRel = FVector::ZeroVector;
 	};
 	bool GetGateWatch(FGateWatch& Out) const;
+	/** For the introduction's camera (AstraIntro.cpp): where the Janus Gate is drawn (world cm), the axis through its ring and its size (the bounds'
+	 *  radius, cm). False when the system has no Gate. */
+	bool GetGateView(FVector& OutPos, FVector& OutAxis, float& OutRadiusCm) const;
+	/** ... and the allied warships nearest the Aquila (no craft, no fixtures): where each is drawn (world cm, XYZ) and its size (cm, W), nearest first. */
+	void GetAllyViews(int32 Max, TArray<FVector4>& Out) const;
 	/** The system the gate is tuned to: the run under way, else Fleet's orders ("" = none). */
 	FString GetGateDestination() const { return GateRun != EAstraGateRun::None ? GateDest : FleetOrderedDest; }
 	/** Where a live contact is from the Aquila, aimed at its lead point (for the helm's intercept). */

@@ -9,6 +9,7 @@
 #include "AstraShipSubsystem.h"
 #include "Dom/JsonObject.h"
 #include "Dom/JsonValue.h"
+#include "Engine/StaticMeshActor.h"
 #include "Engine/World.h"
 
 namespace AstraGateWatch
@@ -114,4 +115,43 @@ bool UAstraBattleSubsystem::GetGateWatch(FGateWatch& Out) const
 		}
 	}
 	return true;
+}
+
+bool UAstraBattleSubsystem::GetGateView(FVector& OutPos, FVector& OutAxis, float& OutRadiusCm) const
+{
+	if (Ships.Num() == 0 || !Landmarks.IsValidIndex(GateLandmark) || !Landmarks[GateLandmark].Actor)
+	{
+		return false;
+	}
+	const AStaticMeshActor* A = Landmarks[GateLandmark].Actor;
+	FVector Origin, Extent;
+	A->GetActorBounds(false, Origin, Extent);
+	OutPos = Origin;
+	OutAxis = A->GetActorForwardVector();
+	OutRadiusCm = (float)Extent.Size();
+	return true;
+}
+
+void UAstraBattleSubsystem::GetAllyViews(int32 Max, TArray<FVector4>& Out) const
+{
+	Out.Reset();
+	if (Ships.Num() == 0)
+	{
+		return;
+	}
+	TArray<const FAstraBattleShip*> Near;
+	for (int32 i = 1; i < Ships.Num(); ++i)
+	{
+		const FAstraBattleShip& S = Ships[i];
+		if (S.bAlive && S.Side == EAstraSide::Astra && !S.bCraft && !S.bFixture && !S.bWreck && !S.bDerelict)
+		{
+			Near.Add(&S);
+		}
+	}
+	const FVector P = Ships[0].Pos;
+	Near.Sort([&P](const FAstraBattleShip& A, const FAstraBattleShip& B) { return FVector::DistSquared(A.Pos, P) < FVector::DistSquared(B.Pos, P); });
+	for (int32 i = 0; i < Near.Num() && Out.Num() < Max; ++i)
+	{
+		Out.Add(FVector4(ToWorld(Near[i]->Pos), 100.f * Near[i]->Radius));
+	}
 }

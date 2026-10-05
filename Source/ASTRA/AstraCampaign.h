@@ -35,6 +35,8 @@ public:
 	 *  healed or gone home) and the level starts over from it. */
 	void NewCommand(const FString& System);
 	bool IsStarted() const { return bStarted; }
+	/** The title menu's INTRODUCTION: the tour, then the menu again. */
+	void PlayIntro();
 
 	/** The title menu (bInGame: opened with Esc during play — the game pauses, Resume comes first). */
 	void ShowMenu(bool bInGame);
@@ -66,4 +68,7 @@ private:
 	TSharedPtr<class FJsonObject> LoadSave() const;
 	void SetMenuInput(bool bMenu);
 	void Begin(const FString& Mode);
+	/** The war itself (Begin, after the introduction when it plays). */
+	void BeginWar(const FString& Mode);
+	bool bIntroDone = false;
 };

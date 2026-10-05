@@ -469,6 +469,59 @@ void UAstraMindSubsystem::SendSettings()
 	Send(M);
 }
 
+void UAstraMindSubsystem::Narrate(const FString& Text, const FString& Lang)
+{
+	if (!IsConnected())
+	{
+		return;
+	}
+	TSharedRef<FJsonObject> M = MakeShared<FJsonObject>();
+	M->SetStringField(TEXT("type"), TEXT("narrate"));
+	M->SetStringField(TEXT("text"), Text);
+	M->SetStringField(TEXT("lang"), Lang);
+	Send(M);
+}
+
+void UAstraMindSubsystem::StopNarration()
+{
+	if (IsConnected())
+	{
+		TSharedRef<FJsonObject> M = MakeShared<FJsonObject>();
+		M->SetStringField(TEXT("type"), TEXT("narrate"));
+		M->SetBoolField(TEXT("stop"), true);
+		Send(M);
+	}
+	// silent at once (the mind's cut comes a moment later): the next line starts on a new wave
+	if (NarratorAudio && IsValid(NarratorAudio))
+	{
+		NarratorAudio->FadeOut(0.25f, 0.f);
+	}
+	NarratorWave = nullptr;
+	for (auto It = Voices.CreateIterator(); It; ++It)
+	{
+		if (It.Value().Comp.Get() == NarratorAudio)
+		{
+			It.RemoveCurrent();
+		}
+	}
+}
+
+bool UAstraMindSubsystem::IsNarratorSpeaking() const
+{
+	if (!NarratorAudio)
+	{
+		return false;
+	}
+	for (const TPair<int32, FVoiceLine>& V : Voices)
+	{
+		if (V.Value.Comp.Get() == NarratorAudio)
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
 void UAstraMindSubsystem::SendKeyChanged()
 {
 	if (IsConnected())
@@ -1008,6 +1061,11 @@ void UAstraMindSubsystem::CancelVoice(int32 LineId, float FadeSeconds)
 		{
 			ChannelAudio->FadeOut(FMath::Max(FadeSeconds, 0.02f), 0.f);
 			ChannelWave = nullptr;   // the next line starts on a new wave
+		}
+		else if (NarratorAudio && Wave.Get() == NarratorWave)
+		{
+			NarratorAudio->FadeOut(FMath::Max(FadeSeconds, 0.02f), 0.f);
+			NarratorWave = nullptr;
 		}
 		// the line stops here, and with it any earlier line still sounding on the same wave
 		for (auto It = Voices.CreateIterator(); It; ++It)

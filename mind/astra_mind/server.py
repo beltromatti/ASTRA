@@ -1418,6 +1418,12 @@ class Mind:
                     log.info("new game session: conversation reset (the war waits for the Captain's choice)")
                 elif kind == "settings":
                     self._apply_language(msg)               # (the player changed the LANGUAGE settings during play)
+                elif kind == "narrate":
+                    # the introduction's narrator (AstraIntro.cpp): a line of the tour, said now in the player's language; "stop": the player skipped
+                    if msg.get("stop"):
+                        await self.voice.clear("intro_skipped")
+                    elif (msg.get("text") or "").strip():
+                        await self.voice.say(NARRATOR, msg["text"], msg.get("lang") or self.lang, "measured", priority=Prio.ANSWER, addressed=True)
                 elif kind == "key_changed":
                     from .env import reload_env
                     reload_env()                            # (the player entered or replaced the OpenRouter key: the next request carries it)

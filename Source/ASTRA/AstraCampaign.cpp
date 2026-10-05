@@ -3,6 +3,7 @@
 #include "AstraCampaign.h"
 #include "AstraFonts.h"
 #include "AstraApiKey.h"
+#include "AstraIntro.h"
 #include "ASTRAPlayerController.h"
 
 #include "ASTRA.h"
@@ -73,6 +74,7 @@ public:
 		SLATE_EVENT(FSimpleDelegate, OnContinue)
 		SLATE_EVENT(FSimpleDelegate, OnNew)
 		SLATE_EVENT(FSimpleDelegate, OnSettings)
+		SLATE_EVENT(FSimpleDelegate, OnIntro)
 		SLATE_EVENT(FSimpleDelegate, OnQuit)
 	SLATE_END_ARGS()
 
@@ -122,6 +124,10 @@ public:
 		}
 		Item(TEXT("NEW CAMPAIGN"), bHasSave || Args._InGame ? TEXT("the war begins again at Aurelia; the saved one is lost") : TEXT("the war begins at Aurelia"),
 		     Args._OnNew, 1);
+		if (!Args._InGame)
+		{
+			Item(TEXT("INTRODUCTION"), TEXT("a short spoken tour of your ship and the war"), Args._OnIntro, 4);
+		}
 		Item(TEXT("SETTINGS"), TEXT("graphics, sound, language, controls, AI key"), Args._OnSettings, 3);
 		Item(TEXT("QUIT"), FString(), Args._OnQuit, 2);
 
@@ -187,7 +193,7 @@ public:
 	}
 
 private:
-	TSharedPtr<SButton> Buttons[4];
+	TSharedPtr<SButton> Buttons[5];
 	TArray<TPair<int32, FSimpleDelegate>> Order;   // the items as they stand, top to bottom (their index, what they do)
 	int32 Selected = -1;                           // the one lit by the keyboard (none until a key is pressed)
 	FSimpleDelegate FirstDo;     // Enter: the first item (resume, or continue the saved war)
@@ -334,6 +340,7 @@ void UAstraCampaignSubsystem::ShowMenu(bool bInGame)
 		.OnContinue_Lambda([Self]() { if (Self.IsValid()) { Self->Continue(); } })
 		.OnNew_Lambda([Self]() { if (Self.IsValid()) { Self->StartNew(); } })
 		.OnSettings_Lambda([Self]() { if (Self.IsValid()) { Self->ShowSettings(); } })
+		.OnIntro_Lambda([Self]() { if (Self.IsValid()) { Self->PlayIntro(); } })
 		.OnQuit_Lambda([Self]()
 		{
 			if (Self.IsValid())
@@ -501,9 +508,39 @@ void UAstraCampaignSubsystem::Continue()
 	Begin(TEXT("continue"));
 }
 
+void UAstraCampaignSubsystem::PlayIntro()
+{
+	UAstraIntroSubsystem* Intro = GetWorld() ? GetWorld()->GetSubsystem<UAstraIntroSubsystem>() : nullptr;
+	if (!Intro || Intro->IsPlaying())
+	{
+		return;
+	}
+	HideMenu();
+	TWeakObjectPtr<UAstraCampaignSubsystem> Self(this);
+	Intro->Play([Self]() { if (Self.IsValid()) { Self->ShowMenu(false); } });
+}
+
 void UAstraCampaignSubsystem::Begin(const FString& Mode)
 {
 	HideMenu();
+	// a player's first new war opens on the introduction (AstraIntro.h): the war begins when it ends. A start the command line chose (automation,
+	// the test bench) goes straight in, unless it asks for the tour (-astra_intro)
+	FString Arg;
+	const bool bAsked = FParse::Param(FCommandLine::Get(), TEXT("astra_intro"));
+	const bool bScripted = FParse::Param(FCommandLine::Get(), TEXT("astra_harness")) || FParse::Value(FCommandLine::Get(), TEXT("astra_campaign="), Arg);
+	UAstraIntroSubsystem* Intro = GetWorld()->GetSubsystem<UAstraIntroSubsystem>();
+	if (Mode == TEXT("new") && Intro && !Intro->IsPlaying() && !bIntroDone && (bAsked || (!bScripted && !UAstraIntroSubsystem::Seen())))
+	{
+		bIntroDone = true;
+		TWeakObjectPtr<UAstraCampaignSubsystem> Self(this);
+		Intro->Play([Self, Mode]() { if (Self.IsValid()) { Self->BeginWar(Mode); } });
+		return;
+	}
+	BeginWar(Mode);
+}
+
+void UAstraCampaignSubsystem::BeginWar(const FString& Mode)
+{
 	UAstraBattleSubsystem* Battle = GetWorld()->GetSubsystem<UAstraBattleSubsystem>();
 	UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>();
 	const TSharedPtr<FJsonObject> Save = Mode == TEXT("continue") ? LoadSave() : nullptr;

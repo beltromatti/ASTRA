@@ -84,10 +84,9 @@ void AASTRAPlayerController::BeginPlay()
 	{
 		GetWorldTimerManager().SetTimerForNextTick([this]()
 		{
-			if (!HintWidget.IsValid())
+			if (!HintWidget.IsValid() && !bCinematic)
 			{
-				ShowNotice(FString::Printf(TEXT("F1  controls  ·  W or E  stand up  ·  hold %s  talk to the crew  ·  T  type  ·  hold %s  orders  ·  Tab  datapad"),
-				                           *FAstraSettings::KeyName(FAstraSettings::Get().TalkKey), *FAstraSettings::KeyName(FAstraSettings::Get().OrdersKey)), 45.f);
+				ShowStartHint(45.f);
 			}
 		});
 	}
@@ -551,6 +550,45 @@ void AASTRAPlayerController::BoardFalcon(AAstraHangar* Hangar, APawn* Walker)
 	}
 }
 
+void AASTRAPlayerController::ShowStartHint(float Seconds)
+{
+	ShowNotice(FString::Printf(TEXT("F1  controls  ·  W or E  stand up  ·  hold %s  talk to the crew  ·  T  type  ·  hold %s  orders  ·  Tab  datapad"),
+	                           *FAstraSettings::KeyName(FAstraSettings::Get().TalkKey), *FAstraSettings::KeyName(FAstraSettings::Get().OrdersKey)), Seconds);
+}
+
+void AASTRAPlayerController::SetCinematic(bool bOn)
+{
+	if (bCinematic == bOn)
+	{
+		return;
+	}
+	bCinematic = bOn;
+	UGameViewportClient* VC = GetWorld() ? GetWorld()->GetGameViewport() : nullptr;
+	SetIgnoreMoveInput(bOn);                    // (counters: the chair's own hold is not undone)
+	SetIgnoreLookInput(bOn);
+	if (bOn)
+	{
+		if (WindowHud.IsValid())
+		{
+			WindowHud->Remove(this);
+		}
+		if (VC && HintWidget.IsValid())
+		{
+			VC->RemoveViewportWidgetContent(HintWidget.ToSharedRef());
+			HintWidget.Reset();
+		}
+		ShowHelp(false);
+		if (Orders.IsValid() && Orders->IsOpen())
+		{
+			Orders->Close(this, false);
+		}
+	}
+	else
+	{
+		ShowStartHint(30.f);
+	}
+}
+
 void AASTRAPlayerController::ShowNotice(const FString& Text, float Seconds)
 {
 	UGameViewportClient* VC = GetWorld() ? GetWorld()->GetGameViewport() : nullptr;
@@ -968,7 +1006,14 @@ void AASTRAPlayerController::PlayerTick(float DeltaTime)
 		{
 			WindowHud = MakeShared<FAstraWindowHud>();
 		}
-		WindowHud->Tick(this, DeltaTime);
+		if (bCinematic)
+		{
+			WindowHud->Remove(this);
+		}
+		else
+		{
+			WindowHud->Tick(this, DeltaTime);
+		}
 		if (Orders.IsValid())
 		{
 			Orders->Tick(this, DeltaTime);

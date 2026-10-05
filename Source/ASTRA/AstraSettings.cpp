@@ -53,7 +53,7 @@ namespace
 
 	/** The page's sections: the row each one opens with, and its heading. */
 	struct FSection { int32 First; const TCHAR* Title; };
-	const FSection Sections[] = {{RowGraphics, TEXT("GRAPHICS")}, {RowMaster, TEXT("AUDIO")}, {RowLanguage, TEXT("LANGUAGE")},
+	const FSection PageSections[] = {{RowGraphics, TEXT("GRAPHICS")}, {RowMaster, TEXT("AUDIO")}, {RowLanguage, TEXT("LANGUAGE")},
 	                             {RowSensitivity, TEXT("CONTROLS")}, {RowAiKey, TEXT("THE CREW'S MINDS")}};
 
 	// RETINA (the 3D view at the display's own pixels instead of half of them, upscaled) is the Mac's: that is what the engine does on a Retina screen by
@@ -299,7 +299,7 @@ void SAstraSettingsPage::Construct(const FArguments& Args)
 	SAssignNew(Scroll, SScrollBox);
 	for (const int32 Row : VisibleRows())
 	{
-		for (const FSection& Sec : Sections)
+		for (const FSection& Sec : PageSections)
 		{
 			if (Sec.First == Row)
 			{

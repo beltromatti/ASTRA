@@ -32,6 +32,10 @@ public:
 	void StandUp() { if (bSeated) { SetSeated(false); } }
 	/** A short notice at the bottom right of the screen (the start hint, "OPS › DATAPAD: DAMAGE REPORT"). */
 	void ShowNotice(const FString& Text, float Seconds);
+	/** The introduction's tour (AstraIntro.h) has the screen: no notices, no names on the window, no controls card, the Captain's body and eyes
+	 *  still; when it ends the start hint comes back. */
+	void SetCinematic(bool bOn);
+	bool IsCinematic() const { return bCinematic; }
 	// --- ABBORDAGGI: what the weapons ask of the controller (UAstraFpsComponent): the datapad is raised (a menu that holds the walking still, the lift's list, is told by IsMoveInputIgnored)
 	bool IsPadUp() const { return bPadUp; }
 
@@ -88,6 +92,8 @@ protected:
 	bool bSeated = false;
 
 	bool bWalkHintShown = false;      // the walking keys were shown the first time the Captain left the chair
+	bool bCinematic = false;
+	void ShowStartHint(float Seconds);
 	FTimerHandle SeatTimer;
 	void ToggleSeat();
 	void OpenMenu();

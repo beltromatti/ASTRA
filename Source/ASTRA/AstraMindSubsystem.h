@@ -34,6 +34,11 @@ public:
 	void SendSettings();
 	/** The player entered or replaced the OpenRouter key (AstraApiKey.h): the mind reads its .env again. */
 	void SendKeyChanged();
+	/** The introduction's narrator (AstraIntro.cpp): a line said now, in the player's language; StopNarration: the player went on or skipped. */
+	void Narrate(const FString& Text, const FString& Lang);
+	void StopNarration();
+	/** A narrator's line is being heard (from its first sound to its last). */
+	bool IsNarratorSpeaking() const;
 	/** What the mind last said of OpenRouter: "ok" · "invalid_key" · "no_credit" · "rate_limited" · "offline". */
 	const FString& GetAiState() const { return AiState; }
 
