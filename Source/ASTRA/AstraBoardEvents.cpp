@@ -168,6 +168,35 @@ void UAstraBoardSubsystem::ProcessEvents(float Dt)
 			Tell(E.Text, true);
 			break;
 		}
+		case EEvent::Drill:
+		{
+			// a squad's drill moves on (the infantry orders: stacked, going in, a room cleared, an ambush sprung, a place swept): the marines' own news; the net reads it
+			const FSquad* Sq = Fight.Squad(E.Target);
+			if (Sq && Sq->Side == ESide::Aquila)
+			{
+				Tell(E.Text, false);
+			}
+			break;
+		}
+		case EEvent::Sealed:
+		{
+			// a squad has closed a pressure bulkhead behind it: the game's door shuts (the simulation has it shut already and knows who did it)
+			const int32 Door = E.Target;
+			if (Dmg.IsValid() && Dmg->Doors.IsValidIndex(Door))
+			{
+				MirrorDoor(Door, true);
+			}
+			if (UAstraCombatFx* X = bObserved ? FxSub() : nullptr)
+			{
+				X->PlaySoundAt(TEXT("/Game/ASTRA/Audio/SW_Blast_Inside.SW_Blast_Inside"), E.Start + FVector(0.0, 0.0, 110.0), 0.5f, 1.15f);
+			}
+			const FUnit* U = Fight.Unit(E.Unit);
+			if (U && U->Side == ESide::Aquila)
+			{
+				Tell(E.Text, false);
+			}
+			break;
+		}
 		case EEvent::Carried:
 		{
 			// a wounded man has been carried out to his boat: alive, off the ship (his bearer has gone back to the fight)

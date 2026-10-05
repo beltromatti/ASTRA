@@ -127,7 +127,6 @@ namespace AstraBoard
 		float OverrideS = 10.f;                                 // the ship's own people, at a door the enemy shut behind him: how long they take to override it (the attackers cut it: CutS)
 		float SealClearCm = 250.f;                              // and nobody (friend or enemy) may be in the doorway
 		float EscortPointCm = 560.f;                            // the man ahead of the Captain
-		bool bDrillDoctrine = false;                            // the Mandate's boarders and holders use the same drills (stack at the objective's door and go in together; fall back and close the bulkheads)
 	};
 
 	struct FSeen

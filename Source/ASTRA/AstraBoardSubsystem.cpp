@@ -206,6 +206,35 @@ bool UAstraBoardSubsystem::PickBreach(const FString& Id, int32& OutComp, FVector
 	return true;
 }
 
+void UAstraBoardSubsystem::QueueBenchOrder(const TSharedPtr<FJsonObject>& Args, float AfterS)
+{
+	if (Phase == EPhase::Active && Since >= AfterS)
+	{
+		RunBenchOrder(Args);
+		return;
+	}
+	BenchOrders.Add({Args, AfterS});
+}
+
+void UAstraBoardSubsystem::RunBenchOrder(const TSharedPtr<FJsonObject>& Args)
+{
+	if (!Args.IsValid())
+	{
+		FString Out;
+		const TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> Wr = TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>::Create(&Out);
+		FJsonSerializer::Serialize(MarinesPicture(), Wr);
+		UE_LOG(LogASTRA, Log, TEXT("[Board] picture at %.0f s: %s"), Since, *Out);
+		FString Snap;
+		const TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> Wr2 = TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>::Create(&Snap);
+		FJsonSerializer::Serialize(Snapshot(), Wr2);
+		UE_LOG(LogASTRA, Log, TEXT("[Board] snapshot at %.0f s: %s"), Since, *Snap.Left(1200));
+		return;
+	}
+	FString D;
+	const bool bOk = HandleCommand(TEXT("marine_order"), Args, D);
+	UE_LOG(LogASTRA, Log, TEXT("[Board] order %s at %.0f s: %s"), bOk ? TEXT("ok") : TEXT("refused"), Since, *D);
+}
+
 void UAstraBoardSubsystem::SealDoor(int32 Door, bool bSealed)
 {
 	if (!Dmg.IsValid() || !Dmg->Doors.IsValidIndex(Door))
@@ -213,7 +242,12 @@ void UAstraBoardSubsystem::SealDoor(int32 Door, bool bSealed)
 		return;
 	}
 	Fight.SealDoor(Door, bSealed);
-	if (Mode != EMode::Observed)
+	MirrorDoor(Door, bSealed);
+}
+
+void UAstraBoardSubsystem::MirrorDoor(int32 Door, bool bSealed)
+{
+	if (!Dmg.IsValid() || !Dmg->Doors.IsValidIndex(Door) || Mode != EMode::Observed)
 	{
 		return;                                       // another ship's bulkhead is not a door of the Aquila's
 	}
@@ -802,6 +836,18 @@ void UAstraBoardSubsystem::Tick(float DeltaTime)
 	if (Phase == EPhase::Active)
 	{
 		Step(Dt);
+		for (int32 i = 0; i < BenchOrders.Num();)
+		{
+			if (Since >= BenchOrders[i].AfterS)
+			{
+				RunBenchOrder(BenchOrders[i].Args);
+				BenchOrders.RemoveAt(i);
+			}
+			else
+			{
+				++i;
+			}
+		}
 	}
 	else
 	{
