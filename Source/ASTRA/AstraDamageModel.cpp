@@ -60,6 +60,25 @@ namespace
 	float DmKillRadius(uint8 Type) { return Type == 1 ? 1.8f : (Type == 2 ? 3.4f : 2.4f); }     // m: how far from the path of a blow it kills (kinetic, energy, explosive)
 	float DmHurtRadius(uint8 Type) { return Type == 1 ? 3.5f : (Type == 2 ? 7.0f : 5.0f); }
 	FString DmSystemsOf(const FAstraDamageMap& Map, int32 Comp);
+
+	/** A room whose fire is news for the bridge: it holds the reactor, the coolant, the weapons, the ordnance, the engines or the sensors, or it is a magazine, Main Engineering or the bridge. The rest of the
+	 *  ship burning is routine: the incident list, the damage board and the log carry it, and the crew reads them at its next turn (BATTAGLIA-3: in 23 minutes of play 53 "the fire has spread" and 25 "the fire is
+	 *  out" each woke a turn of the crew). */
+	bool DmIsVital(const FAstraDmgComp& C, const FAstraDmgProfile& P)
+	{
+		if (P.bExplosive || C.Kind == TEXT("bridge") || C.Kind == TEXT("engineering"))
+		{
+			return true;
+		}
+		for (const EAstraDmgSystem S : {EAstraDmgSystem::Reactor, EAstraDmgSystem::Coolant, EAstraDmgSystem::Weapons, EAstraDmgSystem::Ordnance, EAstraDmgSystem::Sensors, EAstraDmgSystem::Engines})
+		{
+			if (C.Systems.Contains((uint8)S))
+			{
+				return true;
+			}
+		}
+		return false;
+	}
 }
 
 // ================================================================================================================== set up
@@ -1273,7 +1292,7 @@ void FAstraDamageModel::StepFire(float Dt)
 				if (Clock - Told > (CB.bCorridor ? 30.f : 4.f))
 				{
 					Told = Clock;
-					Report(FString::Printf(TEXT("damage report: the fire has spread to %s"), *Say(Sd.Comp)), true);
+					Report(FString::Printf(TEXT("damage report: the fire has spread to %s"), *Say(Sd.Comp)), DmIsVital(CB, Map->ProfileOf(Sd.Comp)));   // (told to the crew only where it matters: a system, a magazine, the bridge)
 				}
 			}
 		}
@@ -1540,7 +1559,7 @@ void FAstraDamageModel::StepPeople(float Dt)
 			if (Wounded) { Text += FString::Printf(TEXT(", %d wounded getting out"), Wounded); }
 			if (Rescued) { Text += FString::Printf(TEXT(", %d carried out alive"), Rescued); }
 			if (S->TeamT > 0.f) { Text += TEXT("; the damage-control team is there"); }
-			Report(Text, true);
+			Report(Text, Killed > 0 || Wounded + Rescued >= 3);          // (the dead and a handful hurt call the crew; one or two wounded getting out are in the log)
 		}
 	}
 }
@@ -1708,7 +1727,9 @@ void FAstraDamageModel::CloseIncident(FAstraDamage& D, const TCHAR* How)
 	const TCHAR* Done = Kind == 1 ? TEXT("is out") : (Kind == 0 ? TEXT("is sealed") : TEXT("is repaired, power restored"));
 	if (D.Team >= 0)
 	{
-		Report(FString::Printf(TEXT("damage control: the %s at %s %s (team %d free again)"), *D.Kind, *D.Where(), Done, D.Team + 1), Kind != 2);
+		// a breach sealed is news (the air stops going); a fire out only where the fire mattered (a system, a magazine, the bridge); a conduit mended is in the log
+		const bool bVital = Kind == 1 && Map.IsValid() && Map->Comps.IsValidIndex(D.Comp) && DmIsVital(Map->Comps[D.Comp], Map->ProfileOf(D.Comp));
+		Report(FString::Printf(TEXT("damage control: the %s at %s %s (team %d free again)"), *D.Kind, *D.Where(), Done, D.Team + 1), Kind == 0 || bVital);
 	}
 	else if (Kind == 1)
 	{

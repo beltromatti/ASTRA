@@ -766,6 +766,7 @@ void UAstraBattleSubsystem::TickSensors(float Dt)
 	const float ActiveKm = (E == TEXT("full") ? 55.f : (E == TEXT("restricted") ? 28.f : 0.f)) * SensorPower * SensorFactor(Ships[0]);   // (a hurt sensor suite sees less far)
 	const FAstraBattleShip& P = Ships[0];
 	TArray<FString> NewBearings, NewTracks, Classified, Lost, JamOn, BurnThrough, Unmasked, Faded;
+	bool bLostEngaged = false, bFadedEngaged = false;             // the track that went was the one her guns are on: that calls the crew, the rest is the sensors' log
 	// the Mandate's jammers: a capital ship that has stopped running dark (it came close, fired, or heard our ping and
 	// knows it has been found) floods our radar along its bearing; inside 12 km the returns burn through the noise
 	TArray<FVector> JamDirs;
@@ -978,10 +979,12 @@ void UAstraBattleSubsystem::TickSensors(float Dt)
 		else if (OldTrack == 2 && S.Track < 2)
 		{
 			Lost.Add(KnownLabel(S));
+			bLostEngaged |= S.Id == P.FireTarget;
 		}
 		else if (OldTrack == 1 && S.Track == 0)
 		{
 			Faded.Add(S.ContactId);
+			bFadedEngaged |= S.Id == P.FireTarget;
 		}
 	}
 	// the sensors officer's calls, grouped (a raid group lighting up is one call, not eight)
@@ -1000,7 +1003,7 @@ void UAstraBattleSubsystem::TickSensors(float Dt)
 	}
 	if (Lost.Num())
 	{
-		Report(FString::Printf(TEXT("sensors: lost the track on %s — a bearing at most now"), *FString::Join(Lost, TEXT(", "))));
+		Report(FString::Printf(TEXT("sensors: lost the track on %s — a bearing at most now"), *FString::Join(Lost, TEXT(", "))), bLostEngaged);
 	}
 	if (JamOn.Num())
 	{
@@ -1026,7 +1029,7 @@ void UAstraBattleSubsystem::TickSensors(float Dt)
 	if (Faded.Num())
 	{
 		Report(FString::Printf(TEXT("sensors: the bearing on %s has faded — its emissions stopped (it went quiet, or it was never "
-		                            "there)"), *FString::Join(Faded, TEXT(", "))));
+		                            "there)"), *FString::Join(Faded, TEXT(", "))), bFadedEngaged);
 	}
 }
 

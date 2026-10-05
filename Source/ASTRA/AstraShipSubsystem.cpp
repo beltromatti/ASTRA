@@ -3930,8 +3930,17 @@ void UAstraShipSubsystem::FlushHitReport(bool bForce)
 			Where += FString::Printf(TEXT("; and %d more"), HitReport.People.Num() - Shown);
 		}
 	}
+	// it calls the crew when it is news: a breach, a room lost, a death, or the shields or the hull going down to the next of four steps (told again only after they have recovered
+	// and fallen anew); the words of the blows in between stay in the log and in the damage board, and the crew reads them at its next turn (5 Oct: 10 "shields took a hit, holding at
+	// 100%" and a dozen casualty and fire lines in 23 minutes each woke a turn)
+	const int32 ShBand = Sh <= 15 ? 3 : (Sh <= 40 ? 2 : (Sh <= 70 ? 1 : 0));
+	const int32 HuBand = Hu <= 25 ? 3 : (Hu <= 50 ? 2 : (Hu <= 75 ? 1 : 0));
+	const bool bFell = ShBand > ShieldBandTold || HuBand > HullBandTold;
+	ShieldBandTold = ShBand;
+	HullBandTold = HuBand;
+	const bool bNews = bFell || HitReport.bGrave || HitReport.Killed > 0;
 	Event(!Where.IsEmpty() ? FString::Printf(TEXT("damage report: we've been hit — %s; shields %d%%, hull %d%%"), *Where, Sh, Hu)
-	                       : FString::Printf(TEXT("shields took a hit, holding at %d%%"), Sh), true);
+	                       : FString::Printf(TEXT("shields took a hit, holding at %d%%"), Sh), bNews);
 	HitReport = FHitReport();
 }
 
@@ -4077,6 +4086,8 @@ void UAstraShipSubsystem::OnHullHit(const FAstraHullHit& Hit)
 	{
 		HitReport.People.Add(P);
 	}
+	HitReport.Killed += Res.Killed;
+	HitReport.bGrave |= Res.bBreach || Res.bWreck;
 	++HitReport.Hits;
 	FlushHitReport(false);
 }
