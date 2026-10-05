@@ -296,6 +296,10 @@ Sono i costi CPU della *simulazione e dello staging* degli effetti (il banco non
 livelli restano dentro i tetti anche nella battaglia più grande; il tetto dei detriti è raggiunto e funziona come deve (il chunk più vecchio
 cede il posto a uno nuovo). **Il costo della GPU non è ancora misurato in modo pulito: vedi §19**; il gate di [ricerca/11](ricerca/11-efficienza-grafica.md) resta il riferimento.
 
+**La misura che si fa offline: la dimensione degli shader.** `tools/art/war_fx_hlsl_check.py` compila ogni nodo Custom con il DXC del motore (con gli ingressi in un buffer di costanti, perché il compilatore
+non li riduca a un valore) e stampa le istruzioni scalari DXIL: DART 229, TUBE 282, GLOW 213, FIRE (UV 61 + peso 11 + ombreggiatura 83, più due letture del flipbook), SMOKE 93 (+ UV), PLUME 128, SHIELD 450, MINSIZE 53–66. Per pixel
+sono poche centinaia di operazioni: un livello a tutto schermo a 1080p sono circa 0,6 miliardi di operazioni, cioè frazioni di millisecondo sulla GPU del M4; il costo vero è quanti strati si sovrappongono (§15), e quello si misura nel gioco.
+
 ## 14. I ganci nel resto del codice (tutti)
 
 Il modulo tocca il codice della guerra solo dove serve; tutti i punti, perché il lead li veda in una pagina:
