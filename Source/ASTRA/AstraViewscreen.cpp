@@ -929,6 +929,13 @@ void AAstraViewscreen::Aim(float DeltaSeconds)
 		WantPos = Hull - Dir * Num(0, 320.0) * 100.0 + BroadsideSide * Num(1, 210.0) * 100.0 + FVector(0.0, 0.0, Num(2, 100.0) * 100.0);
 		WantDir = (Hull + Dir * Num(3, 2500.0) * 100.0 - WantPos).GetSafeNormal();
 		FovWant = FMath::Clamp((float)Num(4, 46.0) / Zoom, 10.f, 75.f);
+		// each volley shakes the shot a little (30 cm for a fifth of a second: the recoil the hull itself does not show)
+		const UAstraBattleSubsystem::FPlayerFireState PF = B->GetPlayerFireState();
+		if (PF.ShotAgeS < 0.2f)
+		{
+			const float K = 1.f - PF.ShotAgeS / 0.2f;
+			WantPos += FVector(FMath::FRandRange(-30.f, 30.f), FMath::FRandRange(-30.f, 30.f), FMath::FRandRange(-20.f, 20.f)) * K;
+		}
 		bOrbit = true;
 		break;
 	}
