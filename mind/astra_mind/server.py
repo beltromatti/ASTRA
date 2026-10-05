@@ -36,7 +36,7 @@ from .context import Exchange, badge_of_raw, parse as parse_context, parse_lift
 from .delegation import Delegation
 from .initiative import Watch, chatter_system, recent_orders, watch_ask, watch_system
 from .director import ADMIRAL, Director
-from .env import CACHE
+from .env import CACHE, SAVED
 from .host import install_stop_handlers, mind_port
 from .local_ship import LocalShip
 from .openrouter import OpenRouter, credits
@@ -619,6 +619,23 @@ class Mind:
             await self.port.respond(cue, self.lang, self._battle_state(), self.director.war.brief(detail=False))
         except Exception:  # noqa: BLE001
             log.exception("port control failed")
+
+    def _first_watch(self, text: str) -> str:
+        """The player's very first watch on this machine: the XO's greeting also tells, once, in her own words, how the bridge takes the Captain's orders
+        (a new player knows nothing of V, G and Tab; the help card waits on F1). Every other event goes as it is."""
+        if not text.startswith("bridge: the Captain has just come onto the bridge"):
+            return text
+        flag = SAVED / "first_watch.done"
+        try:
+            if flag.exists():
+                return text
+            flag.parent.mkdir(parents=True, exist_ok=True)
+            flag.write_text(time.strftime("%Y-%m-%d %H:%M"))
+        except OSError:
+            return text
+        return (text + " — this is the Captain's first watch aboard: in one more short line of her own, as a good XO does for a new captain, Serra also tells "
+                "them how the bridge takes their orders: they speak to the crew holding V (or type with T), the orders wheel on G gives the commonest orders of "
+                "a fight without a word, the datapad on Tab shows the ship at a glance")
 
     async def _fleet_news(self, text: str) -> None:
         """War news from elsewhere in the March reaches the bridge over the fleet net (comms relays it)."""
@@ -1459,7 +1476,7 @@ class Mind:
                             self.captain_t = self.last_activity
                             asyncio.create_task(self._wheel_turn(text))
                         else:
-                            await self.turns.put(("\x00event:" + text, self.lang))
+                            await self.turns.put(("\x00event:" + self._first_watch(text), self.lang))
                 elif kind == "command_result":
                     self.game.resolve(msg)
                 elif kind == "voice_status":
