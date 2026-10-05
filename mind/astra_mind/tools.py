@@ -192,7 +192,10 @@ BOARD_SHIP = _fn("board_ship", "The XO (or any officer the Captain asks): board 
                                "from where, at which hatches and how long it takes (in minutes and seconds, as one says it: use those words, never convert seconds yourself), and the facts that make it risky, "
                                "or why not: say that, never a promise of your own. Only on the Captain's order. `call_off` turns the boats back, or, with the marines already aboard her, orders them out by their hatches "
                                "(the boats let go when they are in them). `join`: the Captain, who gave the order without saying he goes, now says he goes with the marines: he rides in the first Kestrel if it has not left "
-                               "the bay yet (the result says how long he has, or that it is too late and what is left to him).", {
+                               "the bay yet (the result says how long he has, or that it is too late and what is left to him). The same tool takes the marines through a WRECK: a piece of a broken ship "
+                               "(`boarding_options` lists the ones near, with `wreck`: true and the `part`: bow, middle, stern section or the whole hull; the target is her contact id, as W-02S): nobody is alive "
+                               "aboard her, nothing defends her, she has no shield and no point defence; the marines search her decks, where her dead lie, and some of her rooms have no air. A piece has only the "
+                               "places of her part of the ship: an objective she has not is refused and the result says what she still has.", {
     "action": {"type": "string", "enum": ["launch", "call_off", "join"], "description": "launch (the default), call_off, or join (the Captain goes with the marines)"},
     "target": {"type": "string", "description": "launch: the ship to board: her contact id (T-30) or name from the plot"},
     "boats": {"type": "integer", "minimum": 1, "maximum": 2, "description": "how many Kestrels (twelve marines each); leave out for both"},

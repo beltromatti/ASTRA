@@ -443,6 +443,9 @@ public:
 	FString DrillText(const FSquad& S) const;
 	void SealDoor(int32 Door, bool bSealed);
 	bool IsDoorSealed(int32 Door) const { return Doors.IsSealed(Door); }
+	/** The dead of the war that lie in a room (a ship the war has shot at, a piece of a wreck): the scene tells the simulation, so that a squad that clears a room can say what it found there. */
+	void NoteDead(int32 Comp) { if (Comp != INDEX_NONE) { ++DeadAboard.FindOrAdd(Comp); } }
+	int32 DeadAt(int32 Comp) const { const int32* N = DeadAboard.Find(Comp); return N ? *N : 0; }
 	const FBoardDoors& DoorState() const { return Doors; }
 
 	// ------------------------------------------------------------------------------------------------ stepping
@@ -514,6 +517,7 @@ private:
 	TArray<float> CutT;                      // by door: how long the Mandate have been at work on it
 	AstraBoard::FMission Mis;
 	AstraBoard::FBook Stats;
+	TMap<int32, int32> DeadAboard;                  // by room: the dead of the war that lie there
 	TArray<AstraBoard::FBoardEvent> Events;
 	TArray<AstraBoard::FSeen> SensorPicture[2];
 	double Clock = 0.0;

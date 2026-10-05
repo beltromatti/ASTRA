@@ -54,6 +54,10 @@ namespace
 		const FFleetSnapshot& Snap = *Spec.Inside;
 		const FAstraBoardMap& Map = *Plan.Map;
 		R.bFromWar = true;
+		for (const FFleetSnapshot::FHand& D : Snap.Fallen)
+		{
+			Sim.NoteDead(D.Comp);                                        // (her dead lie where they fell: the squads that clear those rooms say what they find)
+		}
 		// the bulkheads the war shut
 		if (Plan.Dmg.IsValid())
 		{

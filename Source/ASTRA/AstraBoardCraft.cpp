@@ -607,6 +607,10 @@ void UAstraBattleSubsystem::EmitBoardEvent(EEventKind Kind, const FAstraBattleSh
 	{
 		E.TargetName = T->Name;
 	}
+	else
+	{
+		E.bTargetGone = Kind == EEventKind::Destroyed;
+	}
 	UE_LOG(LogASTRA, Display, TEXT("[Boarding] %7.1f %s %s (order %d leg %d, %d men%s) %s -> %s%s%s"), Time, EventName(E.Kind), *E.CraftName, E.Order, E.Leg, E.Men, E.bMenAboard ? TEXT(", aboard") : TEXT(""),
 	       *E.CarrierName, *E.TargetName, E.Cause.IsEmpty() ? TEXT("") : TEXT(": "), *E.Cause);
 	BoardEvents.Add(MoveTemp(E));

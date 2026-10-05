@@ -148,6 +148,7 @@ namespace AstraBoardCraft
 		FVector Dock = FVector::ZeroVector;
 		FVector DockNormal = FVector::ZeroVector;
 		FString Cause;                   // Destroyed/Aborted: why, in words ("shot down by the Aquila's point defence")
+		bool bTargetGone = false;        // Destroyed: the ship she was latched to is no longer in the battle (a wreck's piece the living space let go of when it drifted out of reach): not a boat that was shot down
 		FString CarrierName, TargetName;
 	};
 

@@ -141,6 +141,7 @@ _KINDS: tuple[tuple[re.Pattern[str], Kind], ...] = tuple((re.compile(p, re.I), k
      r".+ could not come home|the boarders have nothing to go for|.+ was destroyed \()", Kind("assault_log", False, wake=False)),
     (r"^boarding: .+'s boats are .+ from .+'s hull: the first cuts in then", Kind("assault_log", False, wake=False)),     # (the half-minute warning: the bridge's news)
     (r"^boarding: the marines are called out of her decks", Kind("called_out", False)),                     # (call_off with the marines aboard: they come out by their hatches; the net reads it, the bridge says it)
+    (r"^boarding: .+ has drifted out of reach with .+ latched to her: the marines are taken off her", Kind("called_out", False)),     # (a wreck's piece went off the plot with a boat latched to her: everyone is brought home, nobody is lost to a drift)
     (r"^boarding: the marines who could not get out in time are brought off", Kind("assault_log", False, wake=False)),
     (r"^boarding: contact: ", Kind("contact", True, call=True)),
     (r"^boarding: .+ is dead at ", Kind("dead", True, call=True)),
@@ -170,6 +171,8 @@ _KINDS: tuple[tuple[re.Pattern[str], Kind], ...] = tuple((re.compile(p, re.I), k
     (r"^boarding: the (?:boarders are beaten|boarders have broken off|fight has gone quiet)", Kind("outcome", True, call=True)),
     (r"^boarding: not one boarder reached the ship", Kind("outcome", True, call=True)),
     (r"^boarding: .+ is ours: the marines hold ", Kind("outcome", True, call=True)),                  # (the marines' assault: the ship is taken)
+    (r"^boarding: the marines have gone through .+ and hold .+: nobody is alive aboard", Kind("outcome", True, call=True)),     # (a wreck: searched, her dead found)
+    (r"^boarding: the marines have left .+: .+", Kind("outcome", True, call=True)),
     (r"^boarding: the boarding of .+ has failed", Kind("outcome", True, call=True)),
     (r"^boarding: the marines have broken off and are back in their boats", Kind("outcome", True, call=True)),
     (r"^boarding: the fight on .+ has gone quiet", Kind("outcome", True, call=True)),
@@ -323,6 +326,10 @@ WHEN THE MARINES BOARD A SHIP (the board says `role: attacking`: the Aquila's ma
   a boat that is shot at while it waits is a boat lost.
 - The Captain may have come with the marines (the board shows him in the fight, where he is and how he is: a rifle in the column, and the first man the ship's people will want): his life comes
   before the objective, `follow_captain` and `rescue_captain` are for him, and his orders stand over yours. If he is carried out (the Medbay) the marines go on without him, the way he left them.
+- The ship may be a WRECK (the board says `wreck: true`, `wreck_part`, `dead_aboard_this_piece`): a piece of a ship the war broke, her people dead, her power gone. Nobody is alive aboard and nothing defends her:
+  there is no enemy, no `hostiles_known`, nothing to flank or ambush; the squads search her (`sweep` is the order for it: room after room, each reported as it is cleared, with the number of her dead that lie there)
+  and hold what the objective names; some rooms have no air, the torn ends are open to space. A marine who finds the dead says it plainly and with respect, what he sees and how many, never more than he sees. The Captain decides
+  how long to stay; the boats wait at her hatches.
 - `bulkheads` is for defending the Aquila: another ship's are not yours to seal. `hold` at a place the squad has taken, `advance` toward the next, `assault` into defenders in cover costs marines (at
   two to one, or to relieve a squad), `fall_back` to a place on your own way, `withdraw` out of the ship. What the Captain asks of the Major in an assault is the commander's trade: the objective,
   the risks, when to get out; Reyes advises, the Captain decides.
@@ -765,6 +772,9 @@ class MarineMinds:
             lines.append(f" the assault: your marines are boarding {ship}" + (f" ({pic['ship_class']})" if pic.get("ship_class") else "")
                          + f"; {_n(pic.get('elapsed_s'))} s since the first boat cut in; they came in at {pic.get('breach', '?')}; the objective is {pic.get('objective', '?')} "
                          f"[id {pic.get('objective_id', '?')}]")
+            if pic.get("wreck"):
+                lines.append(f" {ship} is a WRECK ({pic.get('wreck_part', 'a piece of a broken ship')}): nobody is alive aboard her and nothing defends her; about {_n(pic.get('dead_aboard_this_piece'))} of her dead lie in this piece; "
+                             "some rooms have no air, the torn ends are open to space")
         else:
             lines.append(f" the fight: {_n(pic.get('elapsed_s'))} s since the alarm; the boarders came in at {pic.get('breach', '?')} (the hull is {'open' if pic.get('breach_open') else 'not cut yet'}); "
                          f"they go for {pic.get('objective', 'Main Engineering')} [id {pic.get('objective_id', '?')}]")

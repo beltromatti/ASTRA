@@ -675,6 +675,23 @@ bool UAstraBoardSubsystem::StartAssault(const FAssaultSpec& Spec, FString& OutDe
 		A.WreckSection = T.WreckSection;
 		A.WreckPivotM = T.WreckPivotM;
 		A.Wreck = AsWreckAboard(*Site, T.WreckSection);
+		// the living space keeps a piece on the plot only within reach of the Aquila (a piece that drifts past it is let go): the boarding must be over, the boats home, before she is gone
+		const double ReachM = (AstraSpace::FWrecks::ContactKm + 10.0) * 1000.0;
+		const FVector Rel = T.Pos - C.Pos, RelV = T.Vel - C.Vel;
+		const double Qa = RelV.SizeSquared(), Qb = 2.0 * FVector::DotProduct(Rel, RelV), Qc = Rel.SizeSquared() - ReachM * ReachM;
+		double LeaveS = 1.0e9;
+		if (Qa > 1.0e-6 && Qb * Qb - 4.0 * Qa * Qc > 0.0)
+		{
+			const double Tt = (-Qb + FMath::Sqrt(Qb * Qb - 4.0 * Qa * Qc)) / (2.0 * Qa);
+			LeaveS = Tt > 0.0 ? Tt : LeaveS;
+		}
+		const double NeedS = 2.0 * Ass.EtaS + 420.0;                            // there, her decks, and home
+		if (LeaveS < NeedS)
+		{
+			OutDetail = FString::Printf(TEXT("%s is drifting away from the Aquila at %.0f m/s and will be out of reach (%.0f km) in %s; a boarding of her takes about %s from the order to the boats being home: the Aquila must close on her first (the helm can intercept her)"),
+			                            *AsShipLabel(T), RelV.Size(), ReachM / 1000.0, *AstraBoardCraft::SpanText((float)LeaveS), *AstraBoardCraft::SpanText((float)NeedS));
+			return false;
+		}
 	}
 	A.Objective = Spec.Objective.IsEmpty() ? (A.Attacker == ESide::Mandate ? FString(TEXT("engineering")) : FString(TEXT("captain"))) : Spec.Objective;
 	A.By = Spec.By;
@@ -1295,6 +1312,29 @@ void UAstraBoardSubsystem::OnCraftEvent(const AstraBoardCraft::FCraftEvent& E)
 	}
 	case AstraBoardCraft::EEventKind::Destroyed:
 	{
+		if (Assault.bWreck && E.bTargetGone)
+		{
+			// not a boat shot down: the piece she was latched to went off the plot (a wreck's place is the record's arithmetic, kept by the living space only within reach of the Aquila). The marines and the Captain
+			// are taken off her at once, the boat is left to her drift: nobody dies of a wreck's going out of reach
+			L->State = FLeg::EState::Home;
+			L->bSailing = false;
+			L->bLanded = false;
+			if (Assault.bRoster)
+			{
+				ReturnMarines(*L, true);
+			}
+			Tell(FString::Printf(TEXT("%s has drifted out of reach with %s latched to her: the marines are taken off her and brought home; the boat is lost to her drift"), *Assault.TargetName, *L->CraftName), true);
+			bool bStillAboard = false;
+			for (const FLeg& O : Assault.Legs)
+			{
+				bStillAboard |= O.State == FLeg::EState::Through || O.State == FLeg::EState::Latched;
+			}
+			if (!bStillAboard && Phase == EPhase::Active)
+			{
+				Finish(TEXT("the wreck drifted out of reach"));
+			}
+			break;
+		}
 		const bool bAboard = E.bMenAboard && !L->bLanded;
 		L->State = FLeg::EState::Lost;
 		L->bSailing = false;
@@ -2226,9 +2266,9 @@ TSharedRef<FJsonObject> UAstraBoardSubsystem::BoardingOptionsJson(int32 SideIdx)
 		if (T.bWreck)
 		{
 			FAssess A;
-			if (SideIdx != 0 || !B->AssessBoarding(First, T.Id, A) || !A.bTargetOk)
+			if (SideIdx != 0 || !B->AssessBoarding(First, T.Id, A) || !A.bTargetOk || A.DistKm > 30.f)
 			{
-				continue;
+				continue;                                                           // (the near ones only: the crew's state is read at every turn, and a wreck lies about a long time)
 			}
 			TSharedRef<FJsonObject> O = MakeShared<FJsonObject>();
 			O->SetStringField(TEXT("ship"), AsShipLabel(T));
@@ -2236,7 +2276,7 @@ TSharedRef<FJsonObject> UAstraBoardSubsystem::BoardingOptionsJson(int32 SideIdx)
 			O->SetStringField(TEXT("class"), TEXT("wreck"));
 			O->SetBoolField(TEXT("wreck"), true);
 			O->SetStringField(TEXT("part"), T.WreckSection == 0 ? TEXT("bow section") : (T.WreckSection == 1 ? TEXT("middle section") : (T.WreckSection == 2 ? TEXT("stern section") : TEXT("whole hull"))));
-			O->SetStringField(TEXT("note"), TEXT("no power, no shield, no defence, nobody alive aboard: a search of her decks, not a fight; her dead lie aboard and some of her rooms have no air"));
+			O->SetStringField(TEXT("note"), TEXT("nobody alive aboard, no defence, no shield: a search of her decks; her dead lie there"));
 			O->SetNumberField(TEXT("distance_km"), FMath::RoundToInt(A.DistKm * 10.f) / 10.0);
 			O->SetStringField(TEXT("from_the_order_to_the_hull_cut_open"), AstraBoardCraft::SpanText(MusterEstimateS() + A.EtaS));
 			WreckTargets.Emplace(A.DistKm, MakeShared<FJsonValueObject>(O));
@@ -2282,7 +2322,7 @@ TSharedRef<FJsonObject> UAstraBoardSubsystem::BoardingOptionsJson(int32 SideIdx)
 		Targets.Add(MakeShared<FJsonValueObject>(O));
 	}
 	WreckTargets.Sort([](const TPair<float, TSharedPtr<FJsonValue>>& X, const TPair<float, TSharedPtr<FJsonValue>>& Y) { return X.Key < Y.Key; });
-	for (int32 i = 0; i < FMath::Min(3, WreckTargets.Num()); ++i)
+	for (int32 i = 0; i < FMath::Min(2, WreckTargets.Num()); ++i)
 	{
 		Targets.Add(WreckTargets[i].Value);
 	}
