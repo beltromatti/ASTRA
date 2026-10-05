@@ -112,6 +112,11 @@ abbordaggi contro l'Aquila, chiesto da ABBORDAGGI).
   - i capitani nemici senza nome.
 
   Da bilanciare: l'Aquila esce quasi intatta dalla battaglia col grosso (98 %, zero missili).
+- **Unita VFX-2 tappa 3** (ebd2cc7). Colpi, fuochi, braci e segni stanno sulla pelle dello scafo, grazie alle mappe di profondità per classe (`tools/art/war_fx_hull_surface.py` → `data/war/fx_hull_surface.json` → `AstraWarFXSurface.inl`). Altro: la brace-ferita, le morti lontane più grandi, il laser leggibile.
+
+  Visto nel gioco: la morte di un Acheron a 25 km nello schermo principale (palla di fuoco intera, i tre tronconi, poi il fumo).
+
+  Rigenerazione quando cambia uno scafo: `blender -b --factory-startup --python-exit-code 1 -P tools/art/war_fx_hull_surface.py` (+ `war_fx_nozzles.py`) → `python3 tools/art/war_fx_data.py --manifest art/export/ships_v3/manifest.json` → ricompilare.
 - **Il suono della battaglia**: la morte di una nave da guerra si sente in plancia, come un'onda grave nelle casse che i sensori rendono (sonificazione, non il suono dell'esplosione: STILE §9; `SW_Sensor_Kill`, sintetizzato da `tools/art/battle_cues.py`).
 - **Correzioni dalla quinta prova:**
   - il «reactor breached» di una nave nemica non è più un avviso urgente (tagliava le chiamate dei comandanti, che si ripetevano);
