@@ -3930,7 +3930,71 @@ void UAstraShipSubsystem::FlushHitReport(bool bForce)
 			Where += FString::Printf(TEXT("; and %d more"), HitReport.People.Num() - Shown);
 		}
 	}
-	// it calls the crew when it is news: a breach, a room lost, a death, or the shields or the hull going down to the next of four steps (told again only after they have recovered
+	// where the blows fell and what became of the shield there: by face, most struck first («5 on the bow, 2 on the port»), the shield of each («the bow shield is down, the port holds at 71 %»), what got through
+	// to the plating and the section it went into
+	static const TCHAR* const FaceName[6] = {TEXT("bow"), TEXT("stern"), TEXT("port"), TEXT("starboard"), TEXT("dorsal"), TEXT("ventral")};
+	static const TCHAR* const SectionName[3] = {TEXT("bow"), TEXT("middle"), TEXT("stern")};
+	float Faces[6], Sections[3];
+	if (Battle)
+	{
+		Battle->GetPlayerFaces(Faces, Sections);
+	}
+	else
+	{
+		for (float& F : Faces) { F = 1.f; }
+		for (float& F : Sections) { F = 1.f; }
+	}
+	TArray<int32> Struck;
+	for (int32 f = 0; f < 6; ++f)
+	{
+		if (HitReport.FaceHits[f] > 0)
+		{
+			Struck.Add(f);
+		}
+	}
+	Struck.Sort([this](int32 A, int32 B) { return HitReport.FaceHits[A] > HitReport.FaceHits[B]; });
+	TArray<FString> Blows, Shields;
+	bool bFaceFell = false;
+	int32 Through = 0;
+	for (const int32 f : Struck)
+	{
+		Blows.Add(FString::Printf(TEXT("%d on the %s"), HitReport.FaceHits[f], FaceName[f]));
+		Through += HitReport.FaceThrough[f];
+		const bool bDown = Faces[f] < 0.05f;
+		Shields.Add(bDown ? FString::Printf(TEXT("the %s shield is down"), FaceName[f]) : FString::Printf(TEXT("the %s shield %s at %.0f%%"), FaceName[f], HitReport.FaceThrough[f] ? TEXT("is") : TEXT("holds"), 100.f * Faces[f]));
+		if (bDown && !FaceDownTold[f])
+		{
+			FaceDownTold[f] = true;
+			bFaceFell = true;                                       // a face gone is news, once
+		}
+		else if (!bDown && Faces[f] > 0.5f)
+		{
+			FaceDownTold[f] = false;
+		}
+	}
+	int32 HitSec = 1;
+	float PastTotal = 0.f;
+	for (int32 k = 0; k < 3; ++k)
+	{
+		PastTotal += HitReport.SectionThrough[k];
+		HitSec = HitReport.SectionThrough[k] > HitReport.SectionThrough[HitSec] ? k : HitSec;
+	}
+	FString Words = FString::Join(Blows, TEXT(", ")) + TEXT(": ") + FString::Join(Shields, TEXT(", "));
+	if (PastTotal >= 1.f)
+	{
+		bool bHolding = true;
+		for (const int32 f : Struck)
+		{
+			bHolding &= Faces[f] >= 0.5f;
+		}
+		Words += FString::Printf(TEXT("; %.0f points got past the shield into the %s section (now %.0f%%)%s"), PastTotal, SectionName[HitSec], 100.f * Sections[HitSec],
+		                         bHolding ? TEXT(": a rail slug leaks some of its energy past even a full shield") : TEXT(""));
+	}
+	else
+	{
+		Words += TEXT("; nothing went through");
+	}
+	// it calls the crew when it is news: a breach, a room lost, a death, a shield face gone, or the shields or the hull going down to the next of four steps (told again only after they have recovered
 	// and fallen anew); the words of the blows in between stay in the log and in the damage board, and the crew reads them at its next turn (5 Oct: 10 "shields took a hit, holding at
 	// 100%" and a dozen casualty and fire lines in 23 minutes each woke a turn)
 	const int32 ShBand = Sh <= 15 ? 3 : (Sh <= 40 ? 2 : (Sh <= 70 ? 1 : 0));
@@ -3938,9 +4002,8 @@ void UAstraShipSubsystem::FlushHitReport(bool bForce)
 	const bool bFell = ShBand > ShieldBandTold || HuBand > HullBandTold;
 	ShieldBandTold = ShBand;
 	HullBandTold = HuBand;
-	const bool bNews = bFell || HitReport.bGrave || HitReport.Killed > 0;
-	Event(!Where.IsEmpty() ? FString::Printf(TEXT("damage report: we've been hit — %s; shields %d%%, hull %d%%"), *Where, Sh, Hu)
-	                       : FString::Printf(TEXT("shields took a hit, holding at %d%%"), Sh), bNews);
+	const bool bNews = bFell || bFaceFell || HitReport.bGrave || HitReport.Killed > 0;
+	Event(FString::Printf(TEXT("damage report: we've been hit — %s%s%s; hull %d%%"), *Words, Where.IsEmpty() ? TEXT("") : TEXT("; "), *Where, Hu), bNews);
 	HitReport = FHitReport();
 }
 
@@ -4089,6 +4152,14 @@ void UAstraShipSubsystem::OnHullHit(const FAstraHullHit& Hit)
 	HitReport.Killed += Res.Killed;
 	HitReport.bGrave |= Res.bBreach || Res.bWreck;
 	++HitReport.Hits;
+	{
+		// which face it struck and how much of it the shield did not stop (the report says it: «shields 100 %, hull 66 %» while the hull falls sounds like an error)
+		const int32 F = FMath::Clamp(Hit.Facing, 0, 5), Sec = FMath::Clamp(Hit.Section, 0, 2);
+		const float Past = FMath::Max(0.f, Hit.Damage - Hit.ShieldTook);
+		++HitReport.FaceHits[F];
+		HitReport.FaceThrough[F] += Past >= 0.25f * Hit.Damage ? 1 : 0;
+		HitReport.SectionThrough[Sec] += Past;
+	}
 	FlushHitReport(false);
 }
 

@@ -592,7 +592,7 @@ void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 			float ShieldF = 0.5f;
 			if (O.Dmg.bModel && O.Dmg.Pool > 0.f)
 			{
-				const int32 Face = AstraFacingOf(O.Att.UnrotateVector((C - X.Pos).GetSafeNormal()));
+				const int32 Face = AstraWar::FacingOfLine(O.Box, O.Att.UnrotateVector((C - X.Pos).GetSafeNormal()));
 				ShieldF = O.Dmg.SectorMax[Face] > 0.f ? O.Dmg.Sector[Face] / O.Dmg.SectorMax[Face] : 0.f;
 			}
 			const float Vuln = FMath::Clamp(1.15f - 0.55f * HullF - 0.35f * ShieldF, 0.2f, 1.3f);
@@ -614,7 +614,7 @@ void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 				double Shield = O.Shield;
 				if (O.Dmg.bModel && O.Dmg.Pool > 0.f)
 				{
-					const int32 Face = AstraFacingOf(O.Att.UnrotateVector((C - X.Pos).GetSafeNormal()));
+					const int32 Face = AstraWar::FacingOfLine(O.Box, O.Att.UnrotateVector((C - X.Pos).GetSafeNormal()));
 					Shield = O.Dmg.Sector[Face];
 				}
 				const double Weight = O.bPlayer ? 1.9 : (O.ClassKey == FName(TEXT("aquila")) ? 1.7 : (O.ClassKey == FName(TEXT("freighter")) ? 0.15 : 1.0));

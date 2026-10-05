@@ -332,9 +332,16 @@ private:
 	float ThermalStress = 0.f;        // overheated conduits: a failure when it reaches 1
 	int32 ThermalSeq = 0;
 	float RadiatorStress = 0.f;       // blows on the radiator wings: one is torn when it reaches 1
-	struct FHitReport { TArray<FString> Lines; TArray<FString> People; int32 Hits = 0, Killed = 0; bool bGrave = false; double Since = -100.0; };   // bGrave: a breach or a room gutted
+	struct FHitReport
+	{
+		TArray<FString> Lines; TArray<FString> People;
+		int32 Hits = 0, Killed = 0; bool bGrave = false; double Since = -100.0;     // bGrave: a breach or a room gutted
+		int32 FaceHits[6] = {}, FaceThrough[6] = {};   // by face (bow, stern, port, starboard, dorsal, ventral): the blows, and those a quarter or more of which the shield did not stop
+		float SectionThrough[3] = {};                  // what got past the shields, by section (bow, middle, stern)
+	};
 	FHitReport HitReport;             // what the last blows did, told in one report
 	int32 ShieldBandTold = 0, HullBandTold = 0;   // how far down (0 above 70 % / 75 %, 3 below 15 % / 25 %) the crew was last called on the shields and the hull: the next call is for the next step down
+	bool FaceDownTold[6] = {};                      // a shield face the crew has been told is down (told again once it has come back past half)
 	TMap<FName, TWeakObjectPtr<class AAstraDoor>> DoorActors;
 	FDelegateHandle DoorPlacedHandle;
 	TSet<int32> ExternalSeals;          // ABBORDAGGI: doors the fight has sealed (the damage model does not know them): they shut again when their deck streams in

@@ -281,6 +281,13 @@ TSharedRef<FJsonObject> UAstraBattleSubsystem::DebugState() const
 				Hi->SetNumberField(TEXT("soak"), FMath::RoundToDouble(HeatBooks.Soak * 10.0) / 10.0);
 				Hi->SetNumberField(TEXT("recharge"), FMath::RoundToDouble(HeatBooks.Recharge * 10.0) / 10.0);
 				Q->SetObjectField(TEXT("heat_in"), Hi);
+				TArray<TSharedPtr<FJsonValue>> FD, FH, SS, SH;
+				for (int32 f = 0; f < 6; ++f) { FD.Add(MakeShared<FJsonValueNumber>(FMath::RoundToDouble(PlayerBooks.FaceDamage[f]))); FH.Add(MakeShared<FJsonValueNumber>(PlayerBooks.FaceHits[f])); }
+				for (int32 k = 0; k < 3; ++k) { SS.Add(MakeShared<FJsonValueNumber>(FMath::RoundToDouble(PlayerBooks.SectionStruct[k]))); SH.Add(MakeShared<FJsonValueNumber>(PlayerBooks.SectionHits[k])); }
+				Q->SetArrayField(TEXT("face_damage"), FD);
+				Q->SetArrayField(TEXT("face_hits"), FH);
+				Q->SetArrayField(TEXT("section_struct"), SS);
+				Q->SetArrayField(TEXT("section_hits"), SH);
 				const FAstraDamageModel::FBooks& Bk = Ship->GetInterior().Books();
 				TSharedRef<FJsonObject> Bo = MakeShared<FJsonObject>();
 				Bo->SetNumberField(TEXT("hits"), Bk.Hits);

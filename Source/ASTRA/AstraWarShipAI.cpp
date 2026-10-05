@@ -185,7 +185,7 @@ FVector UAstraBattleSubsystem::ChooseFacing(const FAstraBattleShip& S, const FVe
 		float Guard = 1.f;
 		if (D.bModel && D.Pool > 0.f)
 		{
-			const int32 F = AstraFacingOf(Local);                  // the face that would take the fire
+			const int32 F = AstraWar::FacingOfLine(S.Box, Local);   // the face that would take the fire (the box's: a flank from twenty degrees off the bow)
 			const float Frac = D.SectorMax[F] > 0.f ? D.Sector[F] / D.SectorMax[F] : 0.f;
 			Guard = 0.7f + 0.6f * Frac * (0.5f + 2.f * D.Base[F]);   // a full, thick face: better
 		}
