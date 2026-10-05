@@ -2,7 +2,9 @@
 #include "ASTRA.h"
 #include "Dom/JsonObject.h"
 #include "Dom/JsonValue.h"
+#include "Misc/CommandLine.h"
 #include "Misc/FileHelper.h"
+#include "Misc/Parse.h"
 #include "Misc/Paths.h"
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
@@ -118,6 +120,7 @@ namespace AstraWar
 					C.Missiles = (int32)NumField(*M, TEXT("count"), C.Missiles);
 					C.MissileCd = (float)NumField(*M, TEXT("cd"), C.MissileCd);
 					C.MissileRange = (float)NumField(*M, TEXT("range"), C.MissileRange);
+					C.MissileSalvo = (int32)NumField(*M, TEXT("salvo"), (double)C.MissileSalvo);
 				}
 				if (const TSharedPtr<FJsonObject>* L = nullptr; O->TryGetObjectField(TEXT("laser"), L))
 				{
@@ -200,7 +203,8 @@ namespace AstraWar
 		}
 		ParseClasses(Builtin, TEXT("the built-in table"));
 		FString Text;
-		const FString Path = FPaths::Combine(FPaths::ProjectDir(), TEXT("data/war/classes.json"));
+		FString Path = FPaths::Combine(FPaths::ProjectDir(), TEXT("data/war/classes.json"));
+		FParse::Value(FCommandLine::Get(), TEXT("warclasses="), Path);          // (the bench's experiments: a table of its own over the built-in one, the real file untouched: tools/war.py --classes)
 		if (FFileHelper::LoadFileToString(Text, *Path))
 		{
 			ParseClasses(Text, *Path);

@@ -75,6 +75,8 @@ struct FAstraDmgState
 	float FireAge = 0.f;
 	float Suppress = 0.f;         // fixed suppression discharging: seconds left
 	bool bSuppressSpent = false;
+	float BurnAge = 0.f;          // seconds the fire has stood at the strength of an incident (the sprinklers' warning for the people)
+	float SpentAge = 0.f;         // seconds since the suppression was discharged and spent (the reserve lines refill it after a while)
 	// power and structure
 	float Power = 1.f;            // the power the room still has
 	float Wreck = 0.f;            // 0..1: the room's fabric and what it holds; at 1 it is gutted

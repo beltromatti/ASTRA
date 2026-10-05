@@ -187,6 +187,7 @@ void UAstraBattleSubsystem::InitShipModel(FAstraBattleShip& S)
 	S.Missiles = C->Missiles;
 	S.MissileCd = C->MissileCd;
 	S.MissileRange = C->MissileRange;
+	S.MissileSalvo = C->MissileSalvo;
 	S.LaserDamage = C->LaserDamage;
 	S.LaserCd = C->LaserCd;
 	S.LaserRange = C->LaserRange;

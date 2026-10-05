@@ -238,6 +238,9 @@ public:
 	int32 InteriorCompOf(const FVector& Cm) const;
 	/** Everything the damage model has in play is made whole at once (the console's test, a new command): the incidents it owns go, the bulkheads open. */
 	void ResetInterior();
+	/** The bench waits for the Aquila's inside before its first tick: the plan's rooms are read on a worker in a second or two (the game does not wait: the first blow comes minutes later), and a headless battle runs
+	 *  a thousand times faster than the game: it could be over before the inside came, or have had her fires, holes and people left out of its first minutes, not the same way twice (BATTAGLIA-3). */
+	void WaitForInterior(double TimeoutS);
 	/** What the damage model costs: milliseconds a tick, on average and at worst (the console's info). */
 	void InteriorCost(float& OutAvgMs, float& OutMaxMs) const { OutAvgMs = InteriorMsAvg; OutMaxMs = InteriorMsMax; }
 	/** The Captain's state under the air and the fire (the screens' vignette, the harness). */

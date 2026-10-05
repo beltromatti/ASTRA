@@ -79,7 +79,13 @@ namespace
 			{TEXT("medbay"), DmMedical}, {TEXT("surgery"), DmMedical}, {TEXT("pharmacy"), DmMedical}, {TEXT("quarantine"), DmMedical},
 			{TEXT("crawlway"), DmCrawl}, {TEXT("engineering"), DmEngineering},
 			// (FLOTTA-VIVA: the kinds of the class plans that the Aquila's plan has none of)
-			{TEXT("engines"), DmMachinery}, {TEXT("coolant"), DmMachinery}, {TEXT("air_plant"), DmMachinery}, {TEXT("cargo"), DmStore}};
+			{TEXT("engines"), DmMachinery}, {TEXT("coolant"), DmMachinery}, {TEXT("air_plant"), DmMachinery}, {TEXT("cargo"), DmStore},
+			// (BATTAGLIA-3: 447 of the Aquila's 3234 rooms had no profile and burned as the default, a furnished room with a hundred seconds of fuel: the Jefferies trunks, the lift lobbies, the spine tunnels,
+			// the airlocks and the lifepod bays are bare metal and cable, and a fire in one starves as a corridor's does. In a long fight the trunks carried the fire from deck to deck and stood at a hundred
+			// per cent for minutes in eleven decks at once: the "20 to 32 fires" of 5 Oct, most of them in places nobody furnishes)
+			{TEXT("trunk"), DmShaft}, {TEXT("tunnel"), DmCorridor}, {TEXT("lobby"), DmCorridor}, {TEXT("transit"), DmCorridor}, {TEXT("airlock"), DmCorridor}, {TEXT("lifepod"), DmCorridor},
+			{TEXT("simulator"), DmOffice}, {TEXT("computer"), DmOffice}, {TEXT("cic"), DmOffice}, {TEXT("security"), DmOffice}, {TEXT("counselling"), DmOffice}, {TEXT("brig"), DmCabin},
+			{TEXT("dental"), DmMedical}, {TEXT("morgue"), DmMedical}, {TEXT("shop"), DmStore}};
 		const EDmClass* C = Table.Find(K);
 		return C ? *C : DmDefault;
 	}

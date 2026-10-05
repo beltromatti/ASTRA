@@ -23,7 +23,7 @@ namespace
 	float GDmCaptain = 1.f;          // 1: the air and the fire can hurt the Captain
 	float GDmBurn = 1.f;             // the structure the fires eat
 	float GDmDoctrine = 1.f;         // 1: pressure bulkheads and lockdowns close by themselves
-	float GDmMist = 1.f;             // 1: the rooms that have anything to burn but no gas system have the sprinklers' mist (BATTAGLIA-3); 0: only the machinery and stores have fixed suppression
+	float GDmMist = 1.f;             // 1: the rooms without a gas system have the sprinklers' mist (BATTAGLIA-3); 0: only the machinery, the magazines, the tanks and the hangars have fixed suppression
 
 	FAutoConsoleVariableRef DmCVarHole(TEXT("astra.damage.hole"), GDmHole, TEXT("DISTRUZIONE: scale of the holes a blow punches through the hull"));
 	FAutoConsoleVariableRef DmCVarFire(TEXT("astra.damage.fire"), GDmFire, TEXT("DISTRUZIONE: how readily blows start fires"));
@@ -37,7 +37,7 @@ namespace
 	FAutoConsoleVariableRef DmCVarCaptain(TEXT("astra.damage.captain"), GDmCaptain, TEXT("DISTRUZIONE: 1 the air, the smoke and the fire can hurt (and kill) the Captain, 0 they cannot"));
 	FAutoConsoleVariableRef DmCVarBurn(TEXT("astra.damage.burn"), GDmBurn, TEXT("DISTRUZIONE: scale of the hull structure the fires eat"));
 	FAutoConsoleVariableRef DmCVarDoctrine(TEXT("astra.damage.auto_seal"), GDmDoctrine, TEXT("DISTRUZIONE: 1 pressure bulkheads and lockdowns close by themselves, 0 they do not"));
-	FAutoConsoleVariableRef DmCVarMist(TEXT("astra.damage.mist"), GDmMist, TEXT("BATTAGLIA-3: 1 the cabins, messes and offices have the sprinklers' mist (fixed suppression a few seconds later than the gas), 0 only the machinery and stores do"));
+	FAutoConsoleVariableRef DmCVarMist(TEXT("astra.damage.mist"), GDmMist, TEXT("BATTAGLIA-3: 1 the rooms without a gas system have the sprinklers' mist (a few seconds later than the gas), 0 only the machinery, magazines, tanks and hangars have fixed suppression"));
 
 	constexpr float DmStep = 0.2f;                 // s: the physics' step (the Aquila's: FAstraDamageModel::StepS, which a fleet ship's inside sets longer)
 	constexpr float DmHoleMin = 0.12f;             // m2: a hole big enough to be an incident (the smaller ones are sealed by the plating itself)
@@ -1211,14 +1211,18 @@ void FAstraDamageModel::StepFire(float Dt)
 				}
 			}
 			// fixed suppression: it discharges once the fire has stood a while (the people have had their warning), if the room has power. The machinery and the stores have
-			// a gas system; the rest of the ship that has anything to burn (the cabins, the messes, the offices) has the sprinklers' mist, which comes a few seconds later and works the
-			// same way (BATTAGLIA-3: a ship in a long fight is lit in dozens of rooms, and four teams cannot walk to every one: the ship's own systems carry what they can); the
-			// corridors and shafts are bare and starve by themselves. A room is armed again when it has been calm a moment (it leaves the books).
-			const bool bMist = GDmMist > 0.5f && !P.bSuppress && P.Fuel >= 60.f;
-			if ((P.bSuppress || bMist) && !S.bSuppressSpent && S.Suppress <= 0.f && S.Fire > 0.35f && S.FireAge > (bMist ? 10.f : 6.f) && S.Power > 0.3f)
+			// a gas system; the rest of the ship (the cabins, the messes, the offices, the passages and the trunks) has the sprinklers' mist, which comes a few seconds later and works the
+			// same way (BATTAGLIA-3: a ship in a long fight is lit in dozens of rooms, and four teams cannot walk to every one: the ship's own systems carry what they can; a bare passage
+			// starves by itself only if the next room does not feed it, and in a long fight the next room does). A room is armed again after 45 s, or when it has been calm a moment (it leaves the books).
+			const bool bMist = GDmMist > 0.5f && !P.bSuppress;
+			S.BurnAge = S.Fire >= DmFireMin ? S.BurnAge + Dt : 0.f;
+			// (the gas waits for a fire of 0.35 that has stood 6 s above 0.2; the mist does not wait for it to grow: six seconds above the strength of an incident, for the people to be warned and get out, and it
+			// comes: a fire that doubles every eight seconds is a third of a room in half a minute, and a ship that is lit in dozens of rooms cannot let each grow to the gas's size before it is met)
+			if (((P.bSuppress && S.Fire > 0.35f && S.FireAge > 6.f) || (bMist && S.Fire >= 0.12f && S.BurnAge > 6.f)) && !S.bSuppressSpent && S.Suppress <= 0.f && S.Power > 0.3f)
 			{
 				S.Suppress = 22.f;
 				S.bSuppressSpent = true;
+				S.SpentAge = 0.f;
 				++Stats.Suppressions;
 				Report(FString::Printf(TEXT("damage report: fixed fire suppression has discharged in %s"), *Say(K)), false);
 			}
@@ -1229,7 +1233,21 @@ void FAstraDamageModel::StepFire(float Dt)
 				S.Fire = 0.f;
 			}
 		}
+		if (S.Fire < DmFireMin)
 		{
+			S.BurnAge = 0.f;                                   // (out, or too small to be an incident: the warning clock starts again with the next)
+		}
+		{
+			// the reserve lines refill a spent suppression after 45 s (the Aquila carries the agent for a long fight): a room that burns again late is met again, not left to the teams
+			if (S.bSuppressSpent && S.Suppress <= 0.f)
+			{
+				S.SpentAge += Dt;
+				if (S.SpentAge >= 45.f)
+				{
+					S.bSuppressSpent = false;
+					S.SpentAge = 0.f;
+				}
+			}
 			const float WasSuppressing = S.Suppress;
 			S.Suppress = FMath::Max(0.f, S.Suppress - Dt);
 			if (WasSuppressing > 0.f && S.Suppress <= 0.f && S.Fire < 0.35f)

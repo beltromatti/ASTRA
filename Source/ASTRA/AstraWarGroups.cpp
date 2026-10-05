@@ -207,6 +207,7 @@ void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 	static AstraWar::FTuneVar KBreak[2] = {AstraWar::FTuneVar(TEXT("break_a"), 1.f), AstraWar::FTuneVar(TEXT("break_m"), 1.f)};          // the losses a group bears before it breaks, times this (0: never)
 	static AstraWar::FTuneVar KFlankRatio(TEXT("flank_ratio"), 0.9f);      // the strength ratio (ours over theirs) from which the group flanks by itself
 	static AstraWar::FTuneVar KRange[2] = {AstraWar::FTuneVar(TEXT("range_ai_a"), 1.f), AstraWar::FTuneVar(TEXT("range_ai_m"), 1.f)};
+	static AstraWar::FTuneVar KPrize(TEXT("prize"), 0.f);                // the groups' hunt for the Aquila (0..1): the distance to her does not count against her as a focus, and she is worth more (BATTAGLIA-3, stage 6)
 	// --- who is in it and where
 	TArray<FAstraBattleShip*, TInlineAllocator<12>> M;
 	for (const int32 Id : G.Members)
@@ -597,8 +598,15 @@ void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 			}
 			const float Vuln = FMath::Clamp(1.15f - 0.55f * HullF - 0.35f * ShieldF, 0.2f, 1.3f);
 			const double Over = FMath::Max(0.0, X.D - (double)G.EngageRange * 1.4);
-			const float ReachF = (float)FMath::Clamp(1.3 - 0.6 * Over / 15000.0, 0.45, 1.0);
-			float Score = TargetValue(O) * (0.5f + Vuln) * ReachF;
+			float ReachF = (float)FMath::Clamp(1.3 - 0.6 * Over / 15000.0, 0.45, 1.0);
+			float Value = TargetValue(O);
+			if (O.bPlayer && KPrize.Get() > 0.f)
+			{
+				const float P = FMath::Clamp(KPrize.Get(), 0.f, 1.f);
+				ReachF = FMath::Lerp(ReachF, 1.f, P);                  // the flagship is the prize: a group does not leave her to what is nearer because she is far behind a line
+				Value *= 1.f + P;
+			}
+			float Score = Value * (0.5f + Vuln) * ReachF;
 			if (KFocus[Me].Get() > 1.5f)
 			{
 				const bool bStrict = KFocus[Me].Get() > 2.5f;                          // mode 3: what our guns reach right now, no allowance for closing
@@ -1040,7 +1048,7 @@ void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 			if (S->Missiles > 0 && S->MissileT <= 0.6f && !S->bConserve && S->SalvoAt < 0.f && D > 2600.0 && D < S->MissileRange * 0.95)
 			{
 				Ready.Add(S);
-				Cells += FMath::Min(S->Missiles, S->SizeTier >= 2 ? 6 : 3);
+				Cells += FMath::Min(S->Missiles, MassedSalvoOf(*S));
 				MaxTof = FMath::Max(MaxTof, D / 1200.0 + 1.5);
 			}
 		}

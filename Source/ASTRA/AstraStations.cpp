@@ -1013,6 +1013,12 @@ void UAstraStationsSubsystem::TickOps()
 		{
 			Sc += 10.f;
 		}
+		// (BATTAGLIA-3: in a long fight a ship burns in many rooms and four teams cannot walk to all of them: the worst first, and not to a fire the room's own suppression is already working on)
+		Sc += 40.f * D.Severity;
+		if (D.Note.Contains(TEXT("suppression discharging")))
+		{
+			Sc -= 60.f;
+		}
 		if (!What.IsEmpty() && (D.Kind.Contains(What) || D.System.Contains(What) || D.Where().Contains(What)))
 		{
 			Sc += 200.f;
@@ -1324,7 +1330,13 @@ void UAstraStationsSubsystem::TickHelm()
 			// she asks is the one that makes the closing speed she wants along the line of sight with her heading off it)
 			const double Off = FMath::DegreesToRadians(AngleDeg(Sh->GetHeadingDeg(), Sh->GetMarkDeg(), WrapDeg(B->BearingTo(T->Pos) + Yaw), B->MarkTo(T->Pos)));
 			const double Face = Err > 0.0 ? FMath::Clamp(FMath::Cos(Off), 0.25, 1.0) : 1.0;
-			SpeedFor((Away + Close) * Face / FMath::Max(0.6, FMath::Cos(FMath::DegreesToRadians(Yaw))));
+			double Want = Away + Close;
+			if (Err <= 0.0 && Away < -0.5 * (double)UAstraShipSubsystem::ReverseThrottlePct * 4.8)
+			{
+				Want = 0.0;                          // inside the standoff and the target is coming at her faster than her reverse drive can open the range: she does not run backwards at half speed
+				                                     // for ten minutes (she drifted eighty kilometres from her fleet in a long fight); she holds, and the guns do not need her to run
+			}
+			SpeedFor(Want * Face / FMath::Max(0.6, FMath::Cos(FMath::DegreesToRadians(Yaw))));
 		}
 		return;
 	}

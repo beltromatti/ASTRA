@@ -2681,7 +2681,11 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 	}
 	if (Name == TEXT("enemy_order"))
 	{
-		return Battle ? Battle->EnemyOrder(Str(TEXT("order")), Str(TEXT("reason")), Str(TEXT("commander")), OutDetail) : false;
+		// a parley is the Captain talking with that commander when he gives the order: the channel open to him (a hail, ours or theirs). The Mandate's admiral deciding by himself in the middle of a battle
+		// is not one, though it is the same command (5 Oct: «withdrawing as agreed over the channel» in front of the 7th Fleet, with no word spoken)
+		const FString Who = Str(TEXT("commander")).ToUpper();
+		const bool bParley = !ChannelParty.IsEmpty() && (Who.IsEmpty() ? (Battle && ChannelParty.Equals(Battle->MandateCommander(), ESearchCase::IgnoreCase)) : ChannelParty.Equals(Who, ESearchCase::IgnoreCase));
+		return Battle ? Battle->EnemyOrder(Str(TEXT("order")), Str(TEXT("reason")), Str(TEXT("commander")), OutDetail, bParley) : false;
 	}
 	if (Name == TEXT("channel_closed") || Name == TEXT("end_transmission"))
 	{
@@ -3779,6 +3783,15 @@ void UAstraShipSubsystem::TickInterior(float DeltaTime)
 		}
 	}
 	TickCaptainFate(DeltaTime);
+}
+
+void UAstraShipSubsystem::WaitForInterior(double TimeoutS)
+{
+	if (bInteriorLoading && InteriorFuture.IsValid())
+	{
+		InteriorFuture.WaitFor(FTimespan::FromSeconds(TimeoutS));
+		TickInterior(0.f);                                 // (installs it: the same code the tick runs when the worker is done)
+	}
 }
 
 void UAstraShipSubsystem::ResetInterior()

@@ -166,6 +166,12 @@ def fight_of(d: dict) -> dict:
         m["fires_max"] = max(h["fires"] for h in heat)
         m["teams_busy_max"] = max(h["teams_busy"] for h in heat)
         m["teams"] = heat[0]["teams"]
+        m["fires_over10_s"] = step * sum(1 for h in heat if h["fires"] >= 10)           # how long the ship burned in ten places or more
+        m["fires_over20_s"] = step * sum(1 for h in heat if h["fires"] >= 20)
+        m["teams_all_busy_s"] = step * sum(1 for h in heat if h["teams"] and h["teams_busy"] >= h["teams"])
+        last = heat[-1].get("interior") or {}
+        m["fires_lit"] = last.get("fires", 0)                                           # the fires the war lit in her rooms (the interior's books), and what the sprinklers did
+        m["sprinklers"] = last.get("suppressions", 0)
     return m
 
 
@@ -245,6 +251,10 @@ def print_rows(rows: list[dict], names: list[str], detail: bool = True) -> None:
         line("Aquila: seconds at 90% heat or more", lambda m: m.get("heat_over90_s"), "{:.0f}")
         line("Aquila: most incidents open at once", lambda m: m.get("incidents_max"), "{:.1f}")
         line("Aquila: most fires open at once", lambda m: m.get("fires_max"), "{:.1f}")
+        line("Aquila: seconds with 10 fires or more", lambda m: m.get("fires_over10_s"), "{:.0f}")
+        line("Aquila: seconds with every damage team out", lambda m: m.get("teams_all_busy_s"), "{:.0f}")
+        line("Aquila: fires lit / sprinkler discharges", lambda m: m.get("fires_lit"), "{:.0f}")
+        line("... sprinkler discharges", lambda m: m.get("sprinklers"), "{:.0f}")
     for ln in _fmt_acc(ok):
         print(ln)
     meds = [m.get("rail_median_bucket") for m in ok if m.get("rail_median_bucket")]
