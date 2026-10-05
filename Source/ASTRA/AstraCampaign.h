@@ -43,6 +43,10 @@ public:
 	/** The SETTINGS page in the menu's place (BACK returns to the menu). */
 	void ShowSettings();
 	void HideSettings();
+	/** The OpenRouter key's page (AstraApiKey.h): before the title menu until a good key is in place (bChange false: QUIT is the only other way out),
+	 *  or from SETTINGS (BACK keeps the old key). */
+	void ShowKeyGate(bool bChange);
+	void HideKeyGate();
 
 private:
 	bool bStarted = false;
@@ -54,6 +58,8 @@ private:
 	TSharedPtr<SWidget> MenuWidget;
 	TSharedPtr<SWidget> SettingsWidget;
 	TSharedPtr<class SAstraSettingsPage> SettingsPage;
+	TSharedPtr<SWidget> KeyWidget;
+	TSharedPtr<class SAstraKeyGate> KeyGate;
 	FDelegateHandle ShipEventHandle;
 
 	FString SavePath() const;

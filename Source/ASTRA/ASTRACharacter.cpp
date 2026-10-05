@@ -1,6 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "ASTRACharacter.h"
+#include "AstraSettings.h"
 #include "Animation/AnimInstance.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -83,7 +84,7 @@ void AASTRACharacter::BeginPlay()
 	// whatever an old Blueprint stored for the camera, the eyes sit above the capsule centre, facing forward
 	EyeZ = StandEyes - StandHalfHeight;
 	FirstPersonCameraComponent->SetRelativeLocationAndRotation(FVector(0.f, 0.f, EyeZ), FRotator::ZeroRotator);
-	FirstPersonCameraComponent->SetFieldOfView(90.f);
+	FirstPersonCameraComponent->SetFieldOfView(FAstraSettings::Get().Fov);       // (the player's FIELD OF VIEW: SETTINGS)
 	UCharacterMovementComponent* Move = GetCharacterMovement();
 	Move->MaxWalkSpeed = WalkSpeed;
 	Move->MaxAcceleration = 1800.f;
@@ -181,9 +182,9 @@ void AASTRACharacter::MoveInput(const FInputActionValue& Value)
 void AASTRACharacter::LookInput(const FInputActionValue& Value)
 {
 	// ABBORDAGGI: through the sights the turn is slower, as the field of view is narrower
-	const float Scale = Fps ? Fps->LookMultiplier() : 1.f;
+	const float Scale = (Fps ? Fps->LookMultiplier() : 1.f) * FAstraSettings::Get().MouseSensitivity;      // (and the player's MOUSE SPEED)
 	const FVector2D LookAxisVector = Value.Get<FVector2D>() * Scale;
-	DoAim(LookAxisVector.X, LookAxisVector.Y);
+	DoAim(LookAxisVector.X, FAstraSettings::Get().bInvertMouse ? -LookAxisVector.Y : LookAxisVector.Y);
 }
 
 void AASTRACharacter::DoAim(float Yaw, float Pitch)

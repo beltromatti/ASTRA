@@ -215,6 +215,8 @@ class _TurnQueue(asyncio.Queue):
 class Mind:
     def __init__(self) -> None:
         self.llm = OpenRouter()
+        self.llm.on_status = self._ai_status
+        self.follow_voice = True                # the crew follows the language the Captain speaks (the game's LANGUAGE settings)
         self.tts = TTSEngine()
         self.stt = Recognizer()
         self.mic = PushToTalk()
@@ -300,6 +302,25 @@ class Mind:
         self.captain_t = 0.0                     # the last time the Captain spoke
         self.lang_file = CACHE / "captain_lang.txt"
         self.lang = self.lang_file.read_text(encoding="utf-8").strip() if self.lang_file.exists() else "en"   # the Captain's language
+
+    def _ai_status(self, state: str, detail: str) -> None:
+        """OpenRouter's state changed (the credit ran out, the key was refused, the network is gone, it answers again): the game tells the
+        player what to do instead of a crew that falls silent."""
+        try:
+            asyncio.get_running_loop().create_task(self._sink("json", {"type": "ai_status", "state": state, "detail": detail[:200]}))
+        except RuntimeError:
+            pass
+
+    def _apply_language(self, msg: dict) -> None:
+        """The game's LANGUAGE settings: the crew's language at the start (the first lines are in it) and whether it follows the Captain's voice."""
+        lang = str(msg.get("lang") or "").strip().lower()
+        if lang and lang != self.lang:
+            self.lang = lang
+            if hasattr(self.tts, "prepare"):
+                asyncio.create_task(self.tts.prepare(lang, [o.voice for o in CREW.values()]))
+        if "follow_voice" in msg:
+            self.follow_voice = bool(msg.get("follow_voice"))
+        log.info("language: %s (%s)", self.lang, "follows the Captain's voice" if self.follow_voice else "fixed")
 
     async def _sink(self, kind: str, payload: Any) -> None:
         dead = []
@@ -1076,6 +1097,8 @@ class Mind:
                 dropped = self.voice.drop_low_priority()      # the Captain speaks: small talk is no longer worth saying
                 if dropped:
                     log.info("captain speaks: %d unspoken small-talk lines dropped", dropped)
+                if not self.follow_voice:
+                    lang = self.lang                          # (the settings fix the crew's language: they answer in it whatever he speaks)
                 if lang != self.lang:
                     if hasattr(self.tts, "prepare"):
                         asyncio.create_task(self.tts.prepare(lang, [o.voice for o in CREW.values()]))   # the crew will answer in it
@@ -1357,7 +1380,10 @@ class Mind:
                     continue
                 kind = msg.get("type")
                 if kind == "hello":
-                    # a new game session: the crew starts a fresh conversation (the ship state is new too)
+                    # a new game session: the crew starts a fresh conversation (the ship state is new too), in the language of the settings
+                    self._apply_language(msg)
+                    if getattr(self.llm, "state", "ok") != "ok":
+                        await self._sink("json", {"type": "ai_status", "state": getattr(self.llm, "state", "ok"), "detail": ""})
                     self.agent.history.clear()
                     self.enemy.reset()
                     self.war.reset()
@@ -1376,6 +1402,12 @@ class Mind:
                     if isinstance(self.llm, OpenRouter):
                         asyncio.create_task(self._warm_up())         # (the session's first report should not pay for a cold route)
                     log.info("new game session: conversation reset (the war waits for the Captain's choice)")
+                elif kind == "settings":
+                    self._apply_language(msg)               # (the player changed the LANGUAGE settings during play)
+                elif kind == "key_changed":
+                    from .env import reload_env
+                    reload_env()                            # (the player entered or replaced the OpenRouter key: the next request carries it)
+                    log.info("the OpenRouter key was changed by the player")
                 elif kind == "campaign":
                     # the Captain chose in the title menu: a new war, or the saved one
                     self.delegation.begin(new=msg.get("mode") != "continue")

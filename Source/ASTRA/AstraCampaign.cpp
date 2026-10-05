@@ -2,6 +2,7 @@
 
 #include "AstraCampaign.h"
 #include "AstraFonts.h"
+#include "AstraApiKey.h"
 #include "ASTRAPlayerController.h"
 
 #include "ASTRA.h"
@@ -121,7 +122,7 @@ public:
 		}
 		Item(TEXT("NEW CAMPAIGN"), bHasSave || Args._InGame ? TEXT("the war begins again at Aurelia; the saved one is lost") : TEXT("the war begins at Aurelia"),
 		     Args._OnNew, 1);
-		Item(TEXT("SETTINGS"), TEXT("graphics, sharpness, frame rate, volumes, subtitles"), Args._OnSettings, 3);
+		Item(TEXT("SETTINGS"), TEXT("graphics, sound, language, controls, AI key"), Args._OnSettings, 3);
 		Item(TEXT("QUIT"), FString(), Args._OnQuit, 2);
 
 		ChildSlot
@@ -149,7 +150,8 @@ public:
 						+ SVerticalBox::Slot().AutoHeight()
 						[
 							SNew(STextBlock).Font(MonoFont(11)).ColorAndOpacity(MenuDim).AutoWrapText(true)
-							.Text(FText::FromString(TEXT("Hold V and speak to your bridge crew, in any language (or T to type).\nE: leave or take the captain's chair.   Tab: your datapad.   Esc: this menu.")))
+							.Text(FText::FromString(FString::Printf(TEXT("Hold %s and speak to your bridge crew, in any language (or T to type).\nE: leave or take the captain's chair.   Tab: your datapad.   Esc: this menu."),
+							                                        *FAstraSettings::KeyName(FAstraSettings::Get().TalkKey))))
 						]
 					]
 				]
@@ -307,8 +309,14 @@ void UAstraCampaignSubsystem::SetMenuInput(bool bMenu)
 
 void UAstraCampaignSubsystem::ShowMenu(bool bInGame)
 {
-	if (MenuWidget.IsValid() || !GEngine || !GetWorld() || !GetWorld()->GetGameViewport())
+	if (MenuWidget.IsValid() || KeyWidget.IsValid() || !GEngine || !GetWorld() || !GetWorld()->GetGameViewport())
 	{
+		return;
+	}
+	// no way into the game without a key that works: the crew is nothing without it (a game without the mind, -astra_nomind, needs none)
+	if (!bInGame && !FAstraApiKey::IsGood() && !FParse::Param(FCommandLine::Get(), TEXT("astra_nomind")))
+	{
+		ShowKeyGate(false);
 		return;
 	}
 	bMenuInGame = bInGame;
@@ -347,7 +355,8 @@ void UAstraCampaignSubsystem::ShowSettings()
 	// the page takes the menu's place; BACK (or Esc) puts the menu back
 	VC->RemoveViewportWidgetContent(MenuWidget.ToSharedRef());
 	TWeakObjectPtr<UAstraCampaignSubsystem> Self(this);
-	TSharedRef<SAstraSettingsPage> Page = SNew(SAstraSettingsPage).OnBack_Lambda([Self]() { if (Self.IsValid()) { Self->HideSettings(); } });
+	TSharedRef<SAstraSettingsPage> Page = SNew(SAstraSettingsPage).OnBack_Lambda([Self]() { if (Self.IsValid()) { Self->HideSettings(); } })
+		.OnApiKey_Lambda([Self]() { if (Self.IsValid()) { Self->ShowKeyGate(true); } });
 	SettingsPage = Page;
 	SettingsWidget = SNew(SWeakWidget).PossiblyNullContent(Page);
 	VC->AddViewportWidgetContent(SettingsWidget.ToSharedRef(), 50);
@@ -356,6 +365,77 @@ void UAstraCampaignSubsystem::ShowSettings()
 		FInputModeUIOnly M;
 		M.SetWidgetToFocus(Page);
 		PC->SetInputMode(M);
+	}
+}
+
+void UAstraCampaignSubsystem::ShowKeyGate(bool bChange)
+{
+	UGameViewportClient* VC = GetWorld() ? GetWorld()->GetGameViewport() : nullptr;
+	if (!VC || KeyWidget.IsValid())
+	{
+		return;
+	}
+	TWeakObjectPtr<UAstraCampaignSubsystem> Self(this);
+	TSharedRef<SAstraKeyGate> Gate = SNew(SAstraKeyGate).ChangeMode(bChange)
+		.OnDone_Lambda([Self, bChange]()
+		{
+			if (Self.IsValid())
+			{
+				Self->HideKeyGate();
+				if (!bChange)
+				{
+					Self->ShowMenu(false);
+				}
+			}
+		})
+		.OnCancel_Lambda([Self, bChange]()
+		{
+			if (!Self.IsValid())
+			{
+				return;
+			}
+			if (bChange)
+			{
+				Self->HideKeyGate();
+			}
+			else
+			{
+				UKismetSystemLibrary::QuitGame(Self->GetWorld(), nullptr, EQuitPreference::Quit, false);
+			}
+		});
+	KeyGate = Gate;
+	KeyWidget = SNew(SWeakWidget).PossiblyNullContent(Gate);
+	VC->AddViewportWidgetContent(KeyWidget.ToSharedRef(), 60);
+	if (APlayerController* PC = UGameplayStatics::GetPlayerController(GetWorld(), 0))
+	{
+		PC->SetShowMouseCursor(true);
+		FInputModeUIOnly M;
+		M.SetWidgetToFocus(Gate);
+		PC->SetInputMode(M);
+	}
+	if (!bChange)
+	{
+		Gate->CheckSaved();                          // (a key saved before and still good: straight on to the menu)
+	}
+}
+
+void UAstraCampaignSubsystem::HideKeyGate()
+{
+	UGameViewportClient* VC = GetWorld() ? GetWorld()->GetGameViewport() : nullptr;
+	if (VC && KeyWidget.IsValid())
+	{
+		VC->RemoveViewportWidgetContent(KeyWidget.ToSharedRef());
+	}
+	KeyWidget.Reset();
+	KeyGate.Reset();
+	if (SettingsPage.IsValid())
+	{
+		if (APlayerController* PC = UGameplayStatics::GetPlayerController(GetWorld(), 0))
+		{
+			FInputModeUIOnly M;
+			M.SetWidgetToFocus(SettingsPage);
+			PC->SetInputMode(M);
+		}
 	}
 }
 

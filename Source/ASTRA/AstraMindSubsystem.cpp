@@ -136,6 +136,8 @@ void UAstraMindSubsystem::Connect()
 		TSharedRef<FJsonObject> Hello = MakeShared<FJsonObject>();
 		Hello->SetStringField(TEXT("type"), TEXT("hello"));
 		Hello->SetStringField(TEXT("client"), TEXT("ue"));
+		Hello->SetStringField(TEXT("lang"), FAstraSettings::Get().Language);           // (the crew's first lines are in the language of the settings)
+		Hello->SetBoolField(TEXT("follow_voice"), FAstraSettings::Get().bFollowVoice);
 		Send(Hello);
 		NextStateTime = 0.0;
 		if (!PendingCampaign.IsEmpty())
@@ -454,6 +456,52 @@ void UAstraMindSubsystem::SendCampaign(const FString& Mode)
 	Send(M);
 }
 
+void UAstraMindSubsystem::SendSettings()
+{
+	if (!IsConnected())
+	{
+		return;                                     // (the next hello carries them)
+	}
+	TSharedRef<FJsonObject> M = MakeShared<FJsonObject>();
+	M->SetStringField(TEXT("type"), TEXT("settings"));
+	M->SetStringField(TEXT("lang"), FAstraSettings::Get().Language);
+	M->SetBoolField(TEXT("follow_voice"), FAstraSettings::Get().bFollowVoice);
+	Send(M);
+}
+
+void UAstraMindSubsystem::SendKeyChanged()
+{
+	if (IsConnected())
+	{
+		TSharedRef<FJsonObject> M = MakeShared<FJsonObject>();
+		M->SetStringField(TEXT("type"), TEXT("key_changed"));
+		Send(M);
+	}
+}
+
+void UAstraMindSubsystem::ShowAiState(const FString& State, const FString& Detail)
+{
+	// the crew falls silent when OpenRouter does not answer: the player is told why, and what to do (again every half minute while it lasts)
+	AiState = State;
+	if (State == TEXT("ok"))
+	{
+		Screen(TEXT("SHIP: The crew's link is back: they answer again."), FColor::Green, 5.f);
+		return;
+	}
+	const double Now = FPlatformTime::Seconds();
+	if (Now - AiNoticeAt < 30.0)
+	{
+		return;
+	}
+	AiNoticeAt = Now;
+	const FString Why = State == TEXT("no_credit") ? TEXT("your OpenRouter credit has run out. Add credit at openrouter.ai/settings/credits; the crew answers again at once.")
+	                  : State == TEXT("invalid_key") ? TEXT("OpenRouter refused the key. Esc, SETTINGS, OPENROUTER KEY to enter it again.")
+	                  : State == TEXT("rate_limited") ? TEXT("OpenRouter is slowing the requests down for a moment: the crew answers again shortly.")
+	                                                  : TEXT("no connection to openrouter.ai: check the internet connection.");
+	Screen(FString::Printf(TEXT("SHIP: The crew cannot think: %s"), *Why), FColor::Orange, 12.f);
+	UE_LOG(LogASTRA, Warning, TEXT("[Mind] OpenRouter: %s (%s)"), *State, *Detail);
+}
+
 void UAstraMindSubsystem::OnText(const FString& Text)
 {
 	TSharedPtr<FJsonObject> Msg;
@@ -465,6 +513,10 @@ void UAstraMindSubsystem::OnText(const FString& Text)
 	if (Type == TEXT("command"))
 	{
 		HandleCommand(Msg);
+	}
+	else if (Type == TEXT("ai_status"))
+	{
+		ShowAiState(Msg->GetStringField(TEXT("state")), Msg->GetStringField(TEXT("detail")));
 	}
 	else if (Type == TEXT("line"))
 	{

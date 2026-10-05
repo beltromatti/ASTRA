@@ -70,6 +70,9 @@ protected:
 
 	/** Push-to-talk (V): the Captain speaks to the bridge crew */
 	void OnTalkPressed();
+	/** Every key, compared with the player's TALK and ORDERS keys (SETTINGS). */
+	void OnBoundKeyPressed(FKey Key);
+	void OnBoundKeyReleased(FKey Key);
 	void OnTalkReleased();
 
 	/** The captain's chair (E): sit down / stand up. The game starts seated. */

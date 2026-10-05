@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import time
 from dataclasses import dataclass, field
 from typing import Any
@@ -16,6 +17,7 @@ import httpx
 from .env import require
 
 API_URL = "https://openrouter.ai/api/v1/chat/completions"
+log = logging.getLogger("astra.openrouter")
 
 
 @dataclass
@@ -54,15 +56,34 @@ class OpenRouter:
     """Sessione HTTP/2 persistente verso OpenRouter (connessione riutilizzata)."""
 
     def __init__(self, timeout: float = 60.0) -> None:
+        # the key is read for every request (the player may enter or replace it in the game while the mind runs: env.reload_env)
         self._client = httpx.AsyncClient(
             http2=True,
             timeout=httpx.Timeout(timeout, connect=10.0),
             headers={
-                "Authorization": f"Bearer {require('OPENROUTER_API_KEY')}",
                 "HTTP-Referer": "https://github.com/beltromatti/ASTRA",
                 "X-Title": "ASTRA",
             },
         )
+        self.state = "ok"                          # what the game is told of the service: ok · invalid_key · no_credit · rate_limited · offline
+        self.on_status: Any = None                 # (state, detail) -> None: called when the state changes (server.py tells the game)
+
+    def _status(self, state: str, detail: str = "") -> None:
+        if state != self.state:
+            self.state = state
+            log.warning("OpenRouter: %s %s", state, detail[:160]) if state != "ok" else log.info("OpenRouter: answering again")
+            if self.on_status is not None:
+                try:
+                    self.on_status(state, detail)
+                except Exception:  # noqa: BLE001
+                    log.exception("the status hook failed")
+
+    @staticmethod
+    def _key_header() -> dict[str, str]:
+        try:
+            return {"Authorization": f"Bearer {require('OPENROUTER_API_KEY')}"}
+        except RuntimeError:
+            return {}
 
     async def close(self) -> None:
         await self._client.aclose()
@@ -132,12 +153,24 @@ class OpenRouter:
                 r = on_tool_call(calls[i])
                 if hasattr(r, "__await__"):
                     await r
+        auth = self._key_header()
+        if not auth:
+            out.error = "no OpenRouter key"
+            self._status("invalid_key", "no key in the .env")
+            return out
         try:
-            async with self._client.stream("POST", API_URL, json=body) as resp:
+            async with self._client.stream("POST", API_URL, json=body, headers=auth) as resp:
                 if resp.status_code != 200:
                     text = (await resp.aread()).decode("utf-8", "replace")
                     out.error = f"HTTP {resp.status_code}: {text[:300]}"
+                    if resp.status_code in (401, 403):
+                        self._status("invalid_key", text[:200])
+                    elif resp.status_code == 402:
+                        self._status("no_credit", text[:200])
+                    elif resp.status_code == 429:
+                        self._status("rate_limited", text[:200])
                     return out
+                self._status("ok")
                 lines = resp.aiter_lines().__aiter__()
                 while True:
                     try:
@@ -195,6 +228,8 @@ class OpenRouter:
                         out.reasoning_tokens = ((usage.get("completion_tokens_details") or {}).get("reasoning_tokens") or 0)
         except (httpx.HTTPError, json.JSONDecodeError) as exc:
             out.error = f"{type(exc).__name__}: {exc}"[:300]
+            if isinstance(exc, (httpx.ConnectError, httpx.ConnectTimeout, httpx.NetworkError)):
+                self._status("offline", out.error)
         if not out.error:
             await fire(None)
         out.t_end = time.perf_counter() - t0
@@ -204,7 +239,6 @@ class OpenRouter:
 
 async def credits() -> dict[str, float]:
     async with httpx.AsyncClient(timeout=20) as client:
-        resp = await client.get("https://openrouter.ai/api/v1/credits",
-                                headers={"Authorization": f"Bearer {require('OPENROUTER_API_KEY')}"})
+        resp = await client.get("https://openrouter.ai/api/v1/credits", headers=OpenRouter._key_header())
         data = resp.json().get("data", {})
         return {"total": float(data.get("total_credits", 0)), "used": float(data.get("total_usage", 0))}

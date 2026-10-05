@@ -30,11 +30,21 @@ public:
 	/** The Captain chose: a new campaign or the saved one ("new" | "continue"); the mind resets or loads the war. */
 	void SendCampaign(const FString& Mode);
 
+	/** The LANGUAGE settings changed: the crew's language and whether it follows the Captain's voice. */
+	void SendSettings();
+	/** The player entered or replaced the OpenRouter key (AstraApiKey.h): the mind reads its .env again. */
+	void SendKeyChanged();
+	/** What the mind last said of OpenRouter: "ok" · "invalid_key" · "no_credit" · "rate_limited" · "offline". */
+	const FString& GetAiState() const { return AiState; }
+
 	/** Launch `uv run astra-mind` automatically when nothing is listening (AstraMindLaunch.h: macOS, Windows, Linux). */
 	UPROPERTY(config)
 	bool bAutoLaunchMind = true;
 
 private:
+	FString AiState = TEXT("ok");
+	double AiNoticeAt = -1e9;
+	void ShowAiState(const FString& State, const FString& Detail);
 	TSharedPtr<IWebSocket> Socket;
 	FTSTicker::FDelegateHandle TickHandle;
 	double NextConnectTime = 0.0;

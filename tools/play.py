@@ -146,6 +146,13 @@ def user_idle_s() -> float:
     return 1e9
 
 
+def campaign_arg(a: argparse.Namespace) -> list[str]:
+    """The campaign the game begins: a new one (the default), the saved one (--continue), or none (--menu: the title menu, as a player sees it, with the OpenRouter key's page first)."""
+    if getattr(a, "menu", False):
+        return []
+    return ["-astra_campaign=continue" if a.cont else "-astra_campaign=new"]
+
+
 def cmd_launch(a: argparse.Namespace) -> None:
     if alive():
         print("a harness game is already running; `tools/play.py quit` first")
@@ -176,8 +183,7 @@ def cmd_launch(a: argparse.Namespace) -> None:
         if exe is None or not exe.exists():
             print(f"no app at {app}")
             sys.exit(1)
-        args = [str(exe), "-astra_harness", f"-astra_harness_port={PORT}", "-unattended",
-                "-astra_campaign=continue" if a.cont else "-astra_campaign=new"]
+        args = [str(exe), "-astra_harness", f"-astra_harness_port={PORT}", "-unattended"] + campaign_arg(a)
         if not a.player_save:
             # the tests keep their own Saved folder (Saved_Harness): a new campaign of the harness autosaved over the player's own war (4 Oct). Their
             # settings are copied there once, so a test sees the game as they do; their files are only read
@@ -187,8 +193,7 @@ def cmd_launch(a: argparse.Namespace) -> None:
                 shutil.copytree(app_saved_dir() / "Config", harness_saved / "Config")
     else:
         args = [str(ENGINE), str(ROOT / "ASTRA.uproject"), a.map, "-game", "-windowed", f"-ResX={w}", f"-ResY={h}",
-                "-astra_harness", f"-astra_harness_port={PORT}", "-unattended", "-NoVerifyGC",
-                "-astra_campaign=continue" if a.cont else "-astra_campaign=new"]
+                "-astra_harness", f"-astra_harness_port={PORT}", "-unattended", "-NoVerifyGC"] + campaign_arg(a)
     if a.nomind:
         args.append("-astra_nomind")
     elif sys.platform != "win32":
@@ -366,6 +371,7 @@ def main() -> None:
     p.add_argument("--map", default="/Game/ASTRA/Maps/L_Bridge")
     p.add_argument("--res", default="1600x900")
     p.add_argument("--continue", dest="cont", action="store_true")
+    p.add_argument("--menu", action="store_true", help="no campaign: the title menu as a player sees it (the OpenRouter key's page first)")
     p.add_argument("--nomind", action="store_true")
     p.add_argument("--sound", action="store_true")
     p.add_argument("--app", default=None, help="the packaged app (Packaged/Mac/ASTRA.app or ~/Applications/ASTRA.app) instead of the editor binary")

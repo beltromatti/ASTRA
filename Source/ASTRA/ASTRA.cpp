@@ -1,6 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "ASTRA.h"
+#include "AstraSettings.h"
 #include "Modules/ModuleManager.h"
 #include "Containers/Ticker.h"
 #include "Engine/Engine.h"
@@ -32,7 +33,7 @@ public:
 				{
 					return true;    // not yet
 				}
-				if (GSystemResolution.WindowMode == EWindowMode::Windowed)
+				if (GSystemResolution.WindowMode == EWindowMode::Windowed && FAstraSettings::Get().Display != 2)   // (DISPLAY: WINDOW keeps the window)
 				{
 					const FIntPoint Desktop = GEngine->GetGameUserSettings() ? GEngine->GetGameUserSettings()->GetDesktopResolution() : FIntPoint::ZeroValue;
 					if (Desktop.X > 0 && Desktop.Y > 0)

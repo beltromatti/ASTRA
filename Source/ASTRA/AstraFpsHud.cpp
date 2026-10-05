@@ -1,4 +1,5 @@
 #include "AstraFpsHud.h"
+#include "AstraSettings.h"
 #include "AstraFonts.h"
 
 #include "Engine/Font.h"
@@ -191,8 +192,17 @@ int32 SAstraCombatHud::OnPaint(const FPaintArgs&, const FGeometry& G, const FSla
 				WeaponRows[NW++] = K;
 			}
 		}
+		// (the TALK and ORDERS keys are the player's: SETTINGS)
+		const FString TalkKey = FAstraSettings::KeyName(FAstraSettings::Get().TalkKey) + TEXT(" hold");
+		const FString OrdersKey = FAstraSettings::KeyName(FAstraSettings::Get().OrdersKey);
+		FKeyHint CommandRows[UE_ARRAY_COUNT(FpsKeysCommand)];
+		for (int32 i = 0; i < (int32)UE_ARRAY_COUNT(FpsKeysCommand); ++i)
+		{
+			CommandRows[i] = FpsKeysCommand[i];
+			CommandRows[i].Key = i == 0 ? *TalkKey : (i == 2 ? *OrdersKey : FpsKeysCommand[i].Key);
+		}
 		constexpr int32 NM = UE_ARRAY_COUNT(FpsKeysMove), NC = UE_ARRAY_COUNT(FpsKeysCommand);
-		const float W1 = NW > 0 ? ColWidth(WeaponRows, NW) : 0.f, W2 = ColWidth(FpsKeysMove, NM), W3 = ColWidth(FpsKeysCommand, NC);
+		const float W1 = NW > 0 ? ColWidth(WeaponRows, NW) : 0.f, W2 = ColWidth(FpsKeysMove, NM), W3 = ColWidth(CommandRows, NC);
 		const int32 Columns = (NW > 0 ? 3 : 2);
 		const float W = 2.f * Pad + W1 + W2 + W3 + (Columns - 1) * ColGap;
 		const float H = 1.5f * Pad + HeadH + FMath::Max3(NW, NM, NC) * RowH;
@@ -219,7 +229,7 @@ int32 SAstraCombatHud::OnPaint(const FPaintArgs&, const FGeometry& G, const FSla
 		}
 		DrawColumn(TEXT("MOVING"), FpsKeysMove, NM, X);
 		X += W2 + ColGap;
-		DrawColumn(TEXT("COMMAND"), FpsKeysCommand, NC, X);
+		DrawColumn(TEXT("COMMAND"), CommandRows, NC, X);
 	}
 	// the marines' squads, top right: the Captain sees his orders carried out (a squad's name, how many on their feet of how many, what it is doing; amber when it is in contact, red when it is mauled)
 	if (State.SquadsAlpha > 0.02f && !State.Squads.IsEmpty())

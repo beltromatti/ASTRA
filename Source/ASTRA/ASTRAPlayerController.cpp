@@ -86,7 +86,8 @@ void AASTRAPlayerController::BeginPlay()
 		{
 			if (!HintWidget.IsValid())
 			{
-				ShowNotice(TEXT("F1  controls  ·  W or E  stand up  ·  hold V  talk to the crew  ·  T  type  ·  hold G  orders  ·  Tab  datapad"), 45.f);
+				ShowNotice(FString::Printf(TEXT("F1  controls  ·  W or E  stand up  ·  hold %s  talk to the crew  ·  T  type  ·  hold %s  orders  ·  Tab  datapad"),
+				                           *FAstraSettings::KeyName(FAstraSettings::Get().TalkKey), *FAstraSettings::KeyName(FAstraSettings::Get().OrdersKey)), 45.f);
 			}
 		});
 	}
@@ -124,8 +125,9 @@ void AASTRAPlayerController::SetupInputComponent()
 	// push-to-talk to the bridge crew
 	if (IsLocalPlayerController() && InputComponent)
 	{
-		InputComponent->BindKey(EKeys::V, IE_Pressed, this, &AASTRAPlayerController::OnTalkPressed);
-		InputComponent->BindKey(EKeys::V, IE_Released, this, &AASTRAPlayerController::OnTalkReleased);
+		// TALK and ORDERS are the player's keys (SETTINGS): every key goes through these two, which compare it with the settings
+		InputComponent->BindKey(EKeys::AnyKey, IE_Pressed, this, &AASTRAPlayerController::OnBoundKeyPressed).bConsumeInput = false;
+		InputComponent->BindKey(EKeys::AnyKey, IE_Released, this, &AASTRAPlayerController::OnBoundKeyReleased).bConsumeInput = false;
 		InputComponent->BindKey(EKeys::E, IE_Pressed, this, &AASTRAPlayerController::ToggleSeat).bConsumeInput = false;   // a Falcon uses E too
 		// the campaign menu (the game pauses behind it)
 		InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &AASTRAPlayerController::OpenMenu);
@@ -133,9 +135,7 @@ void AASTRAPlayerController::SetupInputComponent()
 		InputComponent->BindKey(EKeys::F1, IE_Pressed, this, &AASTRAPlayerController::ToggleHelp);
 		InputComponent->BindKey(EKeys::T, IE_Pressed, this, &AASTRAPlayerController::OnTypePressed);
 		InputComponent->BindKey(EKeys::Tab, IE_Pressed, this, &AASTRAPlayerController::TogglePad);
-		// the command wheel: G held; while it is open a number picks an order
-		InputComponent->BindKey(EKeys::G, IE_Pressed, this, &AASTRAPlayerController::OnOrdersPressed);
-		InputComponent->BindKey(EKeys::G, IE_Released, this, &AASTRAPlayerController::OnOrdersReleased);
+		// the command wheel: the ORDERS key held (G unless the player chose another); while it is open a number picks an order
 		const FKey Numbers[] = {EKeys::One, EKeys::Two, EKeys::Three, EKeys::Four, EKeys::Five, EKeys::Six, EKeys::Seven, EKeys::Eight};
 		for (int32 n = 0; n < 8; ++n)
 		{
@@ -275,6 +275,32 @@ void AASTRAPlayerController::OnTalkReleased()
 	if (UAstraMindSubsystem* Mind = GetGameInstance() ? GetGameInstance()->GetSubsystem<UAstraMindSubsystem>() : nullptr)
 	{
 		Mind->PushToTalk(false);
+	}
+}
+
+void AASTRAPlayerController::OnBoundKeyPressed(FKey Key)
+{
+	const FAstraSettings& S = FAstraSettings::Get();
+	if (Key == S.TalkKey)
+	{
+		OnTalkPressed();
+	}
+	else if (Key == S.OrdersKey)
+	{
+		OnOrdersPressed();
+	}
+}
+
+void AASTRAPlayerController::OnBoundKeyReleased(FKey Key)
+{
+	const FAstraSettings& S = FAstraSettings::Get();
+	if (Key == S.TalkKey)
+	{
+		OnTalkReleased();
+	}
+	else if (Key == S.OrdersKey)
+	{
+		OnOrdersReleased();
 	}
 }
 
@@ -656,6 +682,19 @@ namespace
 		TEXT("                  RB boost · LB decoys · Y recover/land · X descend\n")
 		TEXT("\n")
 		TEXT("F1  this card");
+
+	/** The card with the player's own TALK and ORDERS keys (SETTINGS) in place of V and G. */
+	FString HelpWithKeys()
+	{
+		const auto Pad = [](const FString& K, int32 Len) { FString S = K; while (S.Len() < Len) { S += TEXT(" "); } return S; };
+		const FString Talk = FAstraSettings::KeyName(FAstraSettings::Get().TalkKey), Orders = FAstraSettings::KeyName(FAstraSettings::Get().OrdersKey);
+		FString Card = HelpCard;
+		Card.ReplaceInline(TEXT("  V (hold)        talk to the crew"), *(TEXT("  ") + Pad(Talk + TEXT(" (hold)"), 16) + TEXT("talk to the crew")), ESearchCase::CaseSensitive);
+		Card.ReplaceInline(TEXT("  G (hold)        the orders wheel"), *(TEXT("  ") + Pad(Orders + TEXT(" (hold)"), 16) + TEXT("the orders wheel")), ESearchCase::CaseSensitive);
+		Card.ReplaceInline(TEXT("  V (hold)        talk to the bridge by radio"), *(TEXT("  ") + Pad(Talk + TEXT(" (hold)"), 16) + TEXT("talk to the bridge by radio")),
+		                   ESearchCase::CaseSensitive);
+		return Card;
+	}
 }
 
 void AASTRAPlayerController::EnsureStoryWidget()
@@ -1108,7 +1147,7 @@ void AASTRAPlayerController::ShowHelp(bool bShow)
 			SNew(SBorder).BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush")).BorderBackgroundColor(FLinearColor(0.004f, 0.006f, 0.01f, 0.85f))
 			.Padding(FMargin(40, 30))
 			[
-				SNew(STextBlock).Font(Font).ColorAndOpacity(FLinearColor(0.82f, 0.88f, 0.95f)).Text(FText::FromString(HelpCard))
+				SNew(STextBlock).Font(Font).ColorAndOpacity(FLinearColor(0.82f, 0.88f, 0.95f)).Text(FText::FromString(HelpWithKeys()))
 			]
 		];
 		VC->AddViewportWidgetContent(HelpWidget.ToSharedRef(), 40);

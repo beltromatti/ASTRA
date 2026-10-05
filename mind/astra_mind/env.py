@@ -1,4 +1,4 @@
-"""Caricamento delle chiavi dal file .env nella radice del repository (mai stampate)."""
+"""The keys, from the .env file (the repository's, or the packaged mind's data folder): never printed."""
 from __future__ import annotations
 
 import os
@@ -31,8 +31,16 @@ def load_env() -> dict[str, str]:
     return values
 
 
+def reload_env() -> None:
+    """The .env changed (the player entered or replaced the OpenRouter key in the game): read it again on the next use."""
+    load_env.cache_clear()
+
+
 def require(key: str) -> str:
     value = load_env().get(key, "")
     if not value:
-        raise RuntimeError(f"Chiave mancante nel .env: {key}")
+        load_env.cache_clear()                    # (perhaps written since: the player's key arrives while the mind is running)
+        value = load_env().get(key, "")
+    if not value:
+        raise RuntimeError(f"missing in the .env: {key}")
     return value
