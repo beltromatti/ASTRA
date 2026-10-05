@@ -21,7 +21,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from . import stations as station_model
-from .crew import CAPTAIN_WORD, CREW, DUTIES_V2, LANG_NAMES
+from .crew import CAPTAIN_WORD, CREW, DUTIES_V2, LANG_NAMES, WHEEL_EVENT
 from .war_minds import aboard_line, seen_line
 
 log = logging.getLogger("astra.watch")
@@ -57,7 +57,7 @@ class Watch:
     # ------------------------------------------------------------------------------------------------ input
     def note(self, text: str, now: float | None = None) -> None:
         """A ship event (any): kept for the next check when it may change what the officers should do."""
-        if SIGNIFICANT.search(text) and not text.startswith(("director:", "story:", "medbay:", "flight: controller")):
+        if SIGNIFICANT.search(text) and not text.startswith(("director:", "story:", "medbay:", "flight: controller", WHEEL_EVENT)):    # (the Captain's own order is no news for the watch)
             self._events = (self._events + [text.strip()[:220]])[-8:]
             self._event_t = self._event_t or (now if now is not None else time.monotonic())
 
@@ -280,9 +280,19 @@ def watch_system(lang: str, state: dict[str, Any], standing: str, style: str, or
         state=json.dumps(trimmed, separators=(",", ":"), ensure_ascii=False))
 
 
+_EVENT_HEAD = "[Ship systems event, not the Captain speaking] "      # (what an event turn is recorded as in the crew's history: agent.handle_event)
+
+
 def recent_orders(history: list[dict[str, Any]], n: int = 3) -> str:
-    """The Captain's last few orders, from the crew's history (their words only)."""
-    said = [m["content"][len("Captain: "):] for m in history if m.get("role") == "user" and str(m.get("content", "")).startswith("Captain: ")]
+    """The Captain's last few orders, from the crew's history: his words, and what he ordered from his command wheel without a word."""
+    said = []
+    for m in history:
+        c = str(m.get("content") or "") if m.get("role") == "user" else ""
+        if c.startswith("Captain: "):
+            said.append(c[len("Captain: "):])
+        elif c.startswith(_EVENT_HEAD + WHEEL_EVENT):
+            rest = c[len(_EVENT_HEAD + WHEEL_EVENT):]
+            said.append("(from his command wheel, no words) " + (rest.split(":", 1)[1].strip() if ":" in rest else rest.strip(" ,")))
     return "; ".join(f'"{s.splitlines()[0][:100]}"' for s in said[-n:])
 
 

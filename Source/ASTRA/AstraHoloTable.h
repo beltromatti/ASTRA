@@ -75,6 +75,9 @@ private:
 	UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> ReachRings;
 	UPROPERTY() TArray<TObjectPtr<UTextRenderComponent>> ReachLabels;
 	UPROPERTY() TArray<TObjectPtr<UTextRenderComponent>> TargetLabel;
+	// the system's Janus Gate and what is coming through it (AstraGateWatch.cpp): its ring, where a force on its way in comes out, how many and how soon
+	UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> GateMarks;
+	UPROPERTY() TArray<TObjectPtr<UTextRenderComponent>> GateLabels;
 	// the sector plot (the war map): systems, gate links, names
 	UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> SectorNodes;
 	UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> SectorLinks;
@@ -146,6 +149,7 @@ private:
 	void TickSector(float DeltaTime, const FVector& ViewerLocal, float Fade);
 	void HideTactical();
 	void TickBearings(const class UAstraBattleSubsystem* Battle, const FVector& ViewerLocal, float Fade);
+	void TickGate(const class UAstraBattleSubsystem* Battle, const FVector& ViewerLocal, float Fade);
 	/** A line on the plot from A to B (actor-local), with its colour and brightness. */
 	void PlaceLine(UStaticMeshComponent* L, const FVector& A, const FVector& B, float Thickness, const FLinearColor& Color, float Intensity);
 	void HideSector();

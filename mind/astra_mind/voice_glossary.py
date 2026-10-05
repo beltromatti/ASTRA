@@ -72,7 +72,7 @@ _TERMS: list[tuple[str, tuple[str, ...], bool]] = [
     ("Cassia", ("casia", "cacia", "kassia", "kessia", "kasia"), False),
     ("Meridian", (), False),
     ("Concordia", (), False),
-    ("Thule", ("tule", "tulle", "thoule"), False),
+    ("Thule", ("tule", "tulle", "thoule", "toul", "thul"), False),
     ("Erebus", ("erebo", "erebus"), False),
     ("Niflheim", ("nifelheim", "niflheim", "niffleim"), True),
     ("Ophir", ("ofir", "ophir"), False),

@@ -67,6 +67,7 @@ Tutti JSON in frame di testo, tranne l'audio (frame binario). Formato dell'audio
 | `channel` | bool | `true` se non è un ufficiale a bordo (radio, nemico, ammiraglio…) |
 | `priority` | string | `answer` · `urgent` · `normal` · `low` |
 | `answer` | bool | è la risposta al Capitano |
+| `addressed` | bool | è rivolta al Capitano (un ordine dell'ammiraglio alla Aquila, una chiamata che deve prendere): come una risposta, la mente non la perde mai (sezione 5bis) |
 | `topic` | string\|null | argomento dichiarato dal produttore |
 | `est_s` | float | durata prevista dell'audio, in secondi |
 | `hold_s` | float | quanto deve restare a schermo il sottotitolo (regola in 3.1) |
@@ -83,6 +84,14 @@ Tutti JSON in frame di testo, tranne l'audio (frame binario). Formato dell'audio
 **`line_dropped`** — *informativo*: una riga accodata che non verrà mai detta: `{"type":"line_dropped","id":13,"speaker":"sensors","text":"…","reason":"expired"}`. `reason` ∈ `captain_spoke` (chiacchiera scartata quando il Capitano parla), `superseded` (una riga più recente sullo stesso argomento, o il resto di un messaggio interrotto il cui autore ha risposto al Capitano), `expired` (troppo tempo in coda, o un rapporto su una notizia ormai vecchia), `stale`, `overflow`, `synth_failed`, `synth_timeout`, `no_audio` (solo punteggiatura: la voce non fa alcun suono), `no_listener`, `empty`, `merged_into_<id>` (unita a un'altra riga: il suo testo è dentro quella), `new_session`, `cleared`. Il gioco non deve fare nulla (non ne ha mai visto il `line`); può scriverlo nel log.
 
 **`floor`** — chi ha la parola: `{"type":"floor","state":"idle|crew|captain","line":12|null}`. `captain` da quando il Capitano preme il tasto (o manda un ordine scritto) finché la sua risposta non comincia; `crew` mentre una riga è in ascolto; `idle` altrimenti. Serve ad abbassare la musica (sezione 4.4) senza indovinare dal contenuto della coda audio.
+
+**`notice`** — *una riga rivolta al Capitano la cui voce non si è riusciuta a fare*: `{"type":"notice","id":14,"speaker":"comms","name":"…","text":"…","lang":"it","tone":"…","channel":false,"priority":"answer","answer":true,"addressed":false,"hold_s":4.8,"why":"…"}`. La mente l'ha chiesta due volte alla sintesi (`SYNTH_RETRIES`) e non è venuta (macchina occupata, modello inciampato): il Capitano la **legge**. Il gioco la mostra come sottotitolo senza voce (`hold_s`, almeno 3 s) e la tiene nel registro delle comunicazioni; non arriva mai `line`/`audio_*` per quell'id. Non succede quasi mai: era il destino, il 5/10, di due risposte al Capitano e di un avviso (`synth_timeout`).
+
+**`net_traffic`** — *una riga detta su una rete radio* (flotta, volo, marines), ascoltata o no dal Capitano: `{"type":"net_traffic","net":"fleet|flight|marines","console":"comms|flight|xo","speaker":"solm","name":"…","text":"…","lang":"it","urgent":false,"addressed":false,"aloud":false,"answer":false}`. **Non si voce mai da questo messaggio**: serve alla console e al taccuino (sezione 5ter). `aloud` = la riga è andata anche all'altoparlante del ponte (e arriva il suo `line`); `addressed` = è per il Capitano; `urgent` = chi parla dice «pericolo ora».
+
+**`console_log`** — *una riga silenziosa sul registro di una console*: `{"type":"console_log","station":"xo|helm|ops|tactical|comms|sensors|engineering|flight","text":"…","kind":"routine|notice","by":"…"}`. La scrive un ufficiale con lo strumento `console_log`: la routine della sua console, che il Capitano legge sulla console o sul taccuino quando vuole e che nessuno dice a voce. `kind: notice` = una riga che l'ufficiale ha voluto far notare (il gioco la evidenzia).
+
+**`net_speaker`** — *il Capitano ha messo una rete sull'altoparlante* (o l'ha tolta): `{"type":"net_speaker","net":"flight","on":true}`. Finché una rete è lì le sue voci si ascoltano com'erano prima delle reti (ogni riga con il suo `line`); la console lo mostra. Lo stato non si salva: a `hello` (nuova sessione) nessuna rete è sull'altoparlante.
 
 ### 2.2 Gioco → mente
 
@@ -206,6 +215,50 @@ Colla nel server (le sole righe di `server.py` toccate, elenco nel rapporto): `p
 
 `voice.captain_speaks()` è il gancio che il server chiama quando il Capitano comincia a parlare: chi parla si ferma (alla prossima pausa entro mezzo secondo, altrimenti una dissolvenza rapida) e le righe `LOW` in coda sono scartate; si può chiamare più volte e accanto a `captain_begin/captain_input` (una riga già in fase di stop resta com'è); con il tasto giù non fa altro, senza tasto prende anche il palco per la risposta, come un ordine scritto (che non ferma una risposta già in corso a un ordine precedente). Il palco accetta anche un motore di voce della prima versione (il cui `stream` è un generatore asincrono di PCM senza tono né arresto): i doppioni di prova di altri moduli continuano a funzionare.
 
+## 5bis. Ciò che è rivolto al Capitano non si perde (VOCI-3)
+
+Il 5/10 due risposte al Capitano e un avviso sono andati perduti (`synth_timeout`), e nelle battaglie fitte la coda piena (`MAX_QUEUED` = 10) scartava righe urgenti e risposte insieme alla chiacchiera. Ora una riga è **protetta** (`Line.protected`) se è una risposta (`Prio.ANSWER`) o è `addressed` (rivolta a lui: `voice.say(..., addressed=True)`):
+
+- **Niente scadenza né `stale_if`**: si dice quando arriva il suo turno (nessun «notizia vecchia»). Se ci sono più righe di quante la coda ne tenga, le vittime sono solo le non protette (`overflow`).
+- **Voce non fatta** (la sintesi fallisce, non risponde entro `SYNTH_TIMEOUT_S`, o produce silenzio): la mente la richiede alla sintesi fino a due volte (`SYNTH_RETRIES`, il contatore `tries`); alla terza il Capitano **la legge**: messaggio `notice` (sezione 2.1), e la riga conta come detta nel registro di ciò che il ponte ha detto (gli ufficiali non la ripetono). Contatori: `voice.stats["synth_again"]`, `["noticed"]`.
+- **Ripensamento** (`rethink`) scaduto o fallito: la riga si dice com'era, non si perde. Solo chi l'ha scritta la può ritirare: un ripensamento che risponde `None` per scelta (la cosa non conta più) dà `line_dropped{reason:"rethought"}`, com'era.
+- **Interrotta dal Capitano** riprende fino a 8 volte (`MAX_RESUMES_ADDRESSED`, 3 per le altre) e non invecchia mai.
+- Un ripensamento che finisce con uno scarto **sveglia il palco** (prima la riga dopo poteva restare in coda per sempre: una svista del palco trovata dal banco).
+
+Chi mette `addressed`: `_say_external` (comandanti del Mandato sul canale, la chiamata di Fleet command, il controllo del porto: tutto ciò che è detto *a lui*), `_ally_say(..., to="aquila")` e `_rourke_say(direct=True)` quando la riga è una chiamata a lui nella voce di chi parla, e una riga di rete che chiama il Capitano (sezione 5ter, la dice il suo ascoltatore).
+
+**Un avviso di pericolo, o una chiamata a lui su una rete, non si perde nemmeno se il Capitano parla subito.** Il turno di rapporto aspetta fino a 3 s che la riga in corso finisca e 0,6 s che arrivi ciò che accompagna l'avviso: se in quel lasco arrivano le parole del Capitano, prima rispondono a lui (il rapporto era in attesa), ma l'avviso (`_URGENT_EVENT`) e il traffico di rete che lo chiama (`nets.CALL_MARK`) tornano in coda e si dicono dopo il suo ordine (l'ufficiale tace se l'ordine li copriva già). Prima di VOCI-3 le notizie raccolte in quel lasco sparivano tutte (`bench.voice_replay` r5 falliva); le notizie semplici restano nello stato della nave e nella cronologia, come sempre.
+
+## 5ter. Le reti radio, i registri delle console e chi ascolta (VOCI-3)
+
+Il 5/10 la flotta, il volo e i marines parlavano tutti sull'unico altoparlante del ponte: ~480 righe in 70 minuti, un terzo mai ascoltato, le stesse notizie da tre bocche e gli ordini del Capitano perduti dietro. Ora una **rete** (`astra_mind/nets.py`) ha un **ascoltatore**, l'ufficiale che ha il turno su quel canale, e il Capitano sente il ponte come un ponte vero: l'XO per il quadro, gli altri ufficiali per la loro console solo quando serve, il resto sul registro.
+
+| Rete | `net` | Ascoltatore | Console (`net_traffic.console`) |
+|---|---|---|---|
+| Rete della flotta (Fleet command, i capitani alleati) | `fleet` | Comunicazioni (`comms`) | `comms` |
+| Rete del volo (CAG, caposquadriglia, Capo del Ponte) | `flight` | Controllo di volo (`flight`, Price) | `flight` |
+| Rete dei marine (maggiore Reyes, capisquadra) | `marines` | l'XO | `xo` |
+
+**Cosa arriva all'altoparlante da solo** (e non passa dall'ascoltatore): (1) la **risposta** a una parola del Capitano (`answer`: l'ammiraglio che gli risponde, un capitano a una sua richiesta: passa prima di tutto e non si perde); (2) una **chiamata diretta** a lui nella voce di chi parla (`direct`: l'ordine di Fleet alla Aquila); (3) una rete che il Capitano ha **messo sull'altoparlante** («metti la rete del volo sull'altoparlante», strumento `net_speaker`, che solo un suo turno può usare) e finché non dice di toglierla; (4) la rete del volo mentre è **in una cabina di pilotaggio o sul ponte di volo** (è la sua radio: `Mind._flight_presence`). Le reti dei comandanti del Mandato non sono reti: chi lo chiama gli parla (5bis, `addressed`).
+
+**Tutto il resto è traffico di rete** (`Nets.post`): va registrato (`net_traffic`, sezione 2.1: consoles e taccuino) e consegnato all'ascoltatore come **evento del suo turno** (`net: traffic on the fleet net — N lines the Captain has NOT heard … Comms has the watch on this net: …`, con l'età di ogni riga e chi la manda; `[URGENT]` se il mittente ha detto «pericolo ora»; «and calls the Captain» se è per lui). Il turno è un turno dell'equipaggio come gli altri: l'ascoltatore decide con la sua dottrina (`agent.NET_ASK`, `crew._NETS`) se dire una riga al Capitano (`speak`: è la *sua* voce, in italiano o come parla il Capitano, e passa dal palco con le sue priorità) o scrivere la routine sul registro con `console_log` (silenzioso). Un messaggio per gli altri alla rete (un capitano a un altro: `to` ≠ `aquila`/`fleet`) si registra e basta: nessuno viene svegliato.
+
+**Con quale richiesta** (`agent.net_ask`): un turno di sole notizie di rete è chiesto con la **sola dottrina dell'ascoltatore** (`NET_ASK`: «TELL HIM» o «LOG IT», con le condizioni scritte); se nello stesso turno ci sono altre notizie, la richiesta generale (`EVENT_ASK`, «riferisci») la precede. Misurato dal vivo (`bench.voci3_live`, il modello dell'equipaggio, 0,0003 $ a turno): con la richiesta generale per prima gli ascoltatori leggevano a voce la routine (posizioni, «rearmed», «squad in position») in 14 prove su 24; con la sola dottrina scritta come due elenchi (cosa dirgli, cosa solo registrare) 28 prove su 28 fanno la cosa giusta: la routine sul registro senza una parola, e una riga dell'ascoltatore per l'urgente, la chiamata a lui, il pilota o il marine a terra.
+
+**I tempi** (`nets.py`): il traffico urgente va all'ascoltatore subito, quello rivolto al Capitano dopo `ADDRESSED_BATCH_S` = 1,2 s (un respiro per ciò che arriva con esso), la routine insieme dopo `ROUTINE_BATCH_S` = 12 s dalla prima riga. Un turno d'ascolto con una sola riga di registro e nessun `speak` non entra nella conversazione dell'equipaggio (non c'è nulla da ricordare).
+
+**`console_log`** (strumento degli ufficiali, in ogni loro turno): scrive una riga su una console (`xo`, `helm`, `ops`, `tactical`, `comms`, `sensors`, `engineering`, `flight`; `kind` `routine` o `notice`) e sul taccuino; nessuno la sente. Il registro tiene le ultime 40 righe per console (`LOG_KEEP`) e il traffico le ultime 80 per rete (`TRAFFIC_KEEP`).
+
+**Cosa sanno gli ufficiali**: la testa dello stato del ponte (`[The bridge now]`) porta «sulle reti e sui registri delle console, NON detto a voce» (`Nets.digest`: le ultime 12 righe degli ultimi 150 s, le reti sull'altoparlante in testa), così nessuno ripete a voce ciò che è già sul registro e chi parla sa che «nessuno ha detto nulla» non vuol dire che la rete taccia.
+
+**Il gioco** (C++, `AstraMindSubsystem` / `AstraScreensSubsystem`): `net_traffic` e `console_log` finiscono in `NetLines` (160 righe) e nel cronometro (`FAstraTimeline`, «net»/«log»); la console Comunicazioni mostra il traffico della rete della flotta, la console Volo quello della rete del volo; il taccuino ha una pagina **LOG** (Tab, ruota delle pagine) con tutto, anche i marine: le righe già ascoltate in grigio, quelle da notare in ambra, quelle urgenti in rosso; `net_speaker` fa dire alla testata della pagina quali reti sono sull'altoparlante. (Il C++ di VOCI-3 non è stato compilato dall'aiutante: lo compila il capo.)
+
+**Interruttore**: `ASTRA_NETS=0` rimette il vecchio instradamento (ogni rete parla sull'altoparlante, nessun ascoltatore: sono le stesse linee di prima e il banco `bench.voci3_games` lo usa come termine di confronto, `OLD`). Si cambia al prossimo avvio della mente.
+
+## 5quater. Gli ordini dati senza parole: il quadrante dei comandi (VOCI-3)
+
+Il Capitano può dare un ordine senza dire nulla (tasto G tenuto premuto: modi delle stazioni tactical/helm/flight/ops, `set_alert`): il gioco lo esegue (`ApplyCommand`, `by=captain`) e manda alla mente `event{text:"bridge: the Captain gave an order from his command wheel, without a word: <cosa> (<dettaglio del comando>)", report:true}` (`crew.WHEEL_EVENT`). Per la mente **è un suo ordine come uno detto a voce**: `Mind._wheel_turn` lo prende subito, in un turno suo (non aspetta un ponte silenzioso, non si unisce alle altre notizie), dentro `captain_turn_begin` (la riga è una **risposta**: passa prima di tutto e non si perde), con il solo strumento `speak` (la console ha già fatto ciò che è stato ordinato: nessuno lo ripete) e senza gli ordini permanenti. L'ufficiale della stazione (l'XO per l'allarme) conferma in una parola o due, nessun altro parla (`agent.WHEEL_ASK` e la regola «The command wheel» in `crew._RULE_BASE`), senza domande né spiegazioni né ripetere ciò che il quadrante mostra; una riga sola solo se il comando non è passato o fa male alla nave in un modo che il Capitano può non vedere. L'ordine resta nella conversazione (l'osservatore di iniziativa lo legge tra gli ultimi ordini, `initiative.recent_orders`) e non è una notizia per l'osservatore (`Watch.note`). Più ordini in pochi secondi sono più turni, ciascuno confermato dal suo ufficiale. Il gioco manda `report:true` solo se vuole la conferma a voce; con `report:false` la mente non dice nulla.
+
 ## 6. Regolazioni (variabili d'ambiente)
 
 | Variabile | Predefinito | Cosa fa |
@@ -223,6 +276,7 @@ Colla nel server (le sole righe di `server.py` toccate, elenco nel rapporto): `p
 | `ASTRA_VOICE_MODELS` | `<home>/voice/models` | dove cercare i modelli di Whisper/Parakeet |
 | `ASTRA_MIC` | `auto` | `always` (microfono sempre aperto), `ptt` (aperto solo a tasto premuto), `off` (nessun dispositivo: il tasto prende la parola e registra silenzio; per le prove), `auto` |
 | `ASTRA_VOICE_QOS` | 1 | priorità dei thread della voce (macOS) |
+| `ASTRA_NETS` | 1 | `0` = il vecchio instradamento: le reti della flotta, del volo e dei marine parlano tutte sull'altoparlante e nessun ascoltatore le legge (sezione 5ter; serve da confronto nei banchi e come rete di sicurezza) |
 | `ASTRA_MIND_LOG`, `ASTRA_MIND_PORT`, `ASTRA_TTS_WARM` | — / 8765 / 1 | il file in cui la mente scrive il suo log (lo imposta il gioco); la porta (la legge anche il gioco); `0` = nessuna voce caricata in anticipo (prove). Vedi [WINDOWS.md](WINDOWS.md) §4.5 |
 
 ## 7. Come si prova (dalla cartella `mind/`)
@@ -231,6 +285,10 @@ Colla nel server (le sole righe di `server.py` toccate, elenco nel rapporto): `p
 uv run python -m bench.voice_units            # 84 controlli veloci (audio, nomi, lingua, riconoscitore con motori finti, regole del testo tagliato)
 uv run python -m bench.voice_floor -v         # 30 scenari del palco con orologio virtuale (-v: la cronologia vista dal gioco)
 uv run python -m bench.voice_replay -v        # 5 rifacimenti del test dal vivo del capo attraverso il server vero (agente, router, palco), modello e voci finti
+uv run python -m unittest bench.voci3_unit    # le reti, il registro, lo strumento `console_log`, l'altoparlante, le righe rivolte al Capitano, il quadrante dei comandi (37 controlli, nessuna rete)
+uv run python -m bench.voci3_floor -v         # 8 scenari del palco e delle reti con orologio virtuale (una risposta mai persa, la voce rifatta e poi `notice`, ...)
+uv run python -m bench.voci3_games s2 s3      # le partite del 5/10 (bench/data/games_2026-10-05, ricavate dai log con bench/games_extract.py) rimesse nel server vero: REAL / OLD / NEW
+uv run python -m bench.voci3_live --only nets --runs 4   # (modello vero, chiave nell'ambiente, ~0,01 $) gli ascoltatori delle reti e le conferme del quadrante dei comandi, giudicati dalle chiamate agli strumenti
 uv run python -m bench.voice_pipeline stt --backends parakeet-ultra,whisperkit-baseline   # riconoscimento: WER e latenza, motori alternati clip per clip
 uv run python -m bench.voice_pipeline live tts mic floor mem   # (più sezioni di seguito) dal tasto al testo, sintesi, microfono, palco con voce vera, memoria
 uv run python -m bench.voice_pipeline report  # il rapporto in docs/bench/voce_<data>.md (dopo aver girato le sezioni)

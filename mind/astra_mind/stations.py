@@ -30,7 +30,7 @@ SQUADRONS = ("alpha", "bravo", "drones")
 WEAPON_GROUPS = ("railguns", "lasers", "missiles", "torpedoes")
 SECTORS = ("forward", "aft", "port", "starboard", "dorsal", "ventral")
 POWER_PROFILES = ("balanced", "combat", "evasive", "silent", "shields", "weapons", "engines")
-DATAPAD_PAGES = ("overview", "contact", "damage", "fleet", "orders")
+DATAPAD_PAGES = ("overview", "contact", "damage", "fleet", "orders", "log")
 POWER_SYSTEMS = ("shields", "weapons", "engines", "sensors", "life_support", "flight_deck")
 
 
@@ -198,7 +198,7 @@ def _build() -> dict[str, Station]:
           "systems and guns too for our own ships, by datalink)",
           (_target(required=False, desc="optional: a contact id (T-21) to show that ship; empty for the Aquila"),), "order", native="ship"),
         m("ops", "datapad", "datapad_push", "put a page on the Captain's datapad (Tab shows it)",
-          (P("page", STR, "overview | contact (a dossier: give focus) | damage | fleet | orders", required=True, enum=DATAPAD_PAGES),
+          (P("page", STR, "overview | contact (a dossier: give focus) | damage | fleet | orders | log (what the officers wrote on their consoles' logs and the nets said that the Captain did not hear)", required=True, enum=DATAPAD_PAGES),
            P("focus", STR, "a contact id, for the page 'contact'")), "order", native="push"),
         m("ops", "damage_control", "dc_auto", "the damage-control teams go where the worst is: breaches, fires, then what a fight needs",
           (), "order", native="auto"),

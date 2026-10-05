@@ -101,6 +101,10 @@ protected:
 	void TickPad(float DeltaTime);
 	/** Brackets and names on the bow window (AstraWindowHud). */
 	TSharedPtr<class FAstraWindowHud> WindowHud;
+	/** G: the Captain's orders without a word (AstraCommandWheel.h): hold, point, let go; a number picks; Esc gives no order. */
+	TSharedPtr<class FAstraCommandWheel> Orders;
+	void OnOrdersPressed();
+	void OnOrdersReleased();
 	UPROPERTY() TObjectPtr<class UStaticMeshComponent> PadMesh;
 	bool bPadUp = false;
 	float PadAlpha = 0.f;

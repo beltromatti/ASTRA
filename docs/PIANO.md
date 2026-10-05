@@ -1,13 +1,28 @@
-# ASTRA — Piano v0.6
+# ASTRA — Piano v0.7
 
-*2 ottobre 2026 · aggiorna la v0.4 (30/9). Nuovo: la nave progettata come una nave vera, con ascensori veri e abitata ovunque
-(F4.3), e le altre navi che si comportano come l'Aquila anche quando non si camminano (FLOTTA-VIVA): così diventano giocabili
-abbordaggi e, in futuro, il PvP. Il lead gioca partite intere da Capitano per rifinire l'esperienza.
-Architettura, moduli e contratti: [ARCHITETTURA.md](ARCHITETTURA.md). Stato: [STATO.md](STATO.md).*
+*5 ottobre 2026 · aggiorna la v0.6 (2/10). Nuovo: **il gameplay prima di tutto**. Le partite dell'utente del 5/10 ([PARTITE_2026-10-05.md](PARTITE_2026-10-05.md))
+dicono che tutto c'è ma il Capitano non ha il controllo: troppe voci, risposte perse, scontri di secondi decisi da altri, attriti nei luoghi.
+La v0.7 rifà il cuore del gioco (§0bis) prima di aggiungere altro. Architettura, moduli e contratti: [ARCHITETTURA.md](ARCHITETTURA.md).
+Stato: [STATO.md](STATO.md).*
 
 > **Lingua del gioco: inglese** (nomi, lore, scritte, interfacce). Gli NPC parlano la lingua del giocatore.
 
 ---
+
+## 0bis. Il cuore del gioco (v0.7): chiarezza, controllo, battaglie epiche
+
+Il Capitano **comanda, non micro-gestisce**: vede tutto, decide spesso, e la nave combatte bene da sola ma in modo brillante con lui.
+Quattro pilastri, ognuno con il suo modulo e le sue misure (le partite vere come banco):
+
+| Pilastro | Che cosa deve essere vero | Chi | Misura |
+|---|---|---|---|
+| **Chiarezza** | l'XO dà il quadro; gli altri parlano per la loro console quando serve, brevi; le reti radio (flotta, volo, marine, nemico) hanno chi le ascolta e riferisce; la routine sta sui registri e sul datapad; nessuna risposta al Capitano persa | VOCI-3 | battute in plancia al minuto in battaglia (oggi ~7, con 2 su 5 mai dette), ripetizioni, risposte perse (oggi 4 dell'ammiraglio), latenza della prima risposta |
+| **Controllo** | l'iniziativa degli ufficiali sta dentro l'autorità data e si annuncia; il Capitano la cambia a parole; il timone e le armi eseguono e manovrano bene da soli | VOCI-3 · BATTAGLIA-3 | iniziative non chieste, ordini persi, nemici in ritirata persi dal timone |
+| **Battaglie epiche e continue** | fuoco per minuti a decine di km, precisione che cala con la distanza, navi che muoiono a pezzi in minuti, nemico che si batte per un piano, calore e incendi che pesano senza paralizzare, tutto visibile | BATTAGLIA-3 · il lead (regia dello schermo) | durata degli scontri (oggi secondi), tempo con il fuoco in corso, chi uccide chi, ritirate premature |
+| **Niente attriti** | i luoghi con un solo nome per tutti (teletrasporto, XO, comparse), la posizione del Capitano sempre fresca, l'abbordaggio in minuti e il Capitano con i suoi marine | il lead (LUOGHI) · ABBORDAGGI-4 | tentativi per arrivare dove si vuole, tempi d'abbordaggio |
+
+Il lead gioca partite intere come un giocatore dopo ogni traguardo, con la stessa lista di misure, e rimanda ai moduli ciò che trova.
+Poi, sullo stesso cuore: la plancia al dettaglio e le persone vere (MetaHuman), la guerra più grande, la nave intera, il pianeta.
 
 ## 0. L'obiettivo di questa fetta
 
@@ -152,9 +167,9 @@ nello stesso contratto: Parakeet ONNX su CPU, TSR.
 Fino a tre agenti (Sonnet 5.5, sforzo massimo) su moduli indipendenti, ognuno nel suo worktree. Il lead dirige,
 integra, prova nel gioco vero, e li chiude quando il modulo è perfetto. Brief in `docs/brief/`.
 
-| Fatti e uniti | Adesso (4/10) | Poi (appena si libera un posto) |
+| Fatti e uniti | Adesso (5/10) | Poi (appena si libera un posto) |
 |---|---|---|
-| MENTE-EQUIPAGGIO, ARTE-PLANCIA, VOCE, NAVE, NAVE-2, ARTE-NAVI, GUERRA, VITA, METALFX, VFX, MENTE-GUERRA, SCALA, DISTRUZIONE, VOLO, NAVE-3, ASCENSORI, ABBORDAGGI (F5.1), TELETRASPORTO, ARTE-PLANCIA-2, CAMPAGNA, **ARTE-INTERNI (primo giro), FLOTTA-VIVA** | **ABBORDAGGI** (F5.2: il Capitano all'abbordaggio) · **SPAZIO-VIVO** (relitti, detriti, capsule, moto delle capitali) · **WINDOWS** (portabilità) | ARTE-INTERNI-2 (le stanze più deboli, i letti vecchi, i soffitti) · PRESTAZIONI-GPU (il costo fisso della scena in battaglia: traslucidi, mesh a istanze, telecamera dello schermo principale) · VFX-2 (armi e motori più leggibili alle distanze vere: dopo che il lead le ha giudicate nel gioco) |
+| MENTE-EQUIPAGGIO, ARTE-PLANCIA, VOCE, NAVE, NAVE-2, ARTE-NAVI, GUERRA, VITA, METALFX, VFX, MENTE-GUERRA, SCALA, DISTRUZIONE, VOLO, NAVE-3, ASCENSORI, ABBORDAGGI (F5.1, F5.2, ABBORDAGGI-3: ponti vestiti, esercitazione, libri), TELETRASPORTO, ARTE-PLANCIA-2, CAMPAGNA, ARTE-INTERNI e ARTE-INTERNI-2, FLOTTA-VIVA, SPAZIO-VIVO e SPAZIO-VIVO-2, WINDOWS | **VOCI-3** (chiarezza e controllo: reti, palco, registro silenzioso, dottrina) · **BATTAGLIA-3** (scontri continui e lunghi, timone e tiro bravi, nemico che si batte) · **ABBORDAGGI-4** (ritmo, il Capitano con i marine, la fanteria comandata, la prima persona); il lead: **LUOGHI** e le prove | ARTE-SCAFI (le navi al livello di EVE: materiali, dettagli, luci) · PRESTAZIONI-GPU · VFX-2 (le armi alle nuove distanze, dopo BATTAGLIA-3) · ARTE-INTERNI-3 (sale comando, officine, stive, le stanze ripetute) |
 
 Il lead, intanto: l'integrazione e le prove di ogni modulo; **partite intere giocate da Capitano** (plancia, battaglia, nave) e la
 rifinitura di ciò che trova; le prestazioni; la plancia al dettaglio.

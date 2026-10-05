@@ -25,7 +25,10 @@ from astra_mind.tools import SHIP_TOOL_NAMES, owner_of, tools_for
 models.LEDGER.write_file = False
 
 SRC = Path(__file__).resolve().parents[2] / "Source" / "ASTRA"
-BOATS = {"kestrels_free": 2, "kestrels_in_all": 2, "marines_in_a_kestrel": 12, "bay": "the assault-shuttle bay on Deck 8 (port side)", "marines_fit_to_go": 71}
+BOATS = {"kestrels_free": 2, "kestrels_in_all": 2, "marines_in_a_kestrel": 12, "bay": "the Assault-Shuttle Bay (Deck 8, Port Passage section B)", "marines_fit_to_go": 71,
+         "flight": {"cruise_m_per_s": 560, "marines_aboard_and_the_boats_away_in": "14 s",
+                    "from_the_order_to_the_hull_cut_open_by_distance": {"5 km": "1 min 5 s", "10 km": "1 min 13 s", "20 km": "1 min 31 s", "40 km": "2 min 6 s", "80 km": "3 min 16 s"},
+                    "reach": "any ship of this battle, however far and however fast she runs"}}
 OPTIONS = {"carriers": [{"ship": "the Aquila", "id": "aquila", "boat": "kestrel", "boats_free": 2, "men_per_boat": 12}],
            "boardable_now": [{"ship": "Charon", "id": "T-30", "class": "Kharon Mandate cruiser, Acheron class", "no_power": True, "faces_open": "all (no power)", "hull_pct": 31,
                               "point_defence_channels": 0, "her_craft_about_her": 0, "distance_km": 4.1}],
@@ -38,6 +41,7 @@ class BoardShip(LocalShip):
     def __init__(self, with_boats: bool = True, options: bool = True) -> None:
         super().__init__(stations=True, fight=False)
         self.with_boats, self.options = with_boats, options
+        self.boats_out = False                                                                 # (the Kestrels have left the bay: a join is too late)
         self.calls: list[tuple[str, dict[str, Any], str]] = []
 
     def snapshot(self) -> dict[str, Any]:
@@ -53,12 +57,18 @@ class BoardShip(LocalShip):
             self.calls.append((name, dict(a), by))
             if a.get("action") == "call_off":
                 return {"ok": True, "detail": "the boarding is called off: the boats turn back or let go"}
+            if a.get("action") == "join":
+                if self.boats_out:
+                    return {"ok": False, "detail": "the Kestrels are already out of the bay, the first cuts in in 41 s: no boat takes the Captain in flight. When they are latched at her hatches the Chief can beam him "
+                                                   "aboard beside the marines (the transporter's own rules apply: our shield, jamming, a room the marines hold), or the boarding goes on without him"}
+                return {"ok": True, "detail": "the Captain goes with the marines: he rides in the first Kestrel, wherever he is now (the screen goes dark and he is in its troop bay as it leaves; nobody walks to the bay)"}
             if not a.get("target"):
                 return {"ok": False, "detail": "name the ship to board (target: her contact id or name)"}
             if str(a["target"]) != "T-30":
                 return {"ok": False, "detail": f"{a['target']} cannot be boarded: she is too far for a boat"}
-            return {"ok": True, "detail": "order 1: the Aquila launches 2 Kestrels (24 marines) at Charon, hatches hatch_s2 (deck 2 section C (Boarding Lock)), hatch_p2b (deck 2 section C (Boarding Lock)); "
-                                          "first at the hull in about 52 s."}
+            return {"ok": True, "detail": "order 1: the Aquila launches 2 Kestrels (24 marines) at Charon, 4.1 km away, hatches hatch_s2 (deck 2 section C (Boarding Lock)), hatch_p2b (deck 2 section C (Boarding Lock)); "
+                                          "the boats leave the bay in 14 s and the first is at her hull and cutting in 1 min 12 s from this order (the crossing and the dock take 58 s of it). The Captain can still go with them "
+                                          "(board_ship join) until the first Kestrel leaves the bay, in 14 s: after that no boat takes him in flight."}
         return super()._execute(name, a, by)
 
 
@@ -109,7 +119,7 @@ class ToolTest(unittest.TestCase):
         props = tool["parameters"]["properties"]
         self.assertEqual(set(props), {"action", "target", "boats", "face", "objective", "marines", "captain"})
         self.assertEqual(props["captain"]["type"], "boolean")
-        self.assertEqual(props["action"]["enum"], ["launch", "call_off"])
+        self.assertEqual(props["action"]["enum"], ["launch", "call_off", "join"])                # (join: the Captain goes with the marines after the order was given without him)
         self.assertEqual(props["face"]["enum"], ["port", "starboard", "dorsal", "ventral", "bow", "stern"])
         self.assertIn("engineering", props["objective"]["enum"])
         self.assertEqual(props["boats"]["maximum"], 2)                                         # (the Aquila has two Kestrels)
@@ -121,22 +131,34 @@ class ToolTest(unittest.TestCase):
         ship = (SRC / "AstraShipSubsystem.cpp").read_text(encoding="utf-8")
         self.assertIn('Name == TEXT("board_ship")', mind)
         self.assertIn('Name == TEXT("board_ship")', ship)                                      # (forwarded to the board subsystem)
-        for field in ("target", "boats", "craft", "face", "objective", "marines", "boarders", "action", "call_off", "direction"):
+        for field in ("target", "boats", "craft", "face", "objective", "marines", "boarders", "action", "call_off", "direction", "join"):
             self.assertIn(f'TEXT("{field}")', mind, field)
         self.assertIn('SetObjectField(TEXT("boarding_boats")', ship)                           # the marker the tool and the rule stand on
         self.assertIn('SetObjectField(TEXT("boarding_options")', ship)
 
     def test_the_ship_state_the_game_writes_has_what_the_rule_reads(self) -> None:
         src = (SRC / "AstraBoardAssault.cpp").read_text(encoding="utf-8")
-        for field in ("kestrels_free", "marines_fit_to_go", "boardable_now", "carriers", "faces_open", "point_defence_channels", "her_craft_about_her", "no_power", "boats_free"):
+        for field in ("kestrels_free", "marines_fit_to_go", "boardable_now", "carriers", "faces_open", "point_defence_channels", "her_craft_about_her", "no_power", "boats_free",
+                      "flight", "cruise_m_per_s", "marines_aboard_and_the_boats_away_in", "from_the_order_to_the_hull_cut_open_by_distance", "from_the_order_to_the_hull_cut_open",
+                      "km_to_go", "eta_s", "cut_in_in", "home_in", "going_home"):
             self.assertIn(f'TEXT("{field}")', src, field)
+
+    def test_the_times_the_crew_reads_are_said_as_one_says_them(self) -> None:
+        # the first test in the game turned "first at the hull in about 170 s" into "eleven minutes": every time the game tells the crew is a span in words (SpanText), never bare seconds to convert
+        src = (SRC / "AstraBoardAssault.cpp").read_text(encoding="utf-8")
+        self.assertIn("from this order (the crossing and the dock take", src)
+        self.assertNotIn("first at the hull in about %.0f s", src)
+        craft = (SRC / "AstraBoardCraft.cpp").read_text(encoding="utf-8")
+        self.assertIn("FString SpanText(double Seconds)", craft)
+        self.assertNotIn("about %.0f s away", craft)
 
 
 class PromptTest(unittest.TestCase):
     def test_the_crew_is_told_how_the_marines_board_and_how_to_answer(self) -> None:
         text = system_prompt("it", BoardShip(True).snapshot(), [])
         for want in ("`board_ship`", "Kestrels, twelve marines each", "shuttle bay on Deck 8", "cannot dock through a shield", "ONE short line", "call_off", "Never say a boarding is on its way unless",
-                     "The Mandate does the same to the Aquila", "`boarding_options`", "`captain: true`", "if that boat is shot down he is in it"):
+                     "The Mandate does the same to the Aquila", "`boarding_options`", "`captain: true`", "if that boat is shot down he is in it", "action join", "MINUTES from the order",
+                     "never convert seconds yourself", "reach any ship of the battle however far"):
             self.assertIn(want, text)
 
     def test_no_boats_no_rule(self) -> None:
@@ -168,6 +190,28 @@ class AgentTest(unittest.IsolatedAsyncioTestCase):
         turn = await crew.agent.handle("richiamali", "it", parse_context(None, crew.ship.snapshot()))
         self.assertEqual(crew.ship.calls[0][1], {"action": "call_off"})
         self.assertTrue(turn.actions[0][2]["ok"])
+
+    async def test_the_captain_who_comes_after_the_order_joins_the_first_kestrel(self) -> None:
+        crew = Crew([("board_ship", {"action": "join"}), speak("Captain, you ride in the first Kestrel: it leaves in fourteen seconds.")])
+        turn = await crew.agent.handle("vengo anch'io", "it", parse_context(None, crew.ship.snapshot()))
+        self.assertEqual(crew.ship.calls, [("board_ship", {"action": "join"}, "xo")])
+        self.assertTrue(turn.actions[0][2]["ok"])
+        self.assertIn("rides in the first Kestrel", turn.actions[0][2]["detail"])
+
+    async def test_a_join_that_is_too_late_says_what_is_left_to_the_captain(self) -> None:
+        crew = Crew([("board_ship", {"action": "join"}), speak("The Kestrels are away, Captain: the Chief can beam you aboard when they are at her hull, about forty seconds.")])
+        crew.ship.boats_out = True
+        turn = await crew.agent.handle("vengo anch'io", "it", parse_context(None, crew.ship.snapshot()))
+        self.assertFalse(turn.actions[0][2]["ok"])
+        self.assertIn("no boat takes the Captain in flight", turn.actions[0][2]["detail"])
+        self.assertIn("Chief can beam him aboard", turn.actions[0][2]["detail"])
+
+    async def test_the_flight_times_are_in_the_state_the_crew_reads(self) -> None:
+        crew = Crew([speak("Two minutes at forty kilometres, Captain.")])
+        await crew.agent.handle("quanto ci mettono i Kestrel a quaranta chilometri?", "it", parse_context(None, crew.ship.snapshot()))
+        last = str(crew.llm.requests[0]["messages"][-1]["content"])
+        self.assertIn("from_the_order_to_the_hull_cut_open_by_distance", last)
+        self.assertIn("2 min 6 s", last)
 
     async def test_a_game_without_boats_refuses_the_call_and_sends_nothing(self) -> None:
         crew = Crew([("board_ship", {"target": "T-30"}), speak("We have no boats for that.")], with_boats=False)

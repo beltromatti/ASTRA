@@ -51,6 +51,103 @@ namespace
 		return S;
 	}
 
+	/** The words of a place that name nothing (articles, prepositions, "room"), in English and in Italian as the bridge passes orders on. */
+	bool XpFiller(const FString& W)
+	{
+		static const TSet<FString> Fill = {TEXT("the"), TEXT("a"), TEXT("an"), TEXT("of"), TEXT("on"), TEXT("at"), TEXT("in"), TEXT("to"), TEXT("into"), TEXT("onto"),
+		    TEXT("my"), TEXT("our"), TEXT("his"), TEXT("her"), TEXT("their"), TEXT("room"), TEXT("area"), TEXT("near"), TEXT("by"), TEXT("aboard"),
+		    TEXT("il"), TEXT("lo"), TEXT("la"), TEXT("i"), TEXT("gli"), TEXT("le"), TEXT("l"), TEXT("un"), TEXT("una"), TEXT("del"), TEXT("dello"), TEXT("della"), TEXT("dei"),
+		    TEXT("degli"), TEXT("delle"), TEXT("al"), TEXT("allo"), TEXT("alla"), TEXT("ai"), TEXT("agli"), TEXT("alle"), TEXT("nel"), TEXT("nello"), TEXT("nella"), TEXT("nei"),
+		    TEXT("sul"), TEXT("sulla"), TEXT("da"), TEXT("dal"), TEXT("dalla"), TEXT("dai"), TEXT("di"), TEXT("sala"), TEXT("zona"), TEXT("mio"), TEXT("mia"), TEXT("miei"),
+		    TEXT("mie"), TEXT("suo"), TEXT("sua"), TEXT("suoi"), TEXT("nostro"), TEXT("nostra")};
+		return Fill.Contains(W);
+	}
+
+	/** The words of a place that matter: lower case, a hyphen splits ("assault-shuttle bay" -> assault, shuttle, bay), the filler dropped, a plural folded
+	 *  ("kestrels" -> kestrel). */
+	TArray<FString> XpWords(const FString& In)
+	{
+		FString S = XpNorm(In).Replace(TEXT("-"), TEXT(" ")).Replace(TEXT("/"), TEXT(" ")).Replace(TEXT("("), TEXT(" ")).Replace(TEXT(")"), TEXT(" "));
+		TArray<FString> Raw, Out;
+		S.ParseIntoArrayWS(Raw);
+		for (FString& W : Raw)
+		{
+			if (XpFiller(W))
+			{
+				continue;
+			}
+			if (W.Len() >= 5 && W.EndsWith(TEXT("s")) && !W.EndsWith(TEXT("ss")))
+			{
+				W.LeftChopInline(1);
+			}
+			Out.Add(W);
+		}
+		return Out;
+	}
+
+	/** What the crew calls a place, against the plan's names: a phrase that was said -> the room name (or kind) it stands for. The resolver tries the words
+	 *  as said and each alias they hold, and keeps the best (an alias never hides a room whose own name was said). */
+	const TArray<TPair<FString, FString>>& XpPlaceAliases()
+	{
+		static const TArray<TPair<FString, FString>> A = {
+		    {TEXT("kestrel bay"), TEXT("assault shuttle bay")}, {TEXT("kestrel"), TEXT("assault shuttle bay")}, {TEXT("boat bay"), TEXT("assault shuttle bay")},
+		    {TEXT("kestrel deck"), TEXT("assault shuttle bay")}, {TEXT("kestrel hangar"), TEXT("assault shuttle bay")}, {TEXT("hangar kestrel"), TEXT("assault shuttle bay")},
+		    {TEXT("ponte kestrel"), TEXT("assault shuttle bay")}, {TEXT("baia kestrel"), TEXT("assault shuttle bay")}, {TEXT("kestrel shuttle bay"), TEXT("assault shuttle bay")},
+		    {TEXT("shuttle bay"), TEXT("assault shuttle bay")}, {TEXT("assault bay"), TEXT("assault shuttle bay")}, {TEXT("launch bay"), TEXT("assault shuttle bay")},
+		    {TEXT("baia"), TEXT("assault shuttle bay")}, {TEXT("hangar deck"), TEXT("flight deck")}, {TEXT("ponte di volo"), TEXT("flight deck")}, {TEXT("hangar"), TEXT("flight deck")},
+		    {TEXT("captains quarters"), TEXT("captains quarters")}, {TEXT("quarters"), TEXT("captains quarters")}, {TEXT("alloggi"), TEXT("captains quarters")},
+		    {TEXT("cabin"), TEXT("captains quarters")}, {TEXT("sickbay"), TEXT("medbay")}, {TEXT("sick bay"), TEXT("medbay")}, {TEXT("infirmary"), TEXT("medbay")},
+		    {TEXT("infermeria"), TEXT("medbay")}, {TEXT("engine room"), TEXT("main engineering")}, {TEXT("reactor room"), TEXT("main engineering")},
+		    {TEXT("sala macchine"), TEXT("main engineering")}, {TEXT("engineering"), TEXT("main engineering")}, {TEXT("armeria"), TEXT("armory")}, {TEXT("armoury"), TEXT("armory")},
+		    {TEXT("caserma"), TEXT("marine barracks")}, {TEXT("barracks"), TEXT("marine barracks")}, {TEXT("mensa"), TEXT("mess hall")}, {TEXT("mess"), TEXT("mess hall")},
+		    {TEXT("plancia"), TEXT("bridge")}, {TEXT("command"), TEXT("bridge")}, {TEXT("teletrasporto"), TEXT("transporter room")}, {TEXT("cic"), TEXT("combat information centre")},
+		    {TEXT("combat information center"), TEXT("combat information centre")}, {TEXT("ready room"), TEXT("ready room")}};
+		return A;
+	}
+
+	/** How well what was said names a room: 100 its id, 90 its name, 80 every word said is a word of its name, 75 ... of its name or its kind, 45 its kind,
+	 *  otherwise 20 + 40 x the share of the words said that are in its name or kind (0 below half). */
+	int32 XpRoomScore(const TArray<FString>& Said, const FString& SaidPhrase, const FAstraLifeComp& C)
+	{
+		if (Said.IsEmpty())
+		{
+			return 0;
+		}
+		const FString IdL = C.Id.ToString().ToLower();
+		if (IdL == SaidPhrase || IdL.Replace(TEXT("_"), TEXT(" ")) == SaidPhrase)
+		{
+			return 100;
+		}
+		const TArray<FString> Name = XpWords(C.Name);
+		const FString KindL = C.Kind.ToString().ToLower();
+		if (FString::Join(Name, TEXT(" ")) == FString::Join(Said, TEXT(" ")))
+		{
+			return 90;
+		}
+		int32 InName = 0, InKind = 0;
+		for (const FString& W : Said)
+		{
+			if (Name.Contains(W))
+			{
+				++InName;
+			}
+			else if (W == KindL)
+			{
+				++InKind;
+			}
+		}
+		if (InName == Said.Num())
+		{
+			return 80;
+		}
+		if (InName + InKind == Said.Num())
+		{
+			return InName ? 75 : 45;
+		}
+		const float Share = float(InName + InKind) / Said.Num();
+		return Share >= 0.5f ? 20 + FMath::RoundToInt(40.f * Share) : 0;
+	}
+
 	/** "T-23", "t23", "ship:T-23" -> "T23"; "A-01" -> "A1"; empty when it is not a contact id. */
 	FString XpContactKey(const FString& In)
 	{
@@ -1297,31 +1394,65 @@ bool UAstraTransporterSubsystem::ResolveEnd(const FString& Text, bool bDest, con
 		return false;
 	}
 	const FAstraLifeMap& Map = L->Sim().GetMap();
-	FString Name = Q;
-	int32 DeckWant = INDEX_NONE;
+	// the deck and the section said with the room ("deck 8 armory", "the armory on deck 8", "ponte otto" is the bridge's to translate), then the words that name it;
+	// a part in brackets is where the room is ("the Assault-Shuttle Bay (Deck 8, Port Passage section B)"): its deck and section count, its other words are not the name
+	FString Name = Q, Where;
+	if (int32 Open = INDEX_NONE; Name.FindChar(TEXT('('), Open))
 	{
-		const int32 Cut = Name.Find(TEXT("deck "));
-		if (Cut != INDEX_NONE)
+		const int32 Close = Name.Find(TEXT(")"), ESearchCase::CaseSensitive, ESearchDir::FromStart, Open);
+		Where = Name.Mid(Open + 1, Close == INDEX_NONE ? MAX_int32 : Close - Open - 1);
+		Name = (Name.Left(Open) + TEXT(" ") + (Close == INDEX_NONE ? FString() : Name.Mid(Close + 1))).TrimStartAndEnd();
+	}
+	int32 DeckWant = INDEX_NONE;
+	TCHAR SectionWant = 0;
+	for (const TCHAR* DeckWord : {TEXT("deck "), TEXT("ponte ")})
+	{
+		if (const int32 InWhere = Where.Find(DeckWord); InWhere != INDEX_NONE && XpFirstNumber(Where.Mid(InWhere + FCString::Strlen(DeckWord))) != INDEX_NONE)
 		{
-			DeckWant = XpFirstNumber(Name.Mid(Cut + 5));
-			// the words round the number stay: "deck 8 armory" -> "armory"; "armory deck 8" -> "armory"
-			FString Left = Name.Left(Cut), Right = Name.Mid(Cut + 5);
+			DeckWant = XpFirstNumber(Where.Mid(InWhere + FCString::Strlen(DeckWord)));
+		}
+		const int32 Cut = Name.Find(DeckWord);
+		if (Cut != INDEX_NONE && XpFirstNumber(Name.Mid(Cut + FCString::Strlen(DeckWord))) != INDEX_NONE)
+		{
+			DeckWant = XpFirstNumber(Name.Mid(Cut + FCString::Strlen(DeckWord)));
+			FString Left = Name.Left(Cut), Right = Name.Mid(Cut + FCString::Strlen(DeckWord));
 			int32 Skip = 0;
 			while (Skip < Right.Len() && (FChar::IsDigit(Right[Skip]) || FChar::IsWhitespace(Right[Skip]))) { ++Skip; }
 			Name = (Left + TEXT(" ") + Right.Mid(Skip)).TrimStartAndEnd();
+			break;
 		}
 	}
-	static const TMap<FString, FString> Alias = {{TEXT("sickbay"), TEXT("medbay")}, {TEXT("infirmary"), TEXT("medbay")}, {TEXT("sick bay"), TEXT("medbay")}, {TEXT("engine room"), TEXT("main engineering")},
-	                                             {TEXT("reactor room"), TEXT("main engineering")}, {TEXT("hangar"), TEXT("flight deck")}, {TEXT("hangar deck"), TEXT("flight deck")},
-	                                             {TEXT("barracks"), TEXT("marine barracks")}, {TEXT("quarters"), TEXT("captains quarters")}, {TEXT("my quarters"), TEXT("captains quarters")},
-	                                             {TEXT("mess"), TEXT("mess hall")}, {TEXT("armoury"), TEXT("armory")}, {TEXT("command"), TEXT("bridge")}, {TEXT("ready room"), TEXT("ready room")},
-	                                             {TEXT("cic"), TEXT("combat information centre")}, {TEXT("combat information center"), TEXT("combat information centre")}};
-	if (const FString* A = Alias.Find(Name))
+	for (const TCHAR* SecWord : {TEXT("section "), TEXT("sezione ")})
 	{
-		Name = *A;
+		if (const int32 InWhere = Where.Find(SecWord); InWhere != INDEX_NONE && InWhere + FCString::Strlen(SecWord) < Where.Len() && FChar::IsAlpha(Where[InWhere + FCString::Strlen(SecWord)]))
+		{
+			SectionWant = FChar::ToUpper(Where[InWhere + FCString::Strlen(SecWord)]);
+		}
+		const int32 Cut = Name.Find(SecWord);
+		const int32 At = Cut + FCString::Strlen(SecWord);
+		if (Cut != INDEX_NONE && At < Name.Len() && FChar::IsAlpha(Name[At]) && (At + 1 == Name.Len() || FChar::IsWhitespace(Name[At + 1])))
+		{
+			SectionWant = FChar::ToUpper(Name[At]);
+			Name = (Name.Left(Cut) + TEXT(" ") + Name.Mid(At + 1)).TrimStartAndEnd();
+			break;
+		}
+	}
+	// what was said, and what it stands for when it is one of the names the crew uses for a place (the whole of what was said: "pilots' quarters" is not
+	// "quarters"); the best reading wins
+	TArray<TArray<FString>> Readings;
+	Readings.Add(XpWords(Name));
+	{
+		const FString Said = FString::Join(Readings[0], TEXT(" "));
+		for (const TPair<FString, FString>& A : XpPlaceAliases())
+		{
+			if (!Said.IsEmpty() && Said == FString::Join(XpWords(A.Key), TEXT(" ")))
+			{
+				Readings.Add(XpWords(A.Value));
+			}
+		}
 	}
 	struct FCand { int32 Comp; int32 Score; double Dist; };
-	TArray<FCand> Cands;
+	TArray<FCand> Cands, Near;
 	FVector Ref = RoomOriginCm;
 	if (Subs.Num() && !Subs[0].bAway)
 	{
@@ -1330,30 +1461,47 @@ bool UAstraTransporterSubsystem::ResolveEnd(const FString& Text, bool bDest, con
 	for (int32 i = 0; i < Map.Comps.Num(); ++i)
 	{
 		const FAstraLifeComp& C = Map.Comps[i];
-		if (C.Status == EAstraRoomStatus::Planned || C.bWalled || (DeckWant != INDEX_NONE && C.Deck != DeckWant))
+		if (C.Status == EAstraRoomStatus::Planned || C.bWalled || (DeckWant != INDEX_NONE && C.Deck != DeckWant) || (SectionWant && C.Section != SectionWant))
 		{
 			continue;
 		}
-		FString NameL = C.Name.ToLower();
-		for (const TCHAR* Junk : {TEXT("'"), TEXT("’")})
-		{
-			NameL = NameL.Replace(Junk, TEXT(""));
-		}
-		const FString KindL = C.Kind.ToString().ToLower();
 		int32 Score = 0;
-		if (C.Id.ToString().ToLower() == Name) { Score = 100; }
-		else if (NameL == Name) { Score = 90; }
-		else if (NameL.StartsWith(Name) && Name.Len() >= 3) { Score = 70; }
-		else if (NameL.Contains(Name) && Name.Len() >= 3) { Score = 55; }
-		else if (KindL == Name) { Score = 45; }
-		if (Score > 0)
+		for (int32 r = 0; r < Readings.Num(); ++r)
+		{
+			// an alias's reading counts a little less than the words as said, so that a room whose own name was said is never lost to it
+			Score = FMath::Max(Score, XpRoomScore(Readings[r], r == 0 ? Name : FString(), C) - (r ? 2 : 0));
+		}
+		if (Score >= 45)
 		{
 			Cands.Add({i, Score, FVector::Dist(C.Box.GetCenter(), Ref)});
+		}
+		else if (Score > 0)
+		{
+			Near.Add({i, Score, FVector::Dist(C.Box.GetCenter(), Ref)});
 		}
 	}
 	if (Cands.IsEmpty())
 	{
-		OutErr = FString::Printf(TEXT("no room, ship or place called \"%s\" (a room of the Aquila by name, a pad, the surface, a ship's contact id)"), *Text);
+		// say what comes closest, so that the next try names it
+		Near.Sort([](const FCand& A, const FCand& B) { return A.Score != B.Score ? A.Score > B.Score : A.Dist < B.Dist; });
+		TArray<FString> Show;
+		TSet<FString> Seen;
+		for (const FCand& C : Near)
+		{
+			if (!Seen.Contains(Map.Comps[C.Comp].Name))
+			{
+				Seen.Add(Map.Comps[C.Comp].Name);
+				Show.Add(Map.Describe(C.Comp));
+			}
+			if (Show.Num() >= 4)
+			{
+				break;
+			}
+		}
+		OutErr = Show.Num() ? FString::Printf(TEXT("no room called \"%s\"%s; the nearest names: %s"), *Text,
+		                                      DeckWant != INDEX_NONE ? *FString::Printf(TEXT(" on deck %d"), DeckWant) : TEXT(""), *FString::Join(Show, TEXT("; ")))
+		                    : FString::Printf(TEXT("no room, ship or place called \"%s\"%s (a room of the Aquila by name, a pad, the surface, a ship's contact id)"), *Text,
+		                                      DeckWant != INDEX_NONE ? *FString::Printf(TEXT(" on deck %d"), DeckWant) : TEXT(""));
 		return false;
 	}
 	int32 Top = 0;
@@ -1367,18 +1515,17 @@ bool UAstraTransporterSubsystem::ResolveEnd(const FString& Text, bool bDest, con
 	{
 		Names.Add(Map.Comps[C.Comp].Name);
 	}
-	if (Names.Num() > 1 && Top < 90)
+	if (Names.Num() > 1 && Top < 80)
 	{
 		TArray<FString> Show;
-		for (const FString& N : Names)
+		for (const FCand& C : Cands)
 		{
-			Show.Add(N);
-			if (Show.Num() >= 5)
+			if (Show.Num() < 5)
 			{
-				break;
+				Show.AddUnique(Map.Describe(C.Comp));
 			}
 		}
-		OutErr = FString::Printf(TEXT("\"%s\" could be %s: say which (a deck number helps)"), *Text, *FString::Join(Show, TEXT(", ")));
+		OutErr = FString::Printf(TEXT("\"%s\" could be %s: say which (a deck number helps)"), *Text, *FString::Join(Show, TEXT("; ")));
 		return false;
 	}
 	Cands.Sort([](const FCand& A, const FCand& B) { return A.Dist < B.Dist; });
@@ -1388,6 +1535,25 @@ bool UAstraTransporterSubsystem::ResolveEnd(const FString& Text, bool bDest, con
 	Out.Label = Map.Describe(Cands[0].Comp);
 	OutComp = C.Id.ToString();
 	Out.bInhibited = T.InhibitKinds.Contains(C.Kind) || T.InhibitIds.Contains(C.Id);
+	if (Out.bInhibited)
+	{
+		// a shielded room: the nearest one the beam reaches, on the same deck, so that the refusal says where to go instead
+		double Best = TNumericLimits<double>::Max();
+		for (int32 i = 0; i < Map.Comps.Num(); ++i)
+		{
+			const FAstraLifeComp& O = Map.Comps[i];
+			if (i == Cands[0].Comp || O.Deck != C.Deck || O.Status == EAstraRoomStatus::Planned || O.bWalled || T.InhibitKinds.Contains(O.Kind) || T.InhibitIds.Contains(O.Id))
+			{
+				continue;
+			}
+			const double D = FVector::Dist(O.Box.GetCenter(), C.Box.GetCenter());
+			if (D < Best)
+			{
+				Best = D;
+				Out.OpenNear = Map.Describe(i);
+			}
+		}
+	}
 	Out.Room = RoomOf(OutComp, C.Name);
 	return true;
 }
@@ -1785,6 +1951,20 @@ void UAstraTransporterSubsystem::RefreshRequest(FRequest& R, const FAstraXportJo
 			R.To.bPadOccupied = !bOurs && J.Phase < EAstraXportPhase::Demat;
 		}
 	}
+}
+
+bool UAstraTransporterSubsystem::ResolvePlace(const FString& Text, FString& OutLabel, FString& OutErr, FString* OutOpenNear) const
+{
+	FEnd E;
+	FString Comp;
+	const TArray<FAstraXportSubject> Nobody;
+	const bool bOk = ResolveEnd(Text, true, Nobody, E, Comp, OutErr);
+	OutLabel = bOk ? E.Label : FString();
+	if (OutOpenNear)
+	{
+		*OutOpenNear = bOk && E.bInhibited ? E.OpenNear : FString();
+	}
+	return bOk;
 }
 
 AstraXport::FVerdict UAstraTransporterSubsystem::Preflight(const FAstraXportOrder& O, FString& OutWhy) const

@@ -315,11 +315,12 @@ void AAstraHoloTable::Tick(float DeltaTime)
 
 void AAstraHoloTable::HideTactical()
 {
-	for (TArray<TObjectPtr<UStaticMeshComponent>>* Pool : {&Rings, &Icons, &Stems, &Vectors, &Dots, &Blasts, &Leaders, &Strobes, &Ticks, &Threats, &TargetLine, &ReachRings})
+	for (TArray<TObjectPtr<UStaticMeshComponent>>* Pool : {&Rings, &Icons, &Stems, &Vectors, &Dots, &Blasts, &Leaders, &Strobes, &Ticks, &Threats, &TargetLine, &ReachRings,
+	                                                        &GateMarks})
 	{
 		HideFrom(*Pool, 0);
 	}
-	for (TArray<TObjectPtr<UTextRenderComponent>>* Pool : {&Labels, &RingLabels, &TickLabels, &TargetLabel, &ReachLabels})
+	for (TArray<TObjectPtr<UTextRenderComponent>>* Pool : {&Labels, &RingLabels, &TickLabels, &TargetLabel, &ReachLabels, &GateLabels})
 	{
 		HideTextFrom(*Pool, 0);
 	}
@@ -338,6 +339,78 @@ void AAstraHoloTable::PlaceLine(UStaticMeshComponent* L, const FVector& A, const
 	L->SetRelativeLocationAndRotation(A, D.Rotation());
 	L->SetRelativeScale3D(FVector(FMath::Max(D.Size(), 0.1f) / 100.f, Thickness, Thickness));
 	SetColor(L, Color, Intensity);
+}
+
+void AAstraHoloTable::TickGate(const UAstraBattleSubsystem* Battle, const FVector& ViewerLocal, float Fade)
+{
+	// the Janus Gate (where the war comes from), and what the bridge knows is coming through it: where it comes out, how many, how soon (the user's
+	// game of 5 Oct: the Gate had cycled, the vanguard was a minute out, «where are the other enemy ships? I don't see them on the holo table»)
+	UAstraBattleSubsystem::FGateWatch W;
+	if (!Battle || !Battle->GetGateWatch(W) || !LineMesh)
+	{
+		HideFrom(GateMarks, 0);
+		HideTextFrom(GateLabels, 0);
+		return;
+	}
+	const auto Eta = [](float S)
+	{
+		const int32 T = FMath::CeilToInt(FMath::Max(0.f, S));
+		return T <= 0 ? FString(TEXT("COMING THROUGH")) : (T < 600 ? FString::Printf(TEXT("IN %d:%02d"), T / 60, T % 60) : FString::Printf(TEXT("IN %d MIN"), T / 60));
+	};
+	int32 NM = 0, NT = 0;
+	// a ring of a dozen strokes with its face to the eye (the table's ring mesh, scaled down to a few centimetres, thins to nothing)
+	const auto Ring = [this, &NM, &ViewerLocal](const FVector& C, float R, float Thick, const FLinearColor& Col, float Inten)
+	{
+		const FMatrix Face = FRotationMatrix::MakeFromX(ViewerLocal - C);
+		const FVector U = Face.GetUnitAxis(EAxis::Y), V = Face.GetUnitAxis(EAxis::Z);
+		constexpr int32 Strokes = 12;
+		for (int32 k = 0; k < Strokes; ++k)
+		{
+			const float A0 = 2.f * PI * k / Strokes, A1 = 2.f * PI * (k + 1) / Strokes;
+			PlaceLine(Pooled(GateMarks, NM++, LineMesh), C + R * (U * FMath::Cos(A0) + V * FMath::Sin(A0)), C + R * (U * FMath::Cos(A1) + V * FMath::Sin(A1)),
+			          Thick, Col, Inten);
+		}
+	};
+	const FLinearColor ColGate(0.72f, 0.82f, 1.f);
+	const FVector G = PlotPoint(W.GateRel);
+	Ring(G, 2.6f, 0.22f, ColGate, 16.f * Fade);
+	UTextRenderComponent* GT = PooledText(GateLabels, NT++);
+	GT->SetRelativeLocation(G + FVector(0.f, 0.f, 5.5f));
+	HoloSetText(GT, TEXT("JANUS GATE · ") + RangeText(W.GateKm));
+	HoloSetSize(GT, 3.4f);
+	HoloSetColor(GT, (ColGate * FMath::Max(0.3f, Fade)).ToFColor(true));
+	FaceViewer(GT, ViewerLocal);
+	// the forces on their way in: a ring that beats where they come out, and their words above it (stacked when they come out at the same place)
+	TArray<FVector, TInlineAllocator<3>> Taken;
+	Taken.Add(G);
+	const struct { int32 N; float EtaS; FVector Rel; FLinearColor Col; const TCHAR* Who; } Forces[] = {
+		{W.Hostile, W.HostileEtaS, W.HostileRel, ColHostile, TEXT("HOSTILE")},
+		{W.Friendly, W.FriendlyEtaS, W.FriendlyRel, ColAstra, TEXT("ASTRA")},
+	};
+	for (const auto& F : Forces)
+	{
+		if (F.N <= 0 || F.EtaS < 0.f)
+		{
+			continue;
+		}
+		const FVector P = PlotPoint(F.Rel);
+		int32 Stack = 0;
+		for (const FVector& T : Taken)
+		{
+			Stack += FVector::Dist(T, P) < 10.f;
+		}
+		Taken.Add(P);
+		const float Beat = 0.5f + 0.5f * FMath::Sin(Time * 5.f);
+		Ring(P, 2.2f + 2.4f * Beat, 0.3f, F.Col, (18.f + 22.f * (1.f - Beat)) * Fade);
+		UTextRenderComponent* T = PooledText(GateLabels, NT++);
+		T->SetRelativeLocation(P + FVector(0.f, 0.f, 7.f + 9.f * Stack));
+		HoloSetText(T, FString::Printf(TEXT("INBOUND · %d %s<br>%s"), F.N, F.Who, *Eta(F.EtaS)));
+		HoloSetSize(T, 4.6f);
+		HoloSetColor(T, (F.Col * FMath::Max(0.3f, Fade)).ToFColor(true));
+		FaceViewer(T, ViewerLocal);
+	}
+	HideFrom(GateMarks, NM);
+	HideTextFrom(GateLabels, NT);
 }
 
 void AAstraHoloTable::TickBearings(const UAstraBattleSubsystem* Battle, const FVector& ViewerLocal, float Fade)
@@ -1072,6 +1145,11 @@ void AAstraHoloTable::TickTactical(float DeltaTime, const FVector& ViewerLocal, 
 			Far = FMath::Max(Far, B.RangeKm * 1.05f);
 		}
 	}
+	UAstraBattleSubsystem::FGateWatch Gate;
+	if (Battle && Battle->GetGateWatch(Gate) && Gate.HostileEtaS >= 0.f)
+	{
+		Far = FMath::Max(Far, FMath::Min(Gate.HostileRel.Size() / 100000.f * 1.05f, 160.f));   // a force on its way in: where it will come out
+	}
 	TargetRangeKm = RangeLadderKm[UE_ARRAY_COUNT(RangeLadderKm) - 1];
 	for (float R : RangeLadderKm)
 	{
@@ -1419,6 +1497,8 @@ void AAstraHoloTable::TickTactical(float DeltaTime, const FVector& ViewerLocal, 
 		HideFrom(TargetLine, 0);
 		HideTextFrom(TargetLabel, 0);
 	}
+
+	TickGate(Battle, ViewerLocal, Fade);
 
 	HideFrom(Icons, NI);
 	HideFrom(Stems, NI);

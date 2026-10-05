@@ -42,10 +42,12 @@ CURRENT: contextvars.ContextVar["Seat | None"] = contextvars.ContextVar("astra_s
 CURRENT_VIEW: contextvars.ContextVar[tuple[March, str] | None] = contextvars.ContextVar("astra_strategy_view", default=None)
 
 # ------------------------------------------------------------------------------------------------ cadence and budget
-PERIODIC_S = 330.0              # a high command looks at the war on its own clock about this often (x 0.85-1.25), when what it reads has changed
+PERIODIC_S = 210.0              # a high command looks at the war on its own clock about this often (x 0.85-1.25), when what it reads has changed
 MIN_GAP_S = 75.0                # and never more often than this on news alone
-FIRST_PULSE_S = 420.0           # the first look: the opening is being fought, the strategic war begins to be decided after it (a Gate cycling towards the Aquila's own system, or a
+FIRST_PULSE_S = 300.0           # the first look: the opening is being fought, the strategic war begins to be decided after it (a Gate cycling towards the Aquila's own system, or a
                                 # major event, does not wait for it)
+QUIET_LOOK_S = 240.0            # a war with no battle anywhere for this long is looked at again even when nothing on the map has moved: the quiet itself is the news (5 Oct: both
+                                # high commands held for seven minutes with nothing changing, and the periodic look, skipped while the map stood still, never came)
 SETTLE_S = 6.0                  # a burst of news is read together: wait this long after the last of it ...
 MAX_SETTLE_S = 15.0             # ... never longer than this after the first
 NEWS_WEIGHT = 2                 # the news that wakes a mind (the March's weights: 0 routine, 1 minor, 2 significant, 3 major)
@@ -215,6 +217,9 @@ needs them, and honest reasons when you say no.
 ASTRA's way of war: balanced fleets and carriers, depth rather than a single line, protection of the civilians behind the front, strict rules of engagement, and trust in subordinates'
 initiative. Your industry is the larger and your people are the more patient: a long war favours ASTRA if the Gates are held, and the Mandate knows it. The Senate sits at Concordia; the
 Home Fleet is the Senate's and leaves the capital only when the Senate is persuaded the capital is not the target.
+Patience is not idleness: a quiet front is a front you do not see. Between the big blows you patrol, escort the convoys, answer a raid at once, probe what the enemy is massing, and
+take back the initiative where he is thin; the Aquila is your best ship and her Captain your sharpest eye: give her the work where she makes the difference (`task_aquila`, or say what
+Fleet needs of her where she is), and do not leave her idle while the war is being decided elsewhere.
 
 {rules}
 
@@ -235,6 +240,9 @@ The Mandate's way of war: attacks fast and concentrated, missile saturation, ele
 the lives of your crews weighed against the objective. The Silence made your people poor and patient in pain, but not rich: the Core's yards out-build yours, and every month of war
 helps them. Your chance is to take the Gates that matter before ASTRA's industry tells, and to bleed the Core's will until its Senate prefers terms; a fleet lost in the wrong place is
 the war lost. The Mandate keeps its word and despises liars; it respects those who surrender and an enemy who is good.
+Time is your enemy: every quiet hour lets ASTRA's yards and reinforcements tell. Keep the initiative: when your main blow is not ready, probe and raid — small fast groups against the
+picket's flanks, the convoys, the outposts, the listening posts — so that the enemy never rests, spends himself answering you, and shows you what you will meet; scouts go first,
+the main body strikes where the raids found him thin. A fleet resting without a reason is the war's time wasted.
 
 {rules}
 
@@ -447,11 +455,20 @@ class StrategicMinds:
             if seat.period <= 0.0:
                 seat.period = PERIODIC_S * random.uniform(0.85, 1.25)
             if gap >= seat.period:
+                quiet = self.quiet_s()
                 if self._digest(side) != seat.digest:
                     why.append("periodic review of the war")
+                elif quiet >= QUIET_LOOK_S:
+                    why.append(f"the war has been quiet for {fmt_s(quiet)}: no battle anywhere in the March")
                 else:
                     seat.last_think = now - seat.period * 0.55          # nothing moved: look again a little later, at no cost
         return why
+
+    def quiet_s(self) -> float:
+        """How long the March has gone without a battle anywhere, the Aquila's own fight included."""
+        if self.m.battles or self.m.real_fight:
+            self._fight_t = self.m.t
+        return max(0.0, self.m.t - getattr(self, "_fight_t", 0.0))
 
     # ------------------------------------------------------------------------------------------------ a pulse
     async def _pulse(self, seat: Seat, why: list[str]) -> None:
@@ -526,7 +543,9 @@ class StrategicMinds:
         speak = ""
         if side == "astra":
             speak = f" The Captain's language is {LANG_NAMES.get(lang, lang)}: what you say to him is in it, and you call him «{CAPTAIN_WORD.get(lang, 'Captain')}»."
-        user = (f"WHAT YOU HAVE DECIDED, SAID AND HEARD (your log, newest last)\n{self.recall(side)}\n\n{self.m.picture(side, since=prev)}{intel}{msgs}\n\n"
+        quiet = self.quiet_s()
+        tempo = f"\nTEMPO: no battle anywhere in the March for {fmt_s(quiet)}." if quiet >= 120.0 else ""
+        user = (f"WHAT YOU HAVE DECIDED, SAID AND HEARD (your log, newest last)\n{self.recall(side)}\n\n{self.m.picture(side, since=prev)}{intel}{msgs}{tempo}\n\n"
                 f"You are looking now because: {'; '.join(why)}.{speak}\nDecide: give your orders with the tools, or call no_change.")
         return system_prompt(side), user
 
@@ -641,7 +660,9 @@ class StrategicMinds:
                 if len(text) < 3:
                     return {"ok": False, "detail": "nothing to say"}
                 self.journal(side, f"told the Captain: {text[:200]}")
-                await self.say(seat.person.key, text, lang, str(a.get("tone", "measured")), answer=by_captain)
+                # (the admiral calling the Captain is heard in his own voice, not relayed by Communications: 5 Oct, four of his calls were lost and the Captain
+                # asked «Ammiraglio, mi senti?»)
+                await self.say(seat.person.key, text, lang, str(a.get("tone", "measured")), answer=by_captain, direct=True)
                 return {"ok": True, "detail": "said on the fleet net"}
             if name == "task_aquila" and side == "astra":
                 ok, detail = m.task_aquila(str(a.get("system", "")), str(a.get("mission", "")), str(a.get("why", "")))
@@ -649,7 +670,7 @@ class StrategicMinds:
                 if ok:
                     words = str(a.get("words", "")).strip()
                     if words:
-                        await self.say(seat.person.key, words, lang, "measured", answer=by_captain)
+                        await self.say(seat.person.key, words, lang, "measured", answer=by_captain, direct=True)
                     if self.on_aquila_task is not None:
                         extra = await self.on_aquila_task(m.aquila_task["system"], m.aquila_task["mission"])
                         detail = f"{detail}; {extra.get('detail', '')}"[:260]

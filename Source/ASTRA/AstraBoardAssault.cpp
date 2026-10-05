@@ -36,6 +36,8 @@ namespace
 	constexpr int32 AsMarinesPerBoat = 12;
 	constexpr float AsRecoveryLimitS = 420.f;        // the boats have this long to be home after the fight (else the assault is closed and what is left is told)
 	constexpr float AsLaunchLimitS = 90.f;           // a launch the battle never made
+	constexpr float AsWithdrawLimitS = 75.f;         // the marines called out of a ship have this long to be aboard the boats (the wounded are carried: 1.15 m/s)
+	constexpr double AsHeadsUpS = 30.0;              // the warning that the first boat is about to cut in
 
 	const TCHAR* AsFaceName(int32 F)
 	{
@@ -415,6 +417,68 @@ int32 UAstraBoardSubsystem::PickMarines(int32 Total, TArray<TArray<int32>>& OutL
 	return N;
 }
 
+float UAstraBoardSubsystem::MusterTimeS(const TArray<TArray<int32>>& Legs) const
+{
+	// the boats leave when most of their marines are in them: each runs from where he stands to the boat bay (the plan's own way, at the jog the squads use), a man asleep wakes and dresses first;
+	// the boats wait for three men in four (the stragglers of a muster do not hold an operation), and a minimum of the time it takes to belt in
+	constexpr float BeltInS = 6.f, JogMps = 3.3f, MinS = 8.f, MaxS = 36.f;
+	const UAstraLifeSubsystem* L = LifeSub();
+	if (!L || !L->IsRunning() || !AqMap.IsValid() || !AqDmg.IsValid())
+	{
+		return 12.f;                                       // no life aboard (a bench world): nameless marines already in the bay
+	}
+	const int32* Bay = AqDmg->CompByName.Find(FName(TEXT("d8_shuttle_bay_B1")));
+	if (!Bay)
+	{
+		return 12.f;
+	}
+	const FVector BayAt = AqMap->CentreOf(*Bay);
+	const FAstraLifeSim& LS = L->Sim();
+	TArray<float> Times;
+	for (const TArray<int32>& Leg : Legs)
+	{
+		for (const int32 R : Leg)
+		{
+			const int32 P = LS.PersonOfRoster(R);
+			if (P == INDEX_NONE)
+			{
+				continue;
+			}
+			const FAstraLifePerson& Pe = LS.Person(P);
+			float Metres = 0.f;
+			TArray<FVector> Pts;
+			FBoardRouteOptions Opt;
+			Opt.bThroughSealed = true;
+			if (!AqMap->Route(Pe.Pos, BayAt, Pts, Opt, &Metres))
+			{
+				Metres = (float)FVector::Dist(Pe.Pos, BayAt) / 100.f * 1.6f;                  // (no way found: the straight line, and a half again)
+			}
+			Times.Add(Metres / JogMps + (Pe.Act == EAstraLifeAct::Sleep ? 0.6f * Pe.WakeDelayS : 0.f));          // (VITA's wake delay is "up and dressed when an alarm goes": an order of the Captain's is called, not rung: 0.6 of it, as VITA's own calls)
+		}
+	}
+	if (Times.IsEmpty())
+	{
+		return 12.f;
+	}
+	Times.Sort();
+	return FMath::Clamp(BeltInS + Times[FMath::Min(Times.Num() - 1, (Times.Num() * 3) / 4)], MinS, MaxS);
+}
+
+float UAstraBoardSubsystem::MusterEstimateS() const
+{
+	// the muster the Aquila's marines would take if the boats were ordered now (the free ones nearest the bay), worked out every few seconds
+	const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+	if (MusterCacheS < 0.f || Now - MusterCacheAt > 6.0 || Now < MusterCacheAt)
+	{
+		TArray<TArray<int32>> Legs;
+		Legs.SetNum(2);
+		PickMarines(2 * AstraBoardCraft::Kestrel().Men, Legs);
+		MusterCacheS = MusterTimeS(Legs);
+		MusterCacheAt = Now;
+	}
+	return MusterCacheS;
+}
+
 // ================================================================================================================== the order
 
 int32 UAstraBoardSubsystem::BestCarrier(const FShipFacts& T) const
@@ -718,8 +782,10 @@ bool UAstraBoardSubsystem::LaunchAssault(FString& OutDetail)
 	Req.Order = Assault.Order;
 	Req.bCaptain = Assault.bCaptain;
 	Req.bSilencePd = Assault.Spec.bDrill;                                 // (the drill: the boats are flown through the point defence unharmed)
-	Req.FirstS = Assault.bRoster ? 25.f : 4.f;
-	Req.GapS = 3.f;
+	// the marines' muster: the time it takes the ones picked to be in the boats (the way from where they stand to the bay, at a jog; the boats go when three in four are aboard); the Mandate's are in theirs
+	Req.FirstS = Assault.bRoster ? MusterTimeS(Marines) : 4.f;
+	Assault.PrepS = Req.FirstS;
+	Req.GapS = 2.f;
 	Assault.Legs.Reset();
 	for (int32 i = 0; i < Boats; ++i)
 	{
@@ -819,8 +885,14 @@ bool UAstraBoardSubsystem::LaunchAssault(FString& OutDetail)
 	{
 		Warn += FString::Printf(TEXT(" The shield on her %s face holds (%.0f%%): the boats cannot dock through it and will turn back."), *Face, Ass.ShieldFrac[AstraBoardCraft::FacingOfNormal(Assault.Legs[0].OutNormal)] * 100.f);
 	}
-	OutDetail = FString::Printf(TEXT("order %d: %s launches %d %s%s (%d %s) at %s, hatches %s; first at the hull in about %.0f s.%s"), Assault.Order, *Assault.CarrierName, Assault.Legs.Num(), Kind->Callsign,
-	                            Assault.Legs.Num() > 1 ? TEXT("s") : TEXT(""), Total, Assault.bRoster ? TEXT("marines") : TEXT("boarders"), *Assault.TargetName, *Hatches, R.EtaS, *Warn);
+	if (Assault.bRoster && !Assault.bCaptain && CaptainOnFoot())
+	{
+		Warn += FString::Printf(TEXT(" The Captain can still go with them (board_ship join) until the first Kestrel leaves the bay, in %s: after that no boat takes him in flight."), *AstraBoardCraft::SpanText(Req.FirstS));
+	}
+	// the time as one says it (the minds read seconds badly: "170 s" became "eleven minutes"): the whole of it from this order, and the parts
+	OutDetail = FString::Printf(TEXT("order %d: %s launches %d %s%s (%d %s) at %s, %.1f km away, hatches %s; the boats leave the bay in %s and the first is at her hull and cutting in %s from this order (the crossing and the dock take %s of it).%s"),
+	                            Assault.Order, *Assault.CarrierName, Assault.Legs.Num(), Kind->Callsign, Assault.Legs.Num() > 1 ? TEXT("s") : TEXT(""), Total, Assault.bRoster ? TEXT("marines") : TEXT("boarders"),
+	                            *Assault.TargetName, Ass.DistKm, *Hatches, *AstraBoardCraft::SpanText(Req.FirstS), *AstraBoardCraft::SpanText(R.EtaS), *AstraBoardCraft::SpanText(R.EtaS - Req.FirstS), *Warn);
 	UE_LOG(LogASTRA, Log, TEXT("[Board] %s"), *OutDetail);
 	if (!R.Why.IsEmpty())
 	{
@@ -905,6 +977,22 @@ void UAstraBoardSubsystem::TickAssault(float Dt)
 	{
 		return;
 	}
+	TellHeadsUp();
+	// the marines are called out of her decks: the boats let go when they are aboard, or when the time is up (what is left of the fight is the boats' to bring home)
+	if (Assault.bWithdrawing)
+	{
+		Assault.WithdrawT += Dt;
+		if (Phase != EPhase::Active)
+		{
+			Assault.bWithdrawing = false;                    // the fight ended (they are all out, or down): the usual end
+		}
+		else if (Assault.WithdrawT > AsWithdrawLimitS)
+		{
+			Tell(TEXT("the marines who could not get out in time are brought off with the boats' help: the boats let go"), true);
+			Finish(TEXT("recalled"));
+			Assault.bWithdrawing = false;
+		}
+	}
 	// a launch the battle never made
 	if (Assault.T - Assault.LaunchT > AsLaunchLimitS)
 	{
@@ -958,6 +1046,85 @@ void UAstraBoardSubsystem::TickAssault(float Dt)
 		}
 	}
 	(void)bAnyLatched;
+}
+
+float UAstraBoardSubsystem::LegEtaS(const FLeg& L) const
+{
+	// the boat's own clock when it is flying (it moves with the hull it goes to), else what was reckoned when it was ordered
+	AstraBoardCraft::FBoatStatus St;
+	if (const UAstraBattleSubsystem* B = Battle(); B && L.CraftId >= 0 && B->BoatStatus(L.CraftId, St))
+	{
+		return (float)St.EtaS;
+	}
+	return FMath::Max(0.f, Assault.EtaS - (Assault.T - Assault.LaunchT));
+}
+
+void UAstraBoardSubsystem::TellHeadsUp()
+{
+	if (Assault.bHeadsUp || !Assault.bLaunched || Assault.bDeparting)
+	{
+		return;
+	}
+	const UAstraBattleSubsystem* B = Battle();
+	if (!B)
+	{
+		return;
+	}
+	double Soonest = 1.0e9;
+	for (const FLeg& L : Assault.Legs)
+	{
+		AstraBoardCraft::FBoatStatus St;
+		if (L.State == FLeg::EState::Flying && L.CraftId >= 0 && B->BoatStatus(L.CraftId, St) && !St.bHome && !St.bDockedOrLatched && St.EtaS > 0.5)
+		{
+			Soonest = FMath::Min(Soonest, St.EtaS);
+		}
+	}
+	if (Soonest > AsHeadsUpS)
+	{
+		return;
+	}
+	Assault.bHeadsUp = true;
+	if (Assault.EtaS < 2.0 * AsHeadsUpS)
+	{
+		return;                                                // a flight that was half a minute anyway was told when it left
+	}
+	Tell(FString::Printf(TEXT("%s's boats are %s from %s's hull: the first cuts in then"), *Assault.CarrierName, *AstraBoardCraft::SpanText(Soonest), *Assault.TargetName), Assault.bRoster || Assault.TargetName == TEXT("the Aquila"));
+}
+
+bool UAstraBoardSubsystem::WithdrawMarines(FString& OutDetail)
+{
+	if (!Assault.bOn || !Assault.bRoster || Phase != EPhase::Active || Mode != EMode::Remote || Fight.Over() || !Fight.IsAttacker(ESide::Aquila))
+	{
+		return false;                                          // nobody of ours is on her decks: the boats just turn back or let go
+	}
+	if (Assault.bWithdrawing)
+	{
+		OutDetail = TEXT("the marines are already coming out of her decks: the boats let go when they are aboard");
+		return true;
+	}
+	int32 Squads = 0, Men = 0;
+	for (const FSquad& S : Fight.Squads())
+	{
+		if (S.Side != ESide::Aquila || S.Leader == INDEX_NONE)
+		{
+			continue;
+		}
+		const int32 Able = [&]() { int32 N = 0; for (const int32 M : S.Members) { N += Fight.Units()[M].Able() ? 1 : 0; } return N; }();
+		if (Able == 0)
+		{
+			continue;
+		}
+		Fight.Order(S.Id, ETask::Withdraw, INDEX_NONE, FVector::ZeroVector, 0.f, TEXT("called out of her decks"));
+		++Squads;
+		Men += Able;
+	}
+	Assault.bWithdrawing = true;
+	Assault.WithdrawT = 0.f;
+	Log.Add(FString::Printf(TEXT("%.0fs: the marines are called out: %d squads, %d men able, back to the boats by their hatches"), Since, Squads, Men));
+	OutDetail = FString::Printf(TEXT("the marines are called out of her decks: %d squads (%d men on their feet) fall back to the hatches they came in by, carrying their wounded; the boats stay latched until they are aboard (%s at most), then let go and fly home"),
+	                            Squads, Men, *AstraBoardCraft::SpanText(AsWithdrawLimitS));
+	Tell(TEXT("the marines are called out of her decks: back to the boats by their hatches"), false);
+	return true;
 }
 
 void UAstraBoardSubsystem::OnCraftEvent(const AstraBoardCraft::FCraftEvent& E)
@@ -1216,8 +1383,8 @@ void UAstraBoardSubsystem::BeginObservedScene()
 			SealSections(L.BreachComp, L.InCm);
 		}
 	}
-	Tell(FString::Printf(TEXT("%s has launched %d assault craft at the Aquila (about %d boarders): they will be at her hull in about %.0f seconds, at %s, going for %s; the section bulkheads are %s and the marines are being called to arms"),
-	                     *Assault.CarrierName, Assault.Legs.Num(), Men, Assault.EtaS, *Places, *ObjLabel, Assault.bLockdown ? TEXT("closing") : TEXT("open")), true);
+	Tell(FString::Printf(TEXT("%s has launched %d assault craft at the Aquila (about %d boarders): they will be at her hull in about %s, at %s, going for %s; the section bulkheads are %s and the marines are being called to arms"),
+	                     *Assault.CarrierName, Assault.Legs.Num(), Men, *AstraBoardCraft::SpanText(Assault.EtaS), *Places, *ObjLabel, Assault.bLockdown ? TEXT("closing") : TEXT("open")), true);
 }
 
 bool UAstraBoardSubsystem::BeginRemoteScene()
@@ -1757,6 +1924,25 @@ TSharedRef<FJsonObject> UAstraBoardSubsystem::AssaultJson() const
 		static const TCHAR* States[] = {TEXT("being readied"), TEXT("in flight"), TEXT("latched to the hull, cutting in"), TEXT("through: the men are aboard"), TEXT("destroyed with its men"), TEXT("turned back"), TEXT("home")};
 		O->SetStringField(TEXT("state"), States[(int32)L.State]);
 		O->SetStringField(TEXT("hatch"), FString::Printf(TEXT("%s (%s)"), *L.DockId.ToString(), *L.PlaceText));
+		// where it is and how long it has to go (the flight's own clock): in words, for the Captain's "where are they"
+		AstraBoardCraft::FBoatStatus St;
+		if (const UAstraBattleSubsystem* B = Battle(); B && L.CraftId >= 0 && L.bSailing && B->BoatStatus(L.CraftId, St))
+		{
+			O->SetStringField(TEXT("flight"), AstraBoardCraft::PhaseName(St.Phase, St.bHome));
+			if (St.bHome)
+			{
+				O->SetBoolField(TEXT("going_home"), true);
+			}
+			if (!St.bDockedOrLatched && St.DistM > 0.0)
+			{
+				O->SetNumberField(TEXT("km_to_go"), FMath::RoundToInt(St.DistM / 100.0) / 10.0);
+			}
+			if (St.EtaS > 0.5)
+			{
+				O->SetNumberField(TEXT("eta_s"), FMath::RoundToInt(St.EtaS));
+				O->SetStringField(St.bHome ? TEXT("home_in") : TEXT("cut_in_in"), AstraBoardCraft::SpanText(St.EtaS));
+			}
+		}
 		Boats.Add(MakeShared<FJsonValueObject>(O));
 	}
 	J->SetArrayField(TEXT("boats"), Boats);
@@ -1776,7 +1962,7 @@ TSharedRef<FJsonObject> UAstraBoardSubsystem::BoatsJson() const
 	J->SetNumberField(TEXT("kestrels_free"), Bay.Free());
 	J->SetNumberField(TEXT("kestrels_in_all"), Bay.Total - Bay.Lost);
 	J->SetNumberField(TEXT("marines_in_a_kestrel"), AstraBoardCraft::Kestrel().Men);
-	J->SetStringField(TEXT("bay"), TEXT("the assault-shuttle bay on Deck 8 (port side)"));
+	J->SetStringField(TEXT("bay"), TEXT("the Assault-Shuttle Bay (Deck 8, Port Passage section B)"));
 	// the marines fit to go: awake or not, on their feet, aboard, not in a fight (the commander stays on the net)
 	const UAstraLifeSubsystem* L = LifeSub();
 	const UAstraShipSubsystem* S = ShipSub();
@@ -1806,6 +1992,22 @@ TSharedRef<FJsonObject> UAstraBoardSubsystem::BoatsJson() const
 		{
 			J->SetNumberField(TEXT("marines_away_from_the_ship"), Away);
 		}
+	}
+	// the flight, in times (the crew reads them as they are: a Kestrel reaches any ship of the battle, and the whole of an operation is minutes, not a quarter of an hour)
+	{
+		const AstraBoardCraft::FKind& K = AstraBoardCraft::Kestrel();
+		const float Muster = MusterEstimateS();
+		TSharedRef<FJsonObject> F = MakeShared<FJsonObject>();
+		F->SetNumberField(TEXT("cruise_m_per_s"), FMath::RoundToInt(K.Cruise));
+		F->SetStringField(TEXT("marines_aboard_and_the_boats_away_in"), AstraBoardCraft::SpanText(Muster));
+		TSharedRef<FJsonObject> T = MakeShared<FJsonObject>();
+		for (const int32 Km : {5, 10, 20, 40, 80})
+		{
+			T->SetStringField(FString::Printf(TEXT("%d km"), Km), AstraBoardCraft::SpanText(Muster + AstraBoardCraft::FlightEtaS(K, Km * 1000.0)));
+		}
+		F->SetObjectField(TEXT("from_the_order_to_the_hull_cut_open_by_distance"), T);
+		F->SetStringField(TEXT("reach"), TEXT("any ship of this battle, however far and however fast she runs: a boat is flown against the ship it goes to; what stops it is her point defence, her fighters and a shield on the hatch's face"));
+		J->SetObjectField(TEXT("flight"), F);
 	}
 	return J;
 }
@@ -1913,6 +2115,7 @@ TSharedRef<FJsonObject> UAstraBoardSubsystem::BoardingOptionsJson(int32 SideIdx)
 		O->SetNumberField(TEXT("point_defence_channels"), A.PdChannels);
 		O->SetNumberField(TEXT("her_craft_about_her"), A.EnemyCraftNear);
 		O->SetNumberField(TEXT("distance_km"), FMath::RoundToInt(A.DistKm * 10.f) / 10.0);
+		O->SetStringField(TEXT("from_the_order_to_the_hull_cut_open"), AstraBoardCraft::SpanText((SideIdx == 0 ? MusterEstimateS() : 4.f) + A.EtaS));
 		Targets.Add(MakeShared<FJsonValueObject>(O));
 	}
 	if (Targets.IsEmpty())

@@ -19,16 +19,21 @@ Producers call `voice.say(speaker, text, lang, tone, ...)`; the optional keyword
               says it updated, changes it, or lets it go (docs/ARCHITETTURA.md §1bis: the agents re-think, the code does not drop
               or shorten what they say). Without it (a canned line) a cut line resumes from the sentence that was cut off
     answer    shorthand for priority=ANSWER
+    addressed the line is addressed to the Captain himself (the admiral's order to the Aquila, a call he must take): like an answer it is never
+              lost to the machinery: not to the queue's size, an expiry, a producer's `stale_if`, a voice that could not be made (it is asked
+              again, and then he reads it: a `notice`), a re-think that failed (it is said as it stands). Only whoever wrote it may withdraw it
+              (a re-think that decides it no longer matters)
 A report (a line said inside a report turn: `voice.low_priority` / `voice.urgent`) that has become old news is re-thought by whoever
 was going to say it (the `rethink` hook); a line without one is dropped and declared, never said late.
 
 Game protocol (JSON text frames and binary audio); docs/protocollo_voce.md has the whole story:
-    line{id,speaker,name,text,lang,tone,channel,priority,answer,topic,est_s,hold_s,rate}    a line is about to be heard
+    line{id,speaker,name,text,lang,tone,channel,priority,answer,addressed,topic,est_s,hold_s,rate}   a line is about to be heard
     audio_begin{line,speaker,rate,est_s,hold_s}                                              its audio starts (subtitle on)
     <binary: uint32 LE line id + PCM16 mono>                                                  paced: about real time
     audio_end{line,dur_s,reason}                                                             it has been heard (reason done or cut)
     cancel{line,reason,fade_ms}                                                              stop it now (flush the audio, fade the subtitle)
     line_dropped{id,speaker,text,reason}                                                     a line that will never be heard (informational)
+    notice{id,speaker,name,text,lang,tone,channel,priority,answer,addressed,hold_s,why}      a line addressed to the Captain whose voice could not be made: he reads it
     floor{state,line}                                                                        state: idle · crew · captain
 """
 from __future__ import annotations
@@ -63,7 +68,9 @@ REPORT_MAX_AGE_S = {Prio.URGENT: 30.0, Prio.NORMAL: 18.0}
 REPORT_LATE_S = 8.0             # (for the producers of report turns) an item older than this says how old it is: the officer judges it
 RETHINK_AFTER_S = 8.0           # a line with a rethink hook that has waited this long (or was cut off) is thought again before it is said
 RETHINK_TIMEOUT_S = 4.0         # ... a re-think that does not answer in this time lets the line go (declared: `rethink_timeout`)
-MAX_RESUMES = 3                 # a line is taken up again at most this many times
+MAX_RESUMES = 3                 # a line is taken up again at most this many times (a line addressed to the Captain: MAX_RESUMES_ADDRESSED)
+MAX_RESUMES_ADDRESSED = 8
+SYNTH_RETRIES = 2               # a line addressed to the Captain whose voice could not be made is asked for again this many times, then he reads it (`notice`)
 
 LEAD_S = 0.45                   # audio is never sent more than this ahead of real time (so a stop is heard within it)
 CUT_WINDOW_S = 0.5              # a stop looks for the end of a phrase this far ahead, else fades out at once
@@ -122,6 +129,13 @@ class Line:
     thought_t: float = 0.0                       # loop time it was last thought again (or queued)
     cut_after: str = ""                          # what was heard of it before it was cut off (for the re-think)
     born: float = 0.0                            # loop time of the news it tells (a report), else when it was queued
+    addressed: bool = False                      # addressed to the Captain himself (see the module's `addressed`): never lost to the machinery
+    tries: int = 0                               # how many times its voice was asked for again after it could not be made
+
+    @property
+    def protected(self) -> bool:
+        """An answer to the Captain, or a line addressed to him: nothing the stage does on its own (queue size, age, a failed voice or re-think) may lose it."""
+        return self.prio == Prio.ANSWER or self.addressed
 
 
 def _sentences(text: str) -> list[str]:
@@ -361,7 +375,7 @@ class Voice:
     # ------------------------------------------------------------------------------------------ enqueue
     async def say(self, speaker: str, text: str, lang: str, tone: str, *, priority: Prio | str | None = None, topic: str | None = None,
                   expires_s: float | None = None, stale_if: Callable[[], bool] | None = None, answer: bool | None = None,
-                  rethink: "Callable[[str, float, str], Awaitable[str | None]] | None" = None) -> int:
+                  rethink: "Callable[[str, float, str], Awaitable[str | None]] | None" = None, addressed: bool = False) -> int:
         """Queue a line; returns its id. Nothing is sent to the game until the line's turn comes (see the module docstring)."""
         text = (text or "").strip()
         self._n += 1
@@ -380,6 +394,9 @@ class Voice:
         if self.muted:
             self._drop_info(lid, speaker, text, "no_listener", prio)
             return lid
+        protected = prio == Prio.ANSWER or addressed
+        if protected:
+            expires_s, stale_if = 0, None            # (an answer to the Captain, or a line addressed to him, is said whenever its turn comes: see Line.protected)
         exp = DEFAULT_EXPIRY[prio] if expires_s is None else expires_s
         deadline = (now + exp) if exp else None
         born = now
@@ -396,7 +413,7 @@ class Voice:
                     return lid
         line = Line(id=lid, speaker=speaker, text=text, lang=lang, tone=tone or "calm", prio=prio, topic=topic,
                     expires=deadline if rethink is None else None, stale_if=stale_if, enq=now, name=name, crew=crew,
-                    rethink=rethink, thought_t=born, born=born)
+                    rethink=rethink, thought_t=born, born=born, addressed=addressed)
         line.est_s = self._estimate(text, lang)
         self._enqueue(line)
         return lid
@@ -418,6 +435,9 @@ class Voice:
         # a newer line on the same topic replaces an older one that has not been said yet
         if line.topic:
             for old in [l for l in self._queue if l.topic == line.topic]:
+                if old.protected and not line.protected:
+                    self._drop(line, "superseded")                # (an answer or a call to the Captain is never replaced by a line that is neither)
+                    return
                 if line.prio <= old.prio:
                     self._drop(old, "superseded")
                 else:
@@ -444,7 +464,7 @@ class Voice:
 
     def _can_merge(self, a: Line, b: Line) -> bool:
         return (a.speaker == b.speaker and a.state == "queued" and a.prio == b.prio and a.prio >= Prio.NORMAL and a.lang == b.lang
-                and a.tone == b.tone and not a.topic and not b.topic and b.enq - a.enq < 4.0
+                and a.addressed == b.addressed and a.tone == b.tone and not a.topic and not b.topic and b.enq - a.enq < 4.0
                 and len(a.text) + len(b.text) < MERGE_MAX_CHARS and (a.stream is None or a.stream.seconds < 0.5))
 
     def _merge(self, a: Line, b: Line) -> None:
@@ -460,8 +480,13 @@ class Voice:
         self._wake()
 
     def _overflow(self) -> None:
+        """More lines waiting than the queue holds: the least important and oldest go (declared). An answer to the Captain and a line addressed to him never do: when
+        nothing else is left to drop, the queue is as long as it is (four replies of the admiral's were lost this way on 5 October)."""
         while len(self._queue) > MAX_QUEUED:
-            self._drop(max(self._queue, key=lambda l: (l.prio, -l.enq)), "overflow")
+            victims = [l for l in self._queue if not l.protected]
+            if not victims:
+                return
+            self._drop(max(victims, key=lambda l: (l.prio, -l.enq)), "overflow")
 
     # ------------------------------------------------------------------------------------------ dropping (never silent)
     def _drop_info(self, lid: int, speaker: str, text: str, reason: str, prio: Prio) -> None:
@@ -482,18 +507,59 @@ class Voice:
             self._synth_line = None
         self._drop_info(line.id, line.speaker, line.text, reason, line.prio)
 
+    def _ask_again(self, line: Line, why: str) -> None:
+        """The voice of a line the Captain is waiting for (an answer, a call to him) could not be made: the machine was busy, the model stumbled. It is asked for again; when
+        it fails again the Captain reads the line (a `notice`: the subtitle with no voice). A line like that is never dropped (5 October: two answers to the Captain
+        and a warning were lost to `synth_timeout`)."""
+        line.tries += 1
+        self.stats["synth_again"] += 1
+        if line.tries <= SYNTH_RETRIES:
+            log.warning("line %d (%s): %s: its voice is asked for again (%d of %d)", line.id, line.speaker, why, line.tries, SYNTH_RETRIES)
+            self._reset_synth(line)
+            self._wake()
+            return
+        if line in self._queue:
+            self._queue.remove(line)
+        line.state = "noticed"
+        self._reset_synth(line, keep_lines=True)
+        if self._synth_line is line:
+            self._synth_line = None
+        try:
+            asyncio.get_running_loop().create_task(self._notice(line, why))
+        except RuntimeError:
+            pass
+
+    async def _notice(self, line: Line, why: str) -> None:
+        """Send a line the voice could not make as text only: the game shows it as a subtitle (the Captain reads it). The officers' record of what was said aloud has it too:
+        he has it."""
+        now = self._now()
+        log.warning("line %d (%s, %s): %s: the Captain reads it instead — %s", line.id, line.speaker, PRIO_NAMES[line.prio], why, line.text[:70])
+        self.stats["noticed"] += 1
+        self.first_audio[line.id] = now
+        await self._send("json", {"type": "notice", "id": line.id, "speaker": line.speaker, "name": line.name, "text": line.text, "lang": line.lang, "tone": line.tone,
+                                  "channel": not line.crew, "priority": PRIO_NAMES[line.prio], "answer": line.prio == Prio.ANSWER, "addressed": line.addressed,
+                                  "hold_s": self._hold_for(line, line.est_s), "why": why})
+        self._heard.append((now, line.name or self.who(line.speaker)[0], line.text, True))
+        self._wake()
+
     def _reap(self) -> None:
-        """Expired, stale and unmakeable lines leave the queue."""
+        """Expired, stale and unmakeable lines leave the queue (not an answer to the Captain or a line addressed to him: those are made again, and then he reads them)."""
         now = self._now()
         for l in list(self._queue):
-            if l.expires is not None and now > l.expires:
+            if l.expires is not None and now > l.expires and not l.protected:
                 self._drop(l, "expired")
             elif l.gen_error and not l.chunks:
-                self._drop(l, "synth_failed")
+                if l.protected:
+                    self._ask_again(l, "its voice could not be made")
+                else:
+                    self._drop(l, "synth_failed")
             elif l.stream is not None and not l.first_ready.is_set() and now - l.synth_t > SYNTH_TIMEOUT_S:
                 log.error("line %d: no audio within %.0f s", l.id, SYNTH_TIMEOUT_S)
-                self._drop(l, "synth_timeout")
-            elif l.stale_if is not None:
+                if l.protected:
+                    self._ask_again(l, f"no audio within {SYNTH_TIMEOUT_S:.0f} s")
+                else:
+                    self._drop(l, "synth_timeout")
+            elif l.stale_if is not None and not l.protected:
                 try:
                     if l.stale_if():
                         self._drop(l, "stale")
@@ -510,17 +576,20 @@ class Voice:
                 new = await asyncio.wait_for(line.rethink(line.text, waited, cut_after), timeout=RETHINK_TIMEOUT_S)
                 why = "rethought"
             except asyncio.TimeoutError:
-                new, why = None, "rethink_timeout"
+                # (a re-think that did not answer is a machine's failure, not the officer's word that it no longer matters: what the Captain waits for is said as it stands)
+                new, why = (line.text if line.protected else None), "rethink_timeout"
             except Exception:  # noqa: BLE001
                 log.exception("line %d: the re-think failed", line.id)
-                new, why = None, "rethink_failed"
+                new, why = (line.text if line.protected else None), "rethink_failed"
             line.rethinking = None
             if line.state != "queued":
+                self._wake()
                 return
             if not new or not new.strip():
                 log.info("line %d (%s) thought again after %.0f s: not worth saying now", line.id, line.speaker, waited)
                 self.stats["rethought_dropped"] += 1
                 self._drop(line, why)
+                self._wake()                      # (the floor looks at what waits behind it: left asleep, the next line stayed in the queue until something else woke it)
                 return
             new = new.strip()
             self.stats["rethought"] += 1
@@ -810,10 +879,16 @@ class Voice:
                 continue
             now = self._now()
             if line.gen_error and not line.chunks:
-                self._drop(line, "synth_failed")
+                if line.protected:
+                    self._ask_again(line, "its voice could not be made")
+                else:
+                    self._drop(line, "synth_failed")
                 continue
             if line.gen_done and not line.chunks:
-                self._drop(line, "no_audio")                # (only punctuation, or a voice that made silence: a subtitle with no voice)
+                if line.protected and any(ch.isalnum() for ch in line.text):
+                    self._ask_again(line, "its voice made no sound")
+                else:
+                    self._drop(line, "no_audio")            # (only punctuation, or a voice that made silence: a subtitle with no voice)
                 continue
             if not self._can_start_smoothly(line):
                 await self._wait(0.05)
@@ -880,8 +955,8 @@ class Voice:
         self._set_floor("crew")
         await self._send("json", {"type": "line", "id": line.id, "speaker": line.speaker, "name": line.name, "text": line.text,
                                   "lang": line.lang, "tone": line.tone, "channel": not line.crew, "priority": PRIO_NAMES[line.prio],
-                                  "answer": line.prio == Prio.ANSWER, "topic": line.topic, "est_s": round(est, 2), "hold_s": hold,
-                                  "rate": rate})
+                                  "answer": line.prio == Prio.ANSWER, "addressed": line.addressed, "topic": line.topic, "est_s": round(est, 2),
+                                  "hold_s": hold, "rate": rate})
         await self._send("json", {"type": "audio_begin", "line": line.id, "speaker": line.speaker, "rate": rate,
                                   "est_s": round(est, 2), "hold_s": hold})
         reason = "done"
@@ -977,7 +1052,7 @@ class Voice:
         text: str | None = None
         if line.prio not in (Prio.NORMAL, Prio.URGENT) or line.cut_reason not in ("captain", "answer_first", "urgent_first"):
             why = "not repeated"
-        elif now - line.enq >= (25.0 if line.crew else 60.0) or line.resumes >= MAX_RESUMES:
+        elif line.resumes >= (MAX_RESUMES_ADDRESSED if line.addressed else MAX_RESUMES) or (not line.addressed and now - line.enq >= (25.0 if line.crew else 60.0)):
             why = "too old to say again"
         elif not line.crew and any(l.speaker == line.speaker and l.prio == Prio.ANSWER for l in self._queue):
             why = "the reply to the Captain takes its place"
@@ -993,9 +1068,9 @@ class Voice:
         self._n += 1
         exp = now + (20.0 if line.crew else 40.0)
         again = Line(id=self._n, speaker=line.speaker, text=text, lang=line.lang, tone=line.tone, prio=line.prio, topic=line.topic,
-                     expires=None if line.rethink else (exp if line.expires is None else min(exp, line.expires)), stale_if=line.stale_if,
+                     expires=None if (line.rethink or line.addressed) else (exp if line.expires is None else min(exp, line.expires)), stale_if=line.stale_if,
                      enq=line.enq, name=line.name, crew=line.crew, resumes=line.resumes + 1, rethink=line.rethink,
-                     thought_t=line.thought_t, born=line.born,
+                     thought_t=line.thought_t, born=line.born, addressed=line.addressed,
                      cut_after=line.text[:max(0, int(played * len(line.text)))].strip() if line.rethink else "")
         again.est_s = self._estimate(again.text, again.lang)
         self.enqueued[again.id] = now

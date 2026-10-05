@@ -116,6 +116,9 @@ class Replay:
         """The scripted model: waits as long as the script says (virtual time), then makes the calls the script has for what it was asked."""
         t = asyncio.get_running_loop().time()
         asked = str(messages[-1].get("content", ""))
+        # (the last message of a crew turn begins with what the crew carries and the state of the bridge now, with its recent events: what the turn is ABOUT is the tail)
+        head = max(asked.rfind("[Ship systems event, not the Captain speaking]"), asked.rfind("\n\nCaptain: "), asked.rfind("[Before speaking]"))
+        asked = asked[head:].lstrip("\n") if head >= 0 else asked
         names = {x["function"]["name"] for x in (tools or [])}
         if asked.startswith("[Before speaking]"):
             # an officer thinking again about a line that waited or was cut off (agent.rethink): the scripted officer is sensible —
@@ -299,7 +302,7 @@ async def r2_old_news_is_not_reported() -> list[str]:
 
 
 async def r3_warning_during_a_hail() -> list[str]:
-    """A warning of danger does not wait for the bridge to fall quiet: it is heard within about two seconds of the event, cutting the long message."""
+    """A warning of danger does not wait for the bridge to fall quiet: it is heard within a few seconds of the event (the line being said gets to end, three at most), cutting the long message."""
     async with Replay() as r:
         LAST[:] = [r]
         await asyncio.sleep(10.0)
@@ -311,8 +314,9 @@ async def r3_warning_during_a_hail() -> list[str]:
         warn = [i for i in tr.order() if tr.line[i]["priority"] == "urgent"]
         if not warn:
             return bad + ["the warning was never heard"]
+        from astra_mind.server import URGENT_GATHER_S, URGENT_WAIT_S        # (a warning gathers what comes with it, and waits for the line being said to end: this long at most)
         heard = tr.begin[warn[0]] - 20.0
-        if heard > 0.8 + 1.5:
+        if heard > 0.8 + max(URGENT_GATHER_S, URGENT_WAIT_S) + 0.6:
             bad.append(f"the warning was heard {heard:.1f} s after the event")
         arch = [i for i in tr.order() if tr.line[i]["speaker"] == "solm"]
         if not arch or tr.reason.get(arch[0]) != "cut" or tr.cancel_t[arch[0]] > tr.begin[warn[0]] + 0.1:

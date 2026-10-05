@@ -2355,6 +2355,7 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 		// the March (CAMPAGNA): the fleets and battles as our high command holds them, for the holo table's sector view
 		MarchFleets.Reset();
 		MarchBattles.Reset();
+		MarchAt = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
 		const TSharedPtr<FJsonObject>* March = nullptr;
 		if (Args->TryGetObjectField(TEXT("march"), March) && March && March->IsValid())
 		{
@@ -2374,6 +2375,7 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 					O->TryGetStringField(TEXT("name"), F.Name);
 					O->TryGetStringField(TEXT("system"), F.System);
 					O->TryGetStringField(TEXT("to"), F.To);
+					O->TryGetStringField(TEXT("next"), F.Next);
 					O->TryGetStringField(TEXT("state"), F.State);
 					double Eta = -1.0, N = 0.0, Age = 0.0;
 					if (O->TryGetNumberField(TEXT("eta_s"), Eta)) { F.EtaS = (float)Eta; }

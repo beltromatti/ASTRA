@@ -20,6 +20,9 @@ namespace AstraBoardCraft
 {
 	constexpr double StageM = 420.0;          // how far in front of its hatch a craft ends its crossing and begins the approach (m)
 	constexpr float ShieldDownFrac = 0.08f;   // a shield sector below this share of its capacity lets a craft through
+	constexpr double BrakeShare = 0.55;       // a boat brakes at this share of its thrust (the flight's own rule: AstraBoardFlight.cpp)
+	constexpr double LeaveS = 3.0;            // from the catapult to clear of the hull, on the bay's axis
+	constexpr double ApproachMaxMps = 55.0;   // the closing speed down a hatch's axis: 0.30 per second of the distance left, at most this, at least 2.5 m/s (AstraBoardFlight.cpp)
 
 	/** What a boat is. */
 	struct FKind
@@ -33,7 +36,7 @@ namespace AstraBoardCraft
 		float Hull;
 		float Radius;                    // m: the sphere a gun strikes
 		float HalfLength;                // m: how far its nose is from its centre (it touches the hull with it)
-		float Cruise;                    // m/s
+		float Cruise;                    // m/s, against the ship it flies to or from (its flight is flown in her frame: a hull that runs at 450 m/s is no faster to catch)
 		float Accel;                     // m/s^2
 		float PdHit;                     // the chance that a point-defence shot finds it (a fighter's is 0.07 to 0.14): an armoured boat, slower, but a hull of 140 to 200
 		float PdDamage;                  // and what a hit does
@@ -72,6 +75,18 @@ namespace AstraBoardCraft
 	};
 	ASTRA_API const TCHAR* PhaseName(EPhase P, bool bHome);
 
+	// ---- the flight's clock: what the minds and the ride's screen are told is what the flight does (the same rules, not a guess). Every number is seconds or metres.
+	/** How long a boat takes to cross DistM in a straight line, from rest against its goal to rest there: it climbs to its cruise, holds it, and brakes at BrakeShare of its thrust. */
+	ASTRA_API double CrossS(const FKind& K, double DistM);
+	/** How long the last leg takes, down the hatch's axis from AlongM to touching: closing speed 0.30 per second of the distance left, at most ApproachMaxMps, at least 2.5 m/s. */
+	ASTRA_API double ApproachS(double AlongM);
+	/** From the boat leaving the bay to the way in being cut open, for a hatch DistM from the carrier's bay (the target's hull, StageM and the touch not counted twice). */
+	ASTRA_API double FlightEtaS(const FKind& K, double DistToHatchM);
+	/** What is left of a flight for a boat in a phase: DistToStageM is the way to the point StageM in front of the hatch (or of the bay's mouth), AlongM the way down the axis, PhaseT the seconds in the phase. */
+	ASTRA_API double RemainingS(const FKind& K, EPhase Phase, bool bHome, double DistToStageM, double AlongM, float PhaseT);
+	/** A time as one says it: "45 s", "1 min 40 s", "about 3 minutes" is the caller's. */
+	ASTRA_API FString SpanText(double Seconds);
+
 	/** The flight of a boarding craft: the state a ship of the battle keeps while it flies one (CraftKind 3). */
 	struct FFlight
 	{
@@ -94,6 +109,7 @@ namespace AstraBoardCraft
 		float AliveT = 0.f;              // seconds since it left
 		float HoldT = 0.f;               // seconds waiting off a shield
 		float GoneT = 0.f;               // seconds going home without a carrier to go to
+		float TransitLimitS = 0.f;       // how long the crossing may take before the boat gives it up (set when it begins: the way there is long or short; 0: not set yet)
 		float Side = 1.f;                // which way it goes round a hull that is in its way (+1 or -1)
 		bool bDepart = false;            // the host: leave the hull now
 		bool bAbort = false;             // the host: turn back
@@ -186,6 +202,20 @@ namespace AstraBoardCraft
 		int32 EnemyCraftNear = 0;        // fighters of the target's side within 4 km of it (they shoot at boats)
 		float HullFrac = 1.f;
 		FString TargetName, CarrierName, TargetClass;
+	};
+
+	/** Where one boat is and how long it has to go (the host's, for the minds' picture of an operation under way and for the Captain's screen in the troop bay). */
+	struct FBoatStatus
+	{
+		bool bFound = false;
+		FString Name;                    // "Kestrel 1"
+		EPhase Phase = EPhase::Idle;
+		bool bHome = false;              // going back to the carrier's bay
+		bool bDockedOrLatched = false;
+		int32 Men = 0;
+		double DistM = 0.0;              // to where it is going: her hatch, or the bay's mouth
+		double EtaS = 0.0;               // to the way in being cut open (out) or to the bay (home); 0 once it is there
+		bool bWaitingOnShield = false;   // held off the hull by a shield: the ETA is only what is left of the approach
 	};
 
 	/** What a carrier has: the berths it started with, those that are away, and those lost for good. */

@@ -94,6 +94,9 @@ class Context:
     source: str = "inferred"            # game | inferred
     asleep: bool = False
     lift: Lift | None = None            # the lift car he is inside, with the stops it serves
+    place_name: str = ""                # the game's own words for where he is ("DECK 8 · ASSAULT-SHUTTLE BAY · SECTION B"): the badge's reading
+    deck: int | None = None             # the deck and section of the compartment he stands in (the plan's: where a fire, a team, a breach is, against him)
+    section: str = ""
 
     @property
     def on_bridge(self) -> bool:
@@ -214,7 +217,8 @@ def parse(raw: dict[str, Any] | None, state: dict[str, Any] | None, enemy: Any =
         listed = known_speakers(raw.get("in_earshot")) if raw.get("in_earshot") is not None else earshot_from_state(place, state)
         return Context(place=place, in_earshot=listed or (BRIDGE if place == "bridge" else ()),
                        facing=(str(raw["facing"]) if raw.get("facing") else None), channel=channel,
-                       pawn=str(raw.get("pawn") or "seated"), source="game", asleep=place_from_state(state)[1], lift=parse_lift(raw.get("lift")))
+                       pawn=str(raw.get("pawn") or "seated"), source="game", asleep=place_from_state(state)[1], lift=parse_lift(raw.get("lift")),
+                       place_name=str(raw.get("place_name") or ""), deck=_deck(raw.get("deck")), section=str(raw.get("section") or ""))
     place, asleep = place_from_state(state)
     channel = None
     if enemy is not None and getattr(enemy, "open", False):
@@ -270,6 +274,54 @@ def _kind(party: str, state: dict[str, Any] | None = None) -> str:
     return "enemy"
 
 
+def _deck(raw: Any) -> int | None:
+    try:
+        n = int(raw)
+    except (TypeError, ValueError):
+        return None
+    return n if n > 0 else None
+
+
+def badge_of(place_name: str = "", place: str = "", deck: int | None = None, section: str = "") -> str:
+    """Where the Captain's badge says he is, in the game's own words ("DECK 8 · ASSAULT-SHUTTLE BAY · SECTION B"), with the deck and the section added when the name does not
+    already carry them. "" when the game said nothing."""
+    name = (place_name or "").strip() or (place or "").strip().replace("_", " ")
+    if not name:
+        return ""
+    up = name.upper()
+    extra = []
+    if deck and f"DECK {deck}" not in up:
+        extra.append(f"deck {deck}")
+    if section and f"SECTION {str(section).upper()}" not in up:
+        extra.append(f"section {section}")
+    return name + (f" ({', '.join(extra)})" if extra else "")
+
+
+def badge(ctx: Context | None) -> str:
+    """The room as the game reads it from his badge, for the words of this utterance ("" when the game sent no context: an older build)."""
+    if ctx is None or ctx.source != "game":
+        return ""
+    return badge_of(ctx.place_name, ctx.place, ctx.deck, ctx.section)
+
+
+def badge_of_raw(raw: dict[str, Any] | None) -> str:
+    """The same from the game's raw `context` (the minds that hear the Captain before his context is parsed: the people around him, the Transporter Room's Chief)."""
+    r = raw or {}
+    return badge_of(str(r.get("place_name") or ""), str(r.get("place") or ""), _deck(r.get("deck")), str(r.get("section") or ""))
+
+
+def where_now(ctx: Context | None, state: dict[str, Any] | None) -> str:
+    """Where the Captain is this moment, for the head of every turn of a mind that talks to him: the ship's own sentence about him (`captain` in the state, which the game
+    rewrites every second from his badge and the plan's compartments) and, with his words, the badge's reading (`context`: the room's name, the deck and the section). It is
+    the live truth: crew.bridge_now teaches that it beats everything remembered (a transport that went through eight minutes ago put the Captain in his quarters for three of
+    the 5 October answers, while he stood on Deck 8). "" when the game said nothing about him."""
+    ship = " ".join(str((state or {}).get("captain") or "").split())
+    b = badge(ctx)
+    if ship and b:
+        return f"{ship} [his badge reads: {b}]"
+    return ship or b
+
+
 def describe_lift(lift: Lift) -> str:
     """The Captain inside a lift car: what the ship's computer does there and which stops it can take him to."""
     label = lambda stop_id: (lift.stop(stop_id).label if lift.stop(stop_id) else stop_id) or stop_id          # noqa: E731
@@ -305,12 +357,12 @@ def describe(ctx: Context, titles: dict[str, str] | None = None) -> str:
         if ch.muted:
             parts.append(f"A channel with {who} is open but MUTED: nothing the Captain says reaches them.")
         elif ch.kind == "flight":
-            parts.append(f"The flight net is live ({who}; the bridge hears it, and so do you): what the Captain says TO a pilot, a squadron, the CAG or the Chief of the Deck goes "
-                         "out on it (Martin lets it through) and they answer for themselves, and carry out the orders for their squadrons. Whatever is for them is theirs: you "
-                         "hear every word and say nothing about it — Price too, unless the words are for him or for Flight Control. What is meant for the bridge is yours.")
+            parts.append(f"The flight net is live ({who}; you hear the Captain's every word): what the Captain says TO a pilot, a squadron, the CAG or the Chief of the Deck goes "
+                         "out on it (Martin lets it through) and they answer him themselves, directly, and carry out the orders for their squadrons. Whatever is for them is theirs: you "
+                         "say nothing about it — Price too, unless the words are for him or for Flight Control. What is meant for the bridge is yours.")
         elif ch.kind == "marines":
-            parts.append(f"The marine net is live ({who}; the bridge hears it, and so do you): what the Captain says TO Major Reyes, the marines, a squad or its sergeant, or about "
-                         "the boarders, the bulkheads and the fight inside the hull, goes out on it (Martin lets it through) and they answer for themselves, and carry out the "
+            parts.append(f"The marine net is live ({who}; you hear the Captain's every word): what the Captain says TO Major Reyes, the marines, a squad or its sergeant, or about "
+                         "the boarders, the bulkheads and the fight inside the hull, goes out on it (Martin lets it through) and they answer him themselves, directly, and carry out the "
                          "orders for their squads and the doors. Whatever is for them is theirs: you hear every word and say nothing about it — Tactical and the XO included, unless "
                          "the words are for them. What is meant for the bridge (the ship, the guns, the helm) is yours.")
         else:

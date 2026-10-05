@@ -676,3 +676,72 @@ il ripiegamento che chiude le paratie dietro di sé (l'ultimo uomo resta alla co
 Il gioco: `marine_order` con `sweep`, `breach`, `take`, `ambush`, `hold_line`, `escort` e i modificatori `fire` (held|free), `seal_behind`, `cover` (il luogo che la squadra copre), `sync`; i luoghi anche come id di porta e come «deck N section X»; il quadro dei marine (`MarinesPicture`) con le fasi di ogni squadra, le stanze pulite e i varchi di ogni settore;
 gli eventi `Drill` (impilata, entrata, pulita, chiusa, imboscata, setacciato) come righe di rapporto. La mente (`marines.py`): i compiti nuovi e i modificatori nello strumento `order`, una sezione del prompt che dice che cosa fa ciascun ordine e quando paga (con i numeri del banco), il vocabolario radio corto, le classi di notizie nuove (`_KINDS`), e al XO uno strumento
 che passa le parole del Capitano alla rete. I Mandati usano gli stessi compiti come dottrina del codice (gli attaccanti impilano alla porta dell'obiettivo; i difensori ripiegano e chiudono). Banchi: scenari per ogni ordine (con e senza, sulla stessa pianta e gli stessi semi: l'ordine deve valere qualcosa) e prove delle menti senza modello (`marines_unit`).
+
+
+## 15. ABBORDAGGI-4 — il ritmo, il Capitano con i marine, la fanteria comandata, la prima persona (5/10)
+
+*Il brief è [brief/ABBORDAGGI-4.md](brief/ABBORDAGGI-4.md); le partite dell'utente da cui nasce sono in [PARTITE_2026-10-05.md](PARTITE_2026-10-05.md) §2-§3. Le sue parole: «abbordaggi ricevuti realistici e
+reali… soldati intelligenti e meccaniche accattivanti, con ordini di guerra molto complessi»; «non posso permettermi attriti». Questa sezione cresce a ogni traguardo.*
+
+### 15.1 Il ritmo (traguardo 1; `AstraBoardCraft.*`, `AstraBoardFlight.cpp`, `AstraBoardAssault.cpp`, `AstraBoardRide.cpp`, `AstraBoardMind.cpp`)
+
+**Che cosa era andato storto** (registri del gioco e della mente del 5/10, 23:10-23:20 UTC):
+1. «Undici minuti» non l'ha detto il gioco: il comando rispondeva «first at the hull in about 170 s» e i Kestrel hanno agganciato 158 s dopo il lancio (l'Acheron a 17,9 km); il modello dell'XO ha
+   trasformato 170 s in «undici minuti». Ora ogni tempo che il gioco dice all'equipaggio è un **intervallo a parole** (`SpanText`: «1 min 40 s», «45 s»), mai secondi nudi da convertire.
+2. **I due Kestrel sono andati perduti con i 24 marine** (23:20:36, «it could not get home»): il volo di ritorno rinunciava dopo **300 s** (`BfTransitLimitS`, uguale per ogni traversata), l'Aquila
+   era a 36-47 km e a 180 m/s ci vogliono 260-300 s. Ora il limite è per ogni traversata **60 s più 2,5 volte il tempo che serve** (`FFlight::TransitLimitS`, calcolato quando la traversata comincia):
+   una barca che avanza non viene mai mollata, una che non avanza torna indietro.
+3. Le navette (Skiff 220 m/s, Kestrel 180) erano più lente di ogni nave capitale (288-500 m/s): in una battaglia a 40-80 km un abbordaggio durava minuti di troppo. Ma il volo è fatto **nel sistema di
+   riferimento della nave che si raggiunge** (`Want = Anchor->Vel + Dir * VDes`: la velocità della barca è contro quella nave, che corra a 450 m/s non la rende più difficile da raggiungere), quindi la
+   velocità giusta non è «più di ogni nave» ma quella che dà un tempo da gioco.
+
+**Come è fatto ora** (numeri nella tabella delle navette `AstraBoardCraft.cpp`, orologio in `AstraBoardCraft::CrossS/ApproachS/FlightEtaS/RemainingS`):
+
+| | prima | ora |
+|---|---|---|
+| Skiff (Mandato) | 220 m/s, 45 m/s² | **640 m/s, 60 m/s²** |
+| Kestrel (Aquila) | 180 m/s, 40 m/s² | **560 m/s, 65 m/s²** |
+| uscita dalla baia | 7 s al più | 4 s al più (3 s tipici) |
+| attesa dei marine prima del lancio | 25 s sempre | **8-36 s dalle posizioni vere**: la strada di ogni marine scelto fino alla baia (rotta della mappa, a 3,3 m/s), un dormiente si sveglia prima (0,6 del suo tempo di VITA), le barche partono con tre uomini su quattro a bordo + 6 s per allacciarsi (`MusterTimeS`) |
+| tempo fino al taglio, stima | `dist/(0,85 v) + 20 + presa`, ad occhio | **la fisica del volo**: sale, tiene la crociera, frena a 0,55 della spinta (come il volo), ultimo tratto lungo l'asse del portello (17 s), presa; errore misurato ≤ 2 s |
+| difesa di punto sulle barche | invariata (`PdHit` 0,06 Skiff, 0,05 Kestrel) | invariata |
+
+**Misure** (`tools/boarding.py craft --setup d10|d20|d40|d80`, battaglia senza grafica, una portaerei Praetorian e un'Acheron senza energia a quella distanza; dalla barca che esce dalla baia al taglio della
+breccia; il «prima» è lo stesso banco con le velocità vecchie, 2 semi):
+
+| distanza | prima | ora | l'orologio delle barche (che le menti leggono) |
+|---|---|---|---|
+| 10 km | 91 s | **59 s** | 58 s |
+| 20 km | 144 s | **77 s** | 76 s |
+| 40 km | 253 s | **112 s** | 111 s |
+| 80 km | 476 s | **182 s** | 183 s |
+
+L'intera catena nel banco dell'ospite (`assault --setup out_10|out_20|out_40|out_80`; i marine del banco dormono tutti, quindi 36 s di attesa: il caso peggiore): **dall'ordine al taglio
+1 min 34 s a 10 km, 1 min 52 s a 20, 2 min 27 s a 40, 3 min 39 s a 80**; il ritorno dopo il combattimento 52 / 69 / 105 / 176 s. Con i marine svegli vicino alla baia l'attesa è di ~12 s.
+La **difesa di punto** non cambia con la distanza (la barca è esposta solo all'ultimo tratto: frenata e avvicinamento, ~26 s): quattro Skiff contro quattro canali, 30 sopravvivono su 96 a 10, 20 e 40 km
+(31 %; era 38 % su 24: stesso ordine di grandezza), contro due canali 50 % (era 54 %), i Falcon in pattuglia le abbattono tutte (0 su 48), due Kestrel contro i due canali di un'Acheron 67 %.
+
+**I fatti per il Capitano** (il modello legge, non calcola; VOCI-3 cura come arriva):
+- il risultato di `board_ship`: «order 1: the Aquila launches 2 Kestrels (24 marines) at Acheron, 17.9 km away, hatches ...; the boats leave the bay in 14 s and the first is at her hull and cutting in 1 min
+  43 s from this order (the crossing and the dock take 1 min 29 s of it)» + i rischi (difesa di punto, scudo, caccia) + «The Captain can still go with them (board_ship join) until the first Kestrel leaves the bay»;
+- `ship_state.boarding.assault.boats[]`: per ogni barca in volo `flight` (la fase), `km_to_go`, `eta_s` e `cut_in_in` / `home_in` a parole; `ship_state.boarding_boats.flight`: la crociera, l'attesa dei marine e i
+  tempi dall'ordine al portello per 5, 10, 20, 40, 80 km; `boarding_options.boardable_now[].from_the_order_to_the_hull_cut_open`; il rapporto dei sensori sulle barche del Mandato dice «about 1 min 12 s from her hull»;
+- l'evento della **mezz'ora** (una volta, solo per un volo di più di un minuto): «boarding: the Aquila's boats are 28 s from Acheron's hull: the first cuts in then» (rapporto per l'XO; la rete dei marine lo ha nel registro);
+- lo schermo del Capitano nella stiva del Kestrel («THE HULL IN 0:48») segue lo stesso orologio.
+
+**Il Capitano va con loro senza attrito.**
+- Con l'ordine: `board_ship {captain: true}` («vengo con voi»), come prima.
+- **Dopo l'ordine** (nuovo, `board_ship {action: join}`, la console `astra.board.join`, `UAstraBoardSubsystem::CaptainJoins`): finché il primo Kestrel non ha lasciato la baia (l'attesa dei marine, 8-36 s) il Capitano sale
+  **ovunque sia**: lo schermo si scurisce e si trova nella stiva truppe del primo Kestrel, nessuno cammina fino alla baia (`UAstraBattleSubsystem::SetBoardingCaptain`; se la barca è già all'imbocco della baia lo mette
+  dentro subito). A barca fuori nessuna barca prende un uomo in volo: la risposta lo dice, con il tempo al portello e la strada che resta (il Capo lo teletrasporta accanto ai marine quando le barche sono agganciate, con le
+  regole del fascio: scudo nostro, disturbo, una stanza che i marine tengono). Provati: `assault --setup out_join` (sale, combatte, torna), `out_join_late` (rifiutato con le ragioni).
+- Il nome della baia per tutti: «Assault-Shuttle Bay» (Deck 8 B, `d8_shuttle_bay_B1`, ingressi `d8_door_shuttle_bay_B1` e `_2` dal Port Passage `d8_po0_B3`); i nomi d'uso («Kestrel Bay», «hangar dei Kestrel»...) li risolve
+  il localizzatore di LUOGHI (main `6893706`, `f1e8df5`).
+
+**Il richiamo con i marine a bordo** (`board_ship {action: call_off}` / `astra.board.recall`): prima le barche si staccavano subito, con i marine ancora nei corridoi dell'altra nave. Ora i marine sono **richiamati**: ogni
+squadra in piedi riceve `withdraw` (ripiega al portello da cui è entrata, porta i feriti), le barche restano agganciate finché sono a bordo (75 s al più, poi i rimasti sono portati via con l'aiuto della barca), poi si
+staccano e tornano. Provato: `assault --setup out_recall` (24 marine fuori in 16 s dal richiamo).
+
+**Come si prova**: `tools/boarding.py craft --setup d10|d20|d40|d80|pd10|pd20|pd40|kpd20` (anche `--seeds 24`), `assault --setup out_10|out_20|out_40|out_80|out_join|out_join_late|out_recall`; ogni banco stampa «pace:» e
+l'orologio delle barche contro il volo. Le menti: `cd mind && .venv/bin/python -m unittest bench.assault_unit bench.marines_unit bench.marines_server` (la regola dell'XO, lo strumento con `join`, i campi che il gioco scrive, il
+formato dei tempi).

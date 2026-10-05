@@ -2,7 +2,7 @@
 
 *Questo file è la memoria operativa del progetto: lo aggiorno a ogni passo. Chi riprende il lavoro (io in una nuova sessione) parte da qui.*
 
-**Ultimo aggiornamento:** 2026-10-04 · **Traguardo corrente:** Piano v0.5 ([PIANO.md](PIANO.md)): la nave come una nave vera (NAVE-3,
+**Ultimo aggiornamento:** 2026-10-05 · **Traguardo corrente:** Piano v0.5 ([PIANO.md](PIANO.md)): la nave come una nave vera (NAVE-3,
 ASCENSORI), gli abbordaggi (F5.1), il lead che gioca partite intere da Capitano e rifinisce; **principio delle intelligenze**
 ([ARCHITETTURA §1bis](ARCHITETTURA.md))
 
@@ -21,6 +21,47 @@ ASCENSORI), gli abbordaggi (F5.1), il lead che gioca partite intere da Capitano 
 pezzi della pianta), **TELETRASPORTO**, **ARTE-PLANCIA-2** (plancia, abitacolo del Falcon, corridoi del Ponte 1 e alloggi del Capitano al
 livello di un film; avviato). Pronti: CAMPAGNA (lo strato strategico), FLOTTA-VIVA, F5.2 (abbordare le navi nemiche; con la guerra che lancia gli
 abbordaggi contro l'Aquila, chiesto da ABBORDAGGI).
+
+**5/10 notte — le partite dell'utente, la v0.7 del piano e i moduli che rifanno il cuore del gioco (il lead):**
+- **Le partite dell'utente** (00:16–01:26, tre sessioni, voce in italiano) lette riga per riga: [PARTITE_2026-10-05.md](PARTITE_2026-10-05.md).
+  In breve: ~480 battute in 70 minuti con più di 150 mai dette (alleati e rete di volo sull'altoparlante della plancia, le stesse cose da più
+  bocche), quattro risposte dell'ammiraglio perse per traboccamento, iniziative non chieste (la CAP), il timone che insegue un nemico più
+  veloce e lo perde, scontri di secondi dentro i 10 km e silenzio fuori, calore al 105 %, 20–32 incendi con 4 squadre, i Kestrel persi con
+  24 marine (il volo di rientro rinunciava dopo 300 s: lo corregge ABBORDAGGI-4), dieci minuti per andare dai Kestrel col teletrasporto.
+- **Piano v0.7** ([PIANO.md §0bis](PIANO.md)): il cuore del gioco prima di tutto — chiarezza, controllo, battaglie epiche e continue, niente
+  attriti. **Aiutanti al lavoro**: VOCI-3 (reti con chi le ascolta, palco senza traboccare, registro silenzioso, dottrina, iniziativa dentro
+  l'autorità data), BATTAGLIA-3 (armi lontane con la precisione che cala, navi che muoiono a pezzi in minuti, timone e tiro bravi, nemico che
+  si batte, calore e squadre), ABBORDAGGI-4 (ritmo, il Capitano con i marine, la fanteria comandata, la prima persona). Brief in `docs/brief/`.
+- **Il lead**: LUOGHI (il teletrasporto capisce i luoghi come li dice l'equipaggio, con i nomi più vicini e la stanza aperta più vicina a una
+  schermata; banco 134/134); il ritmo della guerra (gli alti comandi guardano ogni ~3,5 minuti e anche quando la mappa è ferma ma la guerra
+  tace da 4; la dottrina dell'iniziativa per entrambi); lo schermo principale che non cambia risoluzione a ogni sguardo. Uniti i rami finiti
+  di ARTE-INTERNI-2, ABBORDAGGI-3 e SPAZIO-VIVO-2 (M7–M9: il Falcon raccoglie le capsule con R, i getti dei velivoli, convogli e pattuglie);
+  in corso nell'editor la ricostruzione degli interni e l'importazione del kit dei ponti nemici.
+- **Credito OpenRouter: 3,55 $** (le partite del 5/10 ~1,8 $): segnalato in RICHIESTE.
+- **Che cosa arriva dal Gate** (il lead, `AstraGateWatch.cpp`): il tavolo olografico mostra il Janus Gate e, per una forza annunciata (il transito
+  visto da Keeper Station, i rinforzi di Fleet, le flotte della Marcia dirette qui), un anello che pulsa dove uscirà con quante navi e fra quanto;
+  lo schermo principale lo mette in testa («GATE · 4 HOSTILE INBOUND · IN 1:32»); un'incursione oscura resta una sorpresa. Provato nel gioco
+  (dall'avviso all'arrivo, poi i contatti al loro posto). Dalla domanda dell'utente «dove sono le altre navi nemiche?».
+- **Unita VOCI-3 tappa 1** (b6c4051) e provata nel gioco con la mente vera: le reti (flotta, volo, marine) hanno chi le ascolta e riferisce in
+  una riga o scrive sul registro della console; niente di ciò che è rivolto al Capitano si perde; la ruota degli ordini è confermata
+  dall'ufficiale giusto in 0,6 s («Allarme rosso, posti di combattimento.»); «Comunicazioni, cosa dicono gli alleati?» risponde dal registro;
+  la pagina THE BRIDGE'S LOG sul datapad. ~4 battute al minuto nell'avvicinamento di Solm (prima 6,8). Resta: tre soccorsi di mercantili in
+  80 s durante l'avvicinamento (VOCI-3 tappa 3), la dottrina dell'equipaggio (tappa 2). Rourke che chiama il Capitano ora si sente con la sua
+  voce (tell_captain e task_aquila diretti).
+- **Da indagare (PRESTAZIONI-GPU)**: nel gioco di prova (1600x900, 60 fps di obiettivo) la risoluzione dinamica sta al minimo (33–34 %) e
+  alcuni fotogrammi escono a blocchi (MetalFX attivo; in battaglia e con la ruota aperta: `Saved/Play/fx2.png`, `wheel1.png`, `gatelive.png`),
+  altri lisci; non riprodotto a comando con r.AstraMetalFX 0/1.
+- **Il ritmo** (il lead): il regista sa che la guerra si gioca per i suoi scontri (respiro di un minuto o due, una quiete già lunga si risponde con
+  la mossa successiva della guerra, mai con un'altra calma) ed è interpellato dopo 150 s di niente invece di 420; l'apertura della campagna
+  manda il gruppo di Solm a 90 s invece di 150 (avviso del Gate a ~2,5 min, arrivo prima dei 4; il 5/10 il primo colpo era a 8 minuti).
+- **La ruota degli ordini** (il lead, `AstraCommandWheel.*`): G tenuto, punta e lascia (o un numero; Esc niente): fuoco libero / cessate il fuoco,
+  ingaggia ciò che guardi (dal finestrone, sullo schermo principale, altrimenti il bersaglio del tattico o il più vicino), salva di missili, caccia
+  all'attacco / a casa, scudi, allarme, schermo. Gli stessi comandi degli strumenti degli ufficiali a nome del Capitano; la plancia ne riceve
+  l'evento e l'ufficiale ne risponde (VOCI-3 cura la risposta breve). Provata nel gioco (ENGAGE su T-24 dal suo posto in plancia).
+- **Uniti e provati nel gioco**: gli interni di ARTE-INTERNI-2 (giardino, biblioteche, dormitori, infermeria; 95 stanze reimportate, i ponti
+  ricostruiti), il kit dei ponti nemici di ABBORDAGGI-3 (l'abbordaggio con il Capitano a bordo sui ponti vestiti del Mandato funziona), ABBORDAGGI-4
+  tappa 1 (Kestrel tre volte più veloci: 20 km in 1 min 52 s dall'ordine al taglio; i Kestrel non si perdono più; «vengo anch'io»). Le righe di
+  debug del motore sullo schermo spente nel gioco del giocatore.
 
 **4/10 notte — le console vere e la luce della plancia (il lead):**
 - **Perché le console sembravano finte**: gli schermi vivi erano a ~22 nit contro l'esposizione fissa della plancia (EV100 6,6), un decimo di un

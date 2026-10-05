@@ -234,7 +234,8 @@ MARCH_OPENING: dict[str, Any] = dict(
         "F-A3": dict(where="Meridian",
                      order=dict(kind="hold", target="Meridian", stance="steady", reason="Battle Group Constance musters at Meridian, one Gate from the Aurelia picket: it comes on the Admiral's word")),
     },
-    plan=[dict(at_s=150.0, side="mandate", fleet="F-M1", kind="assault", target="Aurelia", stance="bold", dark=False,
+    # (at 90 s: the Gate's warning comes at about two and a half minutes and the strike group at under four; at 150 s the first shot came eight minutes in, 5 Oct)
+    plan=[dict(at_s=90.0, side="mandate", fleet="F-M1", kind="assault", target="Aurelia", stance="bold", dark=False,
                reason="seize Janus Gate Aurelia and Keeper Station; test the picket")],
 )
 

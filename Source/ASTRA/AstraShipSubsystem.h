@@ -68,7 +68,8 @@ struct FAstraSectorSystem
 struct FAstraMarchFleet
 {
 	FString Id, Side, Name, System, To;   // side: astra | mandate; To: the system it is bound for ("" when it stays)
-	float EtaS = -1.f;                    // seconds to its arrival (-1: not under way, or unknown)
+	FString Next;                         // under way: the system it comes out in next (EtaS is to there; To may lie hops beyond)
+	float EtaS = -1.f;                    // seconds to its arrival (-1: not under way, or unknown), as of GetMarchAt()
 	int32 Ships = 0;
 	bool bKnown = true;                   // our own fleet (false: an enemy track, as old as AgeS)
 	float AgeS = 0.f;
@@ -153,6 +154,8 @@ public:
 	const TArray<FAstraSectorSystem>& GetSector() const { return Sector; }
 	/** The March's fleets and battles for the holo table's sector view (empty without CAMPAGNA). */
 	const TArray<FAstraMarchFleet>& GetMarchFleets() const { return MarchFleets; }
+	/** When the March's picture came (world seconds): its fleets' EtaS count down from then. */
+	double GetMarchAt() const { return MarchAt; }
 	const TArray<FString>& GetMarchBattles() const { return MarchBattles; }
 	const TArray<FString>& GetSectorNews() const { return SectorNews; }
 	/** The Captain is in the Mess Hall (Deck 4). */
@@ -455,6 +458,7 @@ private:
 	float SpaceEV = 6.6f;
 	FString CaptainPlanetside;
 	TArray<FAstraMarchFleet> MarchFleets;
+	double MarchAt = 0.0;
 	TArray<FString> MarchBattles;          // systems where the March has a battle the high command knows of
 	FString ChannelParty;             // the channel open now (a hail, ours or theirs, until it is closed)
 	FVector PlanetDirNow = FVector::DownVector;
