@@ -179,7 +179,8 @@ class WhatSheReads(unittest.TestCase):
 
     def test_the_board_shows_the_plot_the_captain_and_her_console(self) -> None:
         text = transporter.board(STATE)
-        self.assertIn("Where the Captain is: in the Transporter Room", text)
+        self.assertIn("Where the Captain is NOW", text)
+        self.assertIn("in the Transporter Room", text)
         self.assertIn("T-02", text)
         self.assertIn("YOUR CONSOLE", text)
         self.assertIn("\"shields\":\"up\"", text)

@@ -660,7 +660,9 @@ class StrategicMinds:
                 if len(text) < 3:
                     return {"ok": False, "detail": "nothing to say"}
                 self.journal(side, f"told the Captain: {text[:200]}")
-                await self.say(seat.person.key, text, lang, str(a.get("tone", "measured")), answer=by_captain)
+                # (the admiral calling the Captain is heard in his own voice, not relayed by Communications: 5 Oct, four of his calls were lost and the Captain
+                # asked «Ammiraglio, mi senti?»)
+                await self.say(seat.person.key, text, lang, str(a.get("tone", "measured")), answer=by_captain, direct=True)
                 return {"ok": True, "detail": "said on the fleet net"}
             if name == "task_aquila" and side == "astra":
                 ok, detail = m.task_aquila(str(a.get("system", "")), str(a.get("mission", "")), str(a.get("why", "")))
@@ -668,7 +670,7 @@ class StrategicMinds:
                 if ok:
                     words = str(a.get("words", "")).strip()
                     if words:
-                        await self.say(seat.person.key, words, lang, "measured", answer=by_captain)
+                        await self.say(seat.person.key, words, lang, "measured", answer=by_captain, direct=True)
                     if self.on_aquila_task is not None:
                         extra = await self.on_aquila_task(m.aquila_task["system"], m.aquila_task["mission"])
                         detail = f"{detail}; {extra.get('detail', '')}"[:260]
