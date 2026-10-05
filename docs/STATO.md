@@ -2,7 +2,7 @@
 
 *Questo file è la memoria operativa del progetto: lo aggiorno a ogni passo. Chi riprende il lavoro (io in una nuova sessione) parte da qui.*
 
-**Ultimo aggiornamento:** 2026-10-04 · **Traguardo corrente:** Piano v0.5 ([PIANO.md](PIANO.md)): la nave come una nave vera (NAVE-3,
+**Ultimo aggiornamento:** 2026-10-05 · **Traguardo corrente:** Piano v0.5 ([PIANO.md](PIANO.md)): la nave come una nave vera (NAVE-3,
 ASCENSORI), gli abbordaggi (F5.1), il lead che gioca partite intere da Capitano e rifinisce; **principio delle intelligenze**
 ([ARCHITETTURA §1bis](ARCHITETTURA.md))
 
@@ -37,7 +37,14 @@ abbordaggi contro l'Aquila, chiesto da ABBORDAGGI).
   tace da 4; la dottrina dell'iniziativa per entrambi); lo schermo principale che non cambia risoluzione a ogni sguardo. Uniti i rami finiti
   di ARTE-INTERNI-2, ABBORDAGGI-3 e SPAZIO-VIVO-2 (M7–M9: il Falcon raccoglie le capsule con R, i getti dei velivoli, convogli e pattuglie);
   in corso nell'editor la ricostruzione degli interni e l'importazione del kit dei ponti nemici.
-- **Credito OpenRouter: 3,84 $** (le partite del 5/10 ~1,8 $): segnalato in RICHIESTE.
+- **Credito OpenRouter: 3,78 $** (le partite del 5/10 ~1,8 $): segnalato in RICHIESTE.
+- **Che cosa arriva dal Gate** (il lead, `AstraGateWatch.cpp`): il tavolo olografico mostra il Janus Gate e, per una forza annunciata (il transito
+  visto da Keeper Station, i rinforzi di Fleet, le flotte della Marcia dirette qui), un anello che pulsa dove uscirà con quante navi e fra quanto;
+  lo schermo principale lo mette in testa («GATE · 4 HOSTILE INBOUND · IN 1:32»); un'incursione oscura resta una sorpresa. Provato nel gioco
+  (dall'avviso all'arrivo, poi i contatti al loro posto). Dalla domanda dell'utente «dove sono le altre navi nemiche?».
+- **Il ritmo** (il lead): il regista sa che la guerra si gioca per i suoi scontri (respiro di un minuto o due, una quiete già lunga si risponde con
+  la mossa successiva della guerra, mai con un'altra calma) ed è interpellato dopo 150 s di niente invece di 420; l'apertura della campagna
+  manda il gruppo di Solm a 90 s invece di 150 (avviso del Gate a ~2,5 min, arrivo prima dei 4; il 5/10 il primo colpo era a 8 minuti).
 - **La ruota degli ordini** (il lead, `AstraCommandWheel.*`): G tenuto, punta e lascia (o un numero; Esc niente): fuoco libero / cessate il fuoco,
   ingaggia ciò che guardi (dal finestrone, sullo schermo principale, altrimenti il bersaglio del tattico o il più vicino), salva di missili, caccia
   all'attacco / a casa, scudi, allarme, schermo. Gli stessi comandi degli strumenti degli ufficiali a nome del Capitano; la plancia ne riceve
