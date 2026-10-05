@@ -185,7 +185,7 @@ void FAstraBoardSim::ColumnTo(FSquad& S, const FVector& To, float Speed)
 		return;
 	}
 	FUnit& L = People[S.Leader];
-	if (L.Act != EAct::Reload && (L.Path.IsEmpty() || FVector::Dist(L.Dest, To) > 150.f) && FVector::Dist(L.Pos, To) > 120.f)
+	if (L.Act != EAct::Reload && !L.bBusy && (L.Path.IsEmpty() || FVector::Dist(L.Dest, To) > 150.f) && FVector::Dist(L.Pos, To) > 120.f)
 	{
 		L.Slot = INDEX_NONE;
 		GoTo(L, To, Speed);
@@ -194,7 +194,7 @@ void FAstraBoardSim::ColumnTo(FSquad& S, const FVector& To, float Speed)
 	for (const int32 M : S.Members)
 	{
 		FUnit& U = People[M];
-		if (M == S.Leader || !U.Able())
+		if (M == S.Leader || !U.Able() || U.bBusy)                // (a man at a work of his own, the console of a bulkhead, is not the column's)
 		{
 			continue;
 		}
@@ -276,7 +276,7 @@ void FAstraBoardSim::HoldAround(FSquad& S, const FVector& At, float Radius, bool
 	for (const int32 M : S.Members)
 	{
 		FUnit& U = People[M];
-		if (!U.Able())
+		if (!U.Able() || U.bBusy)
 		{
 			continue;
 		}

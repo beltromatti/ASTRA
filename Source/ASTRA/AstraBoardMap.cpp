@@ -418,7 +418,7 @@ static bool BoardAStar(const FAstraBoardMap& Map, const FVector& From, const FVe
 		}
 		if (P.bDoor() && Opt.Doors && Opt.Doors->IsSealed(P.Door))
 		{
-			if (!Opt.bThroughSealed)
+			if (!Opt.bThroughSealed && !(Opt.bThroughClosed && Opt.Doors->ClosedBySide(P.Door) >= 0))
 			{
 				return false;
 			}

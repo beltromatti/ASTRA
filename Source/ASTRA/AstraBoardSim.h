@@ -123,7 +123,8 @@ namespace AstraBoard
 		float AmbushFirstHit = 1.3f;                            // ... its rounds are this much better (the men were laid on their targets) and the enemy is startled
 		float AmbushKillCm = 1100.f;                            // the killing ground: an enemy this near the squad's place and in sight of half of it (the full range of a rifle is 4.5 m, a third of the hits at 20)
 		float AmbushStartleS = 2.2f;                            // the enemy caught in it is startled this long
-		float SealS = 4.f;                                      // the last man at a bulkhead's console: how long it takes to close it
+		float SealS = 4.f;                                      // the last man at a bulkhead's console: how long it takes to close it (and for his side to open it again)
+		float OverrideS = 10.f;                                 // the ship's own people, at a door the enemy shut behind him: how long they take to override it (the attackers cut it: CutS)
 		float SealClearCm = 250.f;                              // and nobody (friend or enemy) may be in the doorway
 		float EscortPointCm = 560.f;                            // the man ahead of the Captain
 		bool bDrillDoctrine = false;                            // the Mandate's boarders and holders use the same drills (stack at the objective's door and go in together; fall back and close the bulkheads)
@@ -193,7 +194,9 @@ namespace AstraBoard
 		// the infantry orders (AstraBoardDrills.cpp)
 		bool bHidden = false;                    // in a corner with his fire held: he is seen only from close
 		int32 HoldDoor = INDEX_NONE;             // stacked at this door (the damage map's index): he does not open it, nor cut it
+		int32 WaitDoor = INDEX_NONE;             // waiting at this shut door (his way goes through it)
 		bool bBusy = false;                      // at a work of his own (the console of a bulkhead): the squad's drill does not move him
+		bool bMoveFire = false;                  // he goes on with his squad's move while he shoots (a bodyguard with the Captain on the move), firing on the move (a worse shot)
 		float EntryT = 0.f;                      // seconds left of the quick first targets of a man who came through a door in a drill
 		float StartleT = 0.f;                    // seconds left of being startled (not alerted, an enemy come out of a door he was not covering)
 		float AlertT = 999.f;                    // seconds since he heard a shot, saw an enemy or was hit: the ones who are not alerted are surprised

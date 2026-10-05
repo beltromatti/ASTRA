@@ -87,6 +87,7 @@ void FAstraBoardSim::ResetDrill(FSquad& S)
 		U.bHidden = false;
 		U.HoldDoor = INDEX_NONE;
 		U.bBusy = false;
+		U.bMoveFire = false;
 		U.StackIdx = INDEX_NONE;
 		U.GoAt = 0.f;
 	}
@@ -579,6 +580,7 @@ void FAstraBoardSim::DrillRoom(FSquad& S, const TArray<int32>& Able)
 			else if (S.DrillT >= Tuning.BreachChargeS)
 			{
 				Doors.Sealed[P->Door] = false;
+				Doors.ClosedBy[P->Door] = -1;
 				++Stats.DrillCharges;
 				S.bCharged = true;
 				S.Drill = EDrill::Stack;
@@ -874,18 +876,24 @@ void FAstraBoardSim::DrillEscort(FSquad& S, const TArray<int32>& Able)
 	// standing: the corners round him, facing the openings of his room
 	if (S.EscortStillT >= 1.5f)
 	{
+		for (const int32 M : Able)
+		{
+			People[M].bMoveFire = false;
+		}
 		HoldAround(S, C->Pos, 520.f);
 		return;
 	}
 	const FVector2D Fwd = S.EscortDir, Side(-Fwd.Y, Fwd.X);
 	TArray<int32> Men = Able;
 	Men.Sort([](int32 A, int32 B) { return A < B; });
+	const bool bWalking = S.EscortStillT < 0.5f;
 	for (int32 i = 0; i < Men.Num(); ++i)
 	{
 		FUnit& U = People[Men[i]];
-		if (U.bBusy || U.Act == EAct::Reload || U.Target != INDEX_NONE)
+		U.bMoveFire = bWalking;                                          // (while he walks they walk and shoot: a bodyguard who stops to fight is a man left behind; when he stands they hold)
+		if (U.bBusy || U.Act == EAct::Reload || (U.Target != INDEX_NONE && !bWalking))
 		{
-			continue;                                                    // (a man who is firing keeps firing: the formation closes up again after)
+			continue;                                                    // (a man who is firing keeps firing when the Captain stands: the formation closes up again after)
 		}
 		FVector2D Want;
 		if (i == 0)
@@ -1050,6 +1058,7 @@ void FAstraBoardSim::StepSealBehind(FSquad& S, const TArray<int32>& Able)
 	if (!bBlocked)
 	{
 		Doors.Sealed[P.Door] = true;
+		Doors.ClosedBy[P.Door] = (int8)S.Side;
 		++Stats.DrillSeals;
 		Emit(EEvent::Sealed, U.Id, P.Door, P.Pos, P.Pos, 0.f, false, FString::Printf(TEXT("%s closed the bulkhead at %s behind them"), *S.Name, *Map->Describe(Near)));
 	}

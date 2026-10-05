@@ -453,6 +453,7 @@ void FAstraBoardSim::SealDoor(int32 Door, bool bSealed)
 	if (Doors.Sealed.IsValidIndex(Door))
 	{
 		Doors.Sealed[Door] = bSealed;
+		Doors.ClosedBy[Door] = -1;                                // (a lockdown or a lifting of it, not a squad's door)
 	}
 }
 
@@ -578,7 +579,7 @@ void FAstraBoardSim::StepDoors()
 		}
 	}
 	OpenNow.Reset();
-	TArray<int32, TInlineAllocator<8>> Cutting;
+	TArray<int32, TInlineAllocator<8>> Cutting, Overriding, Reopening;
 	for (const FUnit& U : People)
 	{
 		if (U.Act == EAct::Dead || U.Act == EAct::Gone || U.Act == EAct::Waiting || !Map->GetComps().IsValidIndex(U.Comp))
@@ -596,10 +597,18 @@ void FAstraBoardSim::StepDoors()
 			const double D = FVector::Dist2D(U.Pos, P.Pos);
 			if (Doors.IsSealed(P.Door))
 			{
-				// the attackers at a sealed bulkhead cut through it
-				if (IsAttacker(U.Side) && U.Able() && D < 260.0 && !Cutting.Contains(P.Door))
+				const int32 By = Doors.ClosedBySide(P.Door);
+				if (By >= 0)
 				{
-					Cutting.Add(P.Door);
+					// a door a squad shut behind it: the ones who are waiting to go through work at it (the side that shut it opens it again from its console, the ship's own people override it, the attackers cut it)
+					if (U.WaitDoor == P.Door && U.Able() && D < 260.0)
+					{
+						(By == (int32)U.Side ? Reopening : IsAttacker(U.Side) ? Cutting : Overriding).AddUnique(P.Door);
+					}
+				}
+				else if (IsAttacker(U.Side) && U.Able() && D < 260.0 && !Cutting.Contains(P.Door))
+				{
+					Cutting.Add(P.Door);                         // (the attackers at a sealed bulkhead cut through it)
 				}
 			}
 			else if (D <= DoorOpenCm && !Doors.Open[P.Door])
@@ -611,16 +620,21 @@ void FAstraBoardSim::StepDoors()
 	}
 	for (int32 d = 0; d < CutT.Num(); ++d)
 	{
-		if (Cutting.Contains(d))
+		const bool bCut = Cutting.Contains(d), bOver = !bCut && Overriding.Contains(d), bAgain = !bCut && !bOver && Reopening.Contains(d);
+		if (bCut || bOver || bAgain)
 		{
-			CutT[d] += StepS;
+			CutT[d] += StepS * (bCut ? 1.f : bOver ? Tuning.CutS / FMath::Max(1.f, Tuning.OverrideS) : Tuning.CutS / FMath::Max(1.f, Tuning.SealS));
 			if (CutT[d] >= Tuning.CutS)
 			{
 				CutT[d] = 0.f;
 				Doors.Sealed[d] = false;
+				Doors.ClosedBy[d] = -1;
 				const int32 Pi = Map->PortalOfDoor(d);
+				const FString At = Pi != INDEX_NONE ? Map->Describe(Map->GetPortals()[Pi].A) : FString(TEXT("?"));
 				Emit(EEvent::Cut, INDEX_NONE, d, Pi != INDEX_NONE ? Map->GetPortals()[Pi].Pos : FVector::ZeroVector, FVector::ZeroVector, 0.f, false,
-				     FString::Printf(TEXT("%s cut through the bulkhead at %s"), Mis.Attacker == ESide::Mandate ? TEXT("the Mandate") : TEXT("the marines"), Pi != INDEX_NONE ? *Map->Describe(Map->GetPortals()[Pi].A) : TEXT("?")));
+				     bCut ? FString::Printf(TEXT("%s cut through the bulkhead at %s"), Mis.Attacker == ESide::Mandate ? TEXT("the Mandate") : TEXT("the marines"), *At)
+				          : bOver ? FString::Printf(TEXT("%s overrode the bulkhead at %s"), Mis.Attacker == ESide::Mandate ? TEXT("the marines") : TEXT("the Mandate"), *At)
+				                  : FString::Printf(TEXT("the bulkhead at %s was opened again"), *At));
 			}
 		}
 		else if (CutT[d] > 0.f)
@@ -1553,7 +1567,7 @@ void FAstraBoardSim::Fight(FUnit& U, float Dt)
 	}
 	// frightened men keep their heads down
 	const bool bPinned = U.Suppression > 0.75f && U.Role != ERole::Leader;
-	if (U.Slot == INDEX_NONE && Dist > 500.f && U.Speed < 1.f && !bStand)
+	if (U.Slot == INDEX_NONE && Dist > 500.f && U.Speed < 1.f && !bStand && !U.bMoveFire)
 	{
 		// in the open and not too close: find a corner first
 		TakeCover(U, T.Pos);
@@ -1614,7 +1628,7 @@ void FAstraBoardSim::Fight(FUnit& U, float Dt)
 	if (U.Path.Num() && U.PathI < U.Path.Num() && U.Speed > 1.f)
 	{
 		// a squad on the move that sees the enemy stops to shoot (the leader's plan will move it again); a man going through a door in a drill goes on to his corner and fires as he goes
-		if ((Dist < 1800.f || U.Role == ERole::Heavy) && U.EntryT <= 0.f)
+		if ((Dist < 1800.f || U.Role == ERole::Heavy) && U.EntryT <= 0.f && !U.bMoveFire)
 		{
 			U.Path.Reset();
 			U.Speed = 0.f;
@@ -1715,6 +1729,7 @@ void FAstraBoardSim::GoTo(FUnit& U, const FVector& To, float Speed, bool bThroug
 	FBoardRouteOptions Opt;
 	Opt.Doors = &Doors;
 	Opt.bThroughSealed = bThroughSealed || IsAttacker(U.Side);           // the attackers cut through what is shut; the holders go the way that is open
+	Opt.bThroughClosed = true;                                           // (a door a squad shut behind it is a delay, not a wall: every side goes by it, working at it)
 	TArray<FVector> Pts;
 	if (!Map->Route(U.Pos, To, Pts, Opt) || Pts.Num() < 2)
 	{
@@ -1752,6 +1767,7 @@ void FAstraBoardSim::Move(FUnit& U, float Dt)
 		return;
 	}
 	U.Speed = U.Cruise;
+	U.WaitDoor = INDEX_NONE;
 	float Left = U.Cruise * Dt * (U.Hp < 30.f ? 0.7f : 1.f);
 	U.bLow = false;
 	while (Left > 0.f && U.PathI < U.Path.Num())
@@ -1774,6 +1790,15 @@ void FAstraBoardSim::Move(FUnit& U, float Dt)
 			{
 				U.Speed = 0.f;
 				U.Act = EAct::Idle;
+				for (const int32 Pi : Map->GetComps()[U.Comp].Portals)
+				{
+					const FBoardPortal& P = Map->GetPortals()[Pi];
+					if (P.bDoor() && Doors.IsSealed(P.Door) && FVector::Dist2D(Next, P.Pos) < 170.0 && FVector::Dist2D(U.Pos, P.Pos) < 190.0)
+					{
+						U.WaitDoor = P.Door;                  // (the door he is waiting at: who works at a door a squad has shut)
+						break;
+					}
+				}
 				return;
 			}
 		}

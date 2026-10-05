@@ -1851,6 +1851,258 @@ static void BoardScenarioHold(FRig& Rig, int32 Seed, int32 Seeds)
 	}
 }
 
+/** Seal behind: a squad of six marines at the near side of a pressure bulkhead on the Mandate's way to Main Engineering, with the Mandate's boarding party (eight, twelve) coming in at the breach behind them. Told to fall back to Engineering they go on and the party
+ *  follows them; told to fall back and seal behind, the last man stays at the console four seconds and shuts the bulkhead on the party: it must be cut open (twenty-two seconds of torch) and the marines are in their corners at Engineering when it comes through. */
+static void BoardScenarioSeal(FRig& Rig, int32 Seed, int32 Seeds)
+{
+	const FAstraBoardMap& M = *Rig.Map;
+	const int32 Obj = Rig.Comp(TEXT("engineering")), Breach = Rig.Comp(*BenchBreach(Rig));
+	if (Obj == INDEX_NONE || Breach == INDEX_NONE)
+	{
+		BCheck("seal: arenas", false, TEXT("no Main Engineering or no breach room in the plan"));
+		return;
+	}
+	const FBox& BB = M.GetComps()[Breach].Box;
+	const FVector Cut(0.5 * (BB.Min.X + BB.Max.X), BB.Max.Y > 0 ? BB.Max.Y - 80.0 : BB.Min.Y + 80.0, BB.Min.Z);
+	TArray<int32> Ps;
+	FBoardRouteOptions Opt;
+	Opt.bThroughSealed = true;
+	if (!M.RoutePortals(Cut, M.CentreOf(Obj), Ps, Opt))
+	{
+		BCheck("seal: arenas", false, TEXT("no way from the breach to Main Engineering"));
+		return;
+	}
+	// the first pressure bulkhead on the way, with ten metres of passage on the breach side of it
+	int32 Door = INDEX_NONE;
+	for (int32 i = 2; i < Ps.Num(); ++i)
+	{
+		if (M.GetPortals()[Ps[i]].Kind == FBoardPortal::EKind::Blast)
+		{
+			Door = Ps[i];
+			break;
+		}
+	}
+	if (Door == INDEX_NONE)
+	{
+		BCheck("seal: arenas", false, TEXT("no pressure bulkhead on the way from the breach to Main Engineering"));
+		return;
+	}
+	const FBoardPortal& P = M.GetPortals()[Door];
+	const int32 Near = FVector::DistSquared(M.CentreOf(P.A), Cut) <= FVector::DistSquared(M.CentreOf(P.B), Cut) ? P.A : P.B;
+	const FVector Start = M.Inset(Near, P.PosIn(Near) + (P.PosIn(Near) - M.CentreOf(P.Other(Near))).GetSafeNormal2D() * 700.0, 60.f);
+	BNote(FString::Printf(TEXT("the bulkhead is at %s (%d openings from the breach of %d to Main Engineering); the squad stands at %s"), *M.Describe(P.A), Ps.Find(Door) + 1, Ps.Num(), *M.Describe(M.CompAt(Start, 80.f))));
+	for (const int32 Boarders : GBoarders > 0 ? TArray<int32>({GBoarders}) : TArray<int32>({8, 12}))
+	{
+		for (const int32 Mode : {0, 1})
+		{
+			if (GSetup >= 0 && Mode != GSetup)
+			{
+				continue;
+			}
+			double Contact = 0.0, LossA = 0.0, LossM = 0.0, T = 0.0, Seals = 0.0, Cuts = 0.0;
+			int32 Beaten = 0, N = 0;
+			for (int32 s = 0; s < Seeds; ++s)
+			{
+				FAstraBoardSim Sim;
+				Sim.Init(Rig.Map.ToSharedRef(), Seed + s * 17);
+				Sim.Tuning = Rig.Tuning;
+				Sim.SpawnAttackers(ESide::Mandate, Breach, Cut, Obj, Boarders, 2.f, Boarders);
+				int32 Counter = 0;
+				const int32 Sq = Sim.Squads().Num();
+				MakeMen(Sim, M, ESide::Aquila, TEXT("Reaction 1"), 6, Start, TEXT("Marine"), Counter);
+				FOrder O;
+				O.Task = ETask::FallBack;
+				O.Comp = Obj;
+				O.Pos = M.CentreOf(Obj);
+				O.Radius = 800.f;
+				O.bSealBehind = Mode == 1;
+				O.Where = M.Describe(Obj);
+				Sim.OrderEx(Sq, O);
+				const FRunResult R = RunSim(Sim, 200.0);
+				++N;
+				Contact += R.Book.FirstContactT;
+				LossA += R.Book.Killed[0] + R.Book.Down[0];
+				LossM += R.Book.Killed[1] + R.Book.Down[1];
+				T += R.T;
+				Seals += R.Book.DrillSeals;
+				Beaten += (R.Outcome == EOutcome::DefenderHolds || R.Outcome == EOutcome::AttackerRepelled) ? 1 : 0;
+			}
+			BNote(FString::Printf(TEXT("    %2d boarders, six marines fall back to Engineering: %-22s the Mandate beaten %2d of %2d, first contact %5.1f s, ends %5.1f s; marines lost %4.1f, Mandate lost %4.1f, bulkheads shut behind them %.1f"),
+			                      Boarders, Mode ? TEXT("seal behind") : TEXT("no seal"), Beaten, N, Contact / FMath::Max(1, N), T / FMath::Max(1, N), LossA / FMath::Max(1, N), LossM / FMath::Max(1, N), Seals / FMath::Max(1, N)));
+			(void)Cuts;
+		}
+	}
+}
+
+
+/** Escort: the Captain goes aboard a Mandate ship by a dock with the marines (two squads of six that go for her engineering hall, and a third of six) and walks to her bridge by the way the plan gives, at a walk, not stopping for anything (the worst of
+ *  players: the Mandate lay their guns on the Captain before any other man). The third squad is told nothing and goes on with the others (the way squads go), or told to follow him (they gather round him wherever he stands), or to escort him (a man ahead,
+ *  two at his sides, the rest behind); or there is no third squad. What each costs him in hits and the squad in men, against the crew of a hulk (a ship with sixty in a hundred of her posts manned, six roaming); and how well the squad keeps with him. */
+static void BoardScenarioEscort(const FString& Class, int32 Seed, int32 Seeds, const FTuning& Tuning)
+{
+	FString Why;
+	const TSharedPtr<FBoardShipPlan> P = AstraBoardPlans::Load(FName(*Class), Why);
+	if (!P.IsValid())
+	{
+		BCheck("escort", false, FString::Printf(TEXT("%s: %s"), *Class, *Why));
+		return;
+	}
+	const int32 Bridge = P->Objective(TEXT("bridge"), TEXT("bridge"));
+	if (Bridge == INDEX_NONE)
+	{
+		BCheck("escort", false, FString::Printf(TEXT("%s has no bridge"), *Class));
+		return;
+	}
+	const FAstraBoardMap& M = *P->Map;
+	struct FRow { const TCHAR* Name; int32 Mode; };
+	const FRow Rows[] = {{TEXT("the Captain with the two squads (12): no escort"), 0}, {TEXT("a third squad, no order (on to engineering)"), 1}, {TEXT("a third squad told to follow him"), 2}, {TEXT("a third squad told to escort him"), 3}};
+	double HitsOf[4] = {0.0, 0.0, 0.0, 0.0}, FoesOf[4] = {0.0, 0.0, 0.0, 0.0}, CloseOf[4] = {0.0, 0.0, 0.0, 0.0};
+	BNote(FString::Printf(TEXT("  the Captain walks at 2.8 m/s from the dock to %s, not stopping for anything:"), *M.Describe(Bridge)));
+	for (const FRow& Row : Rows)
+	{
+		if (GSetup >= 0 && Row.Mode != GSetup)
+		{
+			continue;
+		}
+		double Hits = 0.0, LostThird = 0.0, LostAll = 0.0, FoesLost = 0.0, ArrivedS = 0.0, Left = 0.0, Close = 0.0, CloseN = 0.0;
+		int32 Arrived = 0, Hit = 0, Ran = 0;
+		for (int32 s = 0; s < Seeds; ++s)
+		{
+			FAstraBoardSim Sim;
+			Sim.Init(P->Map.ToSharedRef(), Seed + s);
+			Sim.Tuning = Tuning;
+			AstraBoardScene::FSpec Spec;
+			Spec.Attacker = ESide::Aquila;
+			Spec.Attackers = Row.Mode == 0 ? 12 : 18;
+			Spec.Objective = TEXT("engineering");
+			Spec.PostShare = 0.6f;
+			Spec.Roaming = 6;
+			Spec.bSweep = false;
+			Spec.SealedShare = 0.f;
+			Spec.Seed = Seed + s;
+			const AstraBoardScene::FResult Sc = AstraBoardScene::Build(Sim, *P, Spec);
+			if (!Sc.bOk || Sc.AttackSquads.IsEmpty())
+			{
+				continue;
+			}
+			const FVector Start = Sc.BreachPos;
+			TArray<FVector> Pts;
+			float Metres = 0.f;
+			FBoardRouteOptions Opt;
+			Opt.bThroughSealed = true;
+			if (!M.Route(Start, M.CentreOf(Bridge), Pts, Opt, &Metres) || Pts.Num() < 2)
+			{
+				continue;
+			}
+			Sim.AddCaptain(Start);
+			const int32 Third = Row.Mode == 0 ? INDEX_NONE : Sc.AttackSquads.Last();
+			if (Third != INDEX_NONE && Row.Mode >= 2)
+			{
+				if (Row.Mode == 2)
+				{
+					Sim.Order(Third, ETask::Follow, INDEX_NONE, FVector::ZeroVector, 0.f, TEXT("bench"));
+				}
+				else
+				{
+					FOrder O;
+					O.Task = ETask::Escort;
+					O.Where = TEXT("the Captain");
+					Sim.OrderEx(Third, O);
+				}
+			}
+			double Walked = 0.0, TotalCm = 0.0;
+			for (int32 i = 1; i < Pts.Num(); ++i)
+			{
+				TotalCm += FVector::Dist(Pts[i - 1], Pts[i]);
+			}
+			double StartAt = -1.0, DoneAt = -1.0, NextLook = 0.0;
+			FVector At = Start;
+			float Yaw = 0.f;
+			while (Sim.Time() < 300.0 && DoneAt < 0.0)
+			{
+				const FSquad* T3 = Third != INDEX_NONE ? Sim.Squad(Third) : nullptr;
+				if (StartAt < 0.0)
+				{
+					bool bAboard = true;
+					if (T3)
+					{
+						bAboard = false;
+						for (const int32 Mn : T3->Members)
+						{
+							bAboard |= Sim.Unit(Mn) && Sim.Unit(Mn)->Act != EAct::Waiting;
+						}
+					}
+					if (bAboard && Sim.Time() > 28.0)
+					{
+						StartAt = Sim.Time() + 3.0;                                   // (the Captain steps off three seconds after the third squad is through the hatch)
+					}
+				}
+				if (StartAt >= 0.0 && Sim.Time() >= StartAt)
+				{
+					Walked = FMath::Min(TotalCm, Walked + 2.8 * 100.0 * 0.1);              // 2.8 m/s
+					double Rest = Walked;
+					for (int32 i = 1; i < Pts.Num(); ++i)
+					{
+						const double Seg = FVector::Dist(Pts[i - 1], Pts[i]);
+						if (Rest <= Seg || i == Pts.Num() - 1)
+						{
+							At = FMath::Lerp(Pts[i - 1], Pts[i], FMath::Clamp(Rest / FMath::Max(1.0, Seg), 0.0, 1.0));
+							Yaw = FMath::RadiansToDegrees(FMath::Atan2(Pts[i].Y - Pts[i - 1].Y, Pts[i].X - Pts[i - 1].X));
+							break;
+						}
+						Rest -= Seg;
+					}
+					if (Walked >= TotalCm - 600.0)
+					{
+						DoneAt = Sim.Time();
+					}
+					if (T3 && Sim.Time() >= NextLook)
+					{
+						NextLook = Sim.Time() + 1.0;
+						for (const int32 Mn : T3->Members)
+						{
+							const FUnit* U = Sim.Unit(Mn);
+							if (U && U->Able())
+							{
+								Close += FVector::Dist2D(U->Pos, At) < 1000.0 ? 1.0 : 0.0;
+								CloseN += 1.0;
+							}
+						}
+					}
+				}
+				Sim.SetCaptain(At, Yaw, false, StartAt >= 0.0 ? 280.f : 0.f, false);
+				Sim.Tick(0.1f);
+			}
+			++Ran;
+			Arrived += DoneAt >= 0.0 ? 1 : 0;
+			ArrivedS += DoneAt >= 0.0 ? DoneAt - StartAt : 0.0;
+			Left += (TotalCm - Walked) / 100.0;
+			Hits += Sim.Book().CaptainHits;
+			Hit += Sim.Book().CaptainHits > 0 ? 1 : 0;
+			FoesLost += Sim.Book().Killed[1] + Sim.Book().Down[1];
+			LostAll += Sim.Book().Killed[0] + Sim.Book().Down[0];
+			if (Third != INDEX_NONE)
+			{
+				for (const int32 Mn : Sim.Squad(Third)->Members)
+				{
+					const FUnit* U = Sim.Unit(Mn);
+					LostThird += (U && (U->Act == EAct::Down || U->Act == EAct::Dead)) ? 1.0 : 0.0;
+				}
+			}
+		}
+		const double N = FMath::Max(1, Ran);
+		HitsOf[Row.Mode] = Hits / N;
+		FoesOf[Row.Mode] = FoesLost / N;
+		CloseOf[Row.Mode] = CloseN > 0.0 ? 100.0 * Close / CloseN : 0.0;
+		BNote(FString::Printf(TEXT("    %-46s at the bridge %2d of %2d (%3.0f s on foot); hits on him %5.1f (hit at all in %2d); marines lost %4.1f (the third squad %3.1f); defenders lost %4.1f; the third squad within 10 m of him %3.0f%% of the time"),
+		                      Row.Name, Arrived, Ran, Arrived ? ArrivedS / Arrived : 0.0, HitsOf[Row.Mode], Hit, LostAll / N, LostThird / N, FoesOf[Row.Mode], CloseOf[Row.Mode]));
+	}
+	if (GSetup < 0)
+	{
+		BCheck("escort: the squad keeps with the Captain", CloseOf[3] >= 1.5 * CloseOf[1] && CloseOf[2] >= 1.5 * CloseOf[1], FString::Printf(TEXT("the third squad is within 10 m of him %.0f%% (escort), %.0f%% (follow) of the walk, %.0f%% with no order"), CloseOf[3], CloseOf[2], CloseOf[1]));
+	}
+}
+
 // ================================================================================================================== the Captain's arms on the weapon
 
 namespace
@@ -3470,7 +3722,7 @@ int32 UAstraBoardSimCommandlet::Main(const FString& Params)
 	FParse::Value(*Params, TEXT("-setup="), GSetup);
 	Scenario = Scenario.ToLower();
 	FRig Rig;
-	if (Scenario == TEXT("plans") || Scenario == TEXT("attack") || Scenario == TEXT("interior") || Scenario == TEXT("war") || Scenario == TEXT("dress"))      // (on request only: other ships' plans, the marines going aboard one, the plans made solid and dressed; no plan of the Aquila needed)
+	if (Scenario == TEXT("plans") || Scenario == TEXT("attack") || Scenario == TEXT("interior") || Scenario == TEXT("war") || Scenario == TEXT("dress") || Scenario == TEXT("escort"))      // (on request only: other ships' plans, the marines going aboard one, the plans made solid and dressed; no plan of the Aquila needed)
 	{
 		FString Class;
 		FParse::Value(*Params, TEXT("-class="), Class);
@@ -3497,6 +3749,10 @@ int32 UAstraBoardSimCommandlet::Main(const FString& Params)
 		else if (Scenario == TEXT("war"))
 		{
 			BoardScenarioWar(Class.IsEmpty() ? FString(TEXT("acheron")) : Class, Seed, Seeds, T);
+		}
+		else if (Scenario == TEXT("escort"))
+		{
+			BoardScenarioEscort(Class.IsEmpty() ? FString(TEXT("acheron")) : Class, Seed, Seeds, T);
 		}
 		else
 		{
@@ -3578,6 +3834,10 @@ int32 UAstraBoardSimCommandlet::Main(const FString& Params)
 	if (Scenario == TEXT("hold") || Scenario == TEXT("drills"))
 	{
 		BoardScenarioHold(Rig, Seed, Seeds);
+	}
+	if (Scenario == TEXT("seal") || Scenario == TEXT("drills"))
+	{
+		BoardScenarioSeal(Rig, Seed, Seeds);
 	}
 	int32 Failed = 0;
 	for (const FBCheck& C : BChecks)
