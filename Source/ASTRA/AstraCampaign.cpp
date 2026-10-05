@@ -485,7 +485,8 @@ void UAstraCampaignSubsystem::HideMenu()
 	Menu.Reset();
 	if (bWas && GetWorld())
 	{
-		UGameplayStatics::SetGamePaused(GetWorld(), false);
+		const UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>();
+		UGameplayStatics::SetGamePaused(GetWorld(), Ship && Ship->IsStoryPaused());   // (a story card holds the world: RESUME gives it back to the card)
 		SetMenuInput(false);
 	}
 }

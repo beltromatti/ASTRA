@@ -31,6 +31,7 @@
 #include "Widgets/Text/STextBlock.h"
 // portable-ok: the key file is made readable by its owner only where the system has POSIX permissions (Windows keeps it in the user's own folder)
 #if PLATFORM_MAC || PLATFORM_LINUX
+// portable-ok: (the same: POSIX permissions)
 #include <sys/stat.h>
 #endif
 

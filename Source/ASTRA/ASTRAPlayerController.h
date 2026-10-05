@@ -36,6 +36,8 @@ public:
 	 *  still; when it ends the start hint comes back. */
 	void SetCinematic(bool bOn);
 	bool IsCinematic() const { return bCinematic; }
+	/** The story's cards hold the world still (story_pause): their fades and the subtitles are this controller's, and go on in the pause. */
+	void SetStoryHold(bool bOn) { bShouldPerformFullTickWhenPaused = bOn; }
 	// --- ABBORDAGGI: what the weapons ask of the controller (UAstraFpsComponent): the datapad is raised (a menu that holds the walking still, the lift's list, is told by IsMoveInputIgnored)
 	bool IsPadUp() const { return bPadUp; }
 

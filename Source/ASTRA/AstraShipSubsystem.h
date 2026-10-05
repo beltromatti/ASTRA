@@ -276,6 +276,8 @@ public:
 	/** A railgun volley: the capacitors' draw makes the ship's lights sag for a moment (the power is visible). */
 	void RailgunDraw() { if (RailDrawGap <= 0.f) { RailDraw = 1.f; RailDrawGap = 2.5f; } }   // (at most one sag every 2.5 s: with the mounts firing one after another the lights would never be steady)
 	bool IsShipLost() const { return bShipLost; }
+	/** The story's narrated cards hold the world still (the mind's story_pause): the menu's RESUME keeps it so. */
+	bool IsStoryPaused() const { return bStoryPaused; }
 	bool BoardLifepod(class AAstraLifepodHatch* Hatch, APlayerController* PC, bool bHauled = false);
 	/** The way from an officer's place to the Captain's quarters (world cm, deck level); OutWaitAt: the point at the
 	 *  cabin's door where they wait for the chime. */
@@ -401,6 +403,7 @@ private:
 	bool bAbandon = false;
 	bool bAbandonOrdered = false;
 	bool bShipLost = false;
+	bool bStoryPaused = false;
 	float AbandonLeft = 0.f;          // to the reactor breach
 	float AbandonT = 0.f;             // since the order
 	float AbandonAlarmT = 0.f;

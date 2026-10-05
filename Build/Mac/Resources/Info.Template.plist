@@ -10,7 +10,7 @@
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>ASTRA listens to your voice while you hold V, so you can give orders to your bridge crew in any language.</string>
+	<string>ASTRA listens to your voice only while you hold the talk key (V unless you change it), so you can give orders to your bridge crew in any language.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>LSApplicationCategoryType</key>

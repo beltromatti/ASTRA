@@ -779,8 +779,8 @@ void AASTRAPlayerController::EnsureStoryWidget()
 				+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
 				[
 					// an epilogue line can be long: it wraps, and reads as prose
-					SAssignNew(StorySub, STextBlock).Font(Mono ? FSlateFontInfo(Mono, 17) : FCoreStyle::GetDefaultFontStyle("Mono", 17))
-					.ColorAndOpacity(FLinearColor(0.45f, 0.55f, 0.66f, 0.f)).Justification(ETextJustify::Center).AutoWrapText(true)
+					SAssignNew(StorySub, STextBlock).Font(Mono ? FSlateFontInfo(Mono, 20) : FCoreStyle::GetDefaultFontStyle("Mono", 20))
+					.ColorAndOpacity(FLinearColor(0.72f, 0.8f, 0.88f, 0.f)).Justification(ETextJustify::Center).AutoWrapText(true)
 					.LineHeightPercentage(1.25f)
 				]
 			]
@@ -1047,7 +1047,7 @@ void AASTRAPlayerController::PlayerTick(float DeltaTime)
 	}
 	StoryShade->SetBorderBackgroundColor(FLinearColor(0.f, 0.f, 0.f, StoryBlackNow));
 	StoryTitle->SetColorAndOpacity(FLinearColor(0.75f, 0.88f, 1.f, TextA));
-	StorySub->SetColorAndOpacity(FLinearColor(0.45f, 0.55f, 0.66f, TextA));
+	StorySub->SetColorAndOpacity(FLinearColor(0.72f, 0.8f, 0.88f, TextA));
 	if (StoryBlackNow <= 0.f && StoryBlackWant <= 0.f && StoryTextT < 0.f)
 	{
 		if (UGameViewportClient* VC = GetWorld() ? GetWorld()->GetGameViewport() : nullptr)

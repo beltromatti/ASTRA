@@ -115,7 +115,7 @@ Write-Host "Pacchetto: $Stage"
 # la mente: solo i sorgenti e uv.lock (il suo ambiente Python nasce nei dati di ASTRA, con uv, alla prima configurazione); non l'helper del Mac
 # (stt_server), non gli ambienti, non le cache; bin\ (uv.exe) e' escluso cosi' che /MIR non lo cancelli
 $MindOut = Join-Path $Stage "mind"
-robocopy (Join-Path $Repo "mind") $MindOut /MIR /XD ".venv" "__pycache__" ".cache" ".ruff_cache" ".build" ".swiftpm" "stt_server" "bin" /XF ".DS_Store" "*.pyc" /NFL /NDL /NJH /NJS /NP | Out-Null
+robocopy (Join-Path $Repo "mind") $MindOut /MIR /XD ".venv" "__pycache__" ".cache" ".ruff_cache" ".build" ".swiftpm" "stt_server" "bin" /XF ".DS_Store" "*.pyc" ".env" ".env.*" /NFL /NDL /NJH /NJS /NP | Out-Null
 if ($LASTEXITCODE -ge 8) { Fail "robocopy della mente ha risposto $LASTEXITCODE" }
 if (-not (Test-Path (Join-Path $MindOut "pyproject.toml"))) { Fail "la mente non e' stata copiata in $MindOut" }
 
@@ -142,9 +142,9 @@ ASTRA for Windows
 =================
 
 1. Run Setup-ASTRA.bat once (it needs the internet: it makes the crew's Python environment and downloads their voice and listening models,
-   a few GB). If you have a key file (.env) for the crew's minds, drag it onto Setup-ASTRA.bat or run:
-       Setup-ASTRA.bat -EnvFile C:\path\to\.env
-2. Start ASTRA.exe.
+   a few GB). If you skip it, the game does the same on its first start (slower, with a notice on screen).
+2. Start ASTRA.exe. On the first start it asks for your OpenRouter API key (https://openrouter.ai/keys): the crew's minds run on it, and
+   the game checks it and its credit before the war begins. You can change it later in SETTINGS.
 
 If Windows says a DLL is missing (VCRUNTIME140.dll, MSVCP140.dll), run Engine\Extras\Redist\en-us\UEPrereqSetup_x64.exe once: it installs the
 Microsoft Visual C++ runtime that both the game and the crew's Python libraries need.

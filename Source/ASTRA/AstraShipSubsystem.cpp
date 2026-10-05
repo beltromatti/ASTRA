@@ -2279,7 +2279,14 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 		// the story's narrated cards (the end of a chapter, the introduction): the world holds still under them, and goes on after
 		bool bOn = true;
 		Args->TryGetBoolField(TEXT("on"), bOn);
+		bStoryPaused = bOn;
 		UGameplayStatics::SetGamePaused(GetWorld(), bOn);
+		if (AASTRAPlayerController* PC = Cast<AASTRAPlayerController>(UGameplayStatics::GetPlayerController(GetWorld(), 0)))
+		{
+			// the cards' fades and the subtitles are the controller's (PlayerTick): a paused game ticks only its input, and the cards stayed
+			// unseen (5 Oct: the narrator read the end of a chapter over the frozen bridge)
+			PC->SetStoryHold(bOn);
+		}
 		OutDetail = bOn ? TEXT("the game holds still") : TEXT("the game goes on");
 		return true;
 	}

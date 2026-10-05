@@ -77,11 +77,17 @@
 		},
 		{
 			"Name": "MetaHumanCharacter",
-			"Enabled": true
+			"Enabled": true,
+			"TargetAllowList": [
+				"Editor"
+			]
 		},
 		{
 			"Name": "MetaHumanSDK",
-			"Enabled": true
+			"Enabled": true,
+			"TargetAllowList": [
+				"Editor"
+			]
 		},
 		{
 			"Name": "MetaHumanGenerator",
@@ -95,6 +101,13 @@
 			"Enabled": true,
 			"PlatformAllowList": [
 				"Mac"
+			]
+		},
+		{
+			"Name": "NNEDenoiser",
+			"Enabled": true,
+			"TargetAllowList": [
+				"Editor"
 			]
 		}
 	]
