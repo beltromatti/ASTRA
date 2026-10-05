@@ -33,9 +33,30 @@ namespace AstraBoard
 		FallBack,    // withdraw to a place by bounds
 		Follow,      // stay with the Captain
 		Rescue,      // reach the Captain who is down and carry him out
-		Withdraw     // leave the ship by the breach
+		Withdraw,    // leave the ship by the breach
+		// the infantry orders (AstraBoardDrills.cpp, docs/ABBORDAGGI.md §15.2): a squad runs a drill with phases of its own
+		Sweep,       // clear the rooms of a place one after the other: stack at each door, go in together, clear, report, the next
+		Breach,      // open a door (a sealed bulkhead is charged) and go in through it: stack, charge, entry, clear, then hold what is taken
+		Take,        // take a room and hold it: stack at its door (several squads on a sync: each at its own door, in together), entry, clear, hold from inside
+		Ambush,      // hidden in the corners of a place with the fire held: it is opened all together when the enemy is in the killing ground, or when the squad is found
+		HoldLine,    // bar a sector or a deck: a pair at each opening that leaves it, on the ways the enemy takes first
+		Escort       // with the Captain in formation: a man ahead who looks past every opening, two at the sides, one behind
+	};
+	/** Where a squad is in the drill of one of the infantry orders. */
+	enum class EDrill : uint8
+	{
+		None,        // no drill (the older tasks)
+		Approach,    // on its way to the door it will go in by
+		Stack,       // stacked at the door, the door held shut, waiting for all of them (and for the squads of its sync)
+		Charge,      // a sealed bulkhead: the charge is set, the others wait clear of it
+		Entry,       // through the door a man a moment apart, each to his corner of the room
+		Clear,       // in the room: looking for what is in it, holding until it is clear
+		Hold,        // the place is theirs: held from inside
+		Spring,      // (ambush) hidden, fire held, waiting for the enemy to be where the squad wants him
+		Done         // the order is carried out: the squad holds where it is
 	};
 	const TCHAR* TaskName(ETask T);
+	const TCHAR* DrillName(EDrill D);
 	const TCHAR* ActName(EAct A);
 
 	/** The weapons the fight knows (the player's own are in AstraWeapon.*; these are what a soldier's rifle does in the squad's reckoning). */
@@ -82,6 +103,31 @@ namespace AstraBoard
 		float LethalScale[2] = {0.75f, 1.f};                    // by side (Aquila, Mandate): how much of a beaten man's chance of dying outright is his (1: the base rule; a marine's armour and field surgery make it less)
 		bool bFlank = true;                                     // squads go round (the bench turns it off to see what it is worth)
 		bool bCover = true;                                     // men look for corners (the bench turns it off for the duels in the open)
+		// ---- the infantry orders (AstraBoardDrills.cpp): what each is worth is what these say, and the bench moves them
+		float StartleS = 1.3f;                                  // a man who is not alerted sees an enemy come through a door he was not covering: he is this long getting over it ...
+		float StartleMul = 1.9f;                                // ... and his time to get a gun on him is this much longer
+		float EntryS = 2.5f;                                    // a man who comes through a door in a drill is quick on his first targets for this long ...
+		float EntryMul = 0.55f;                                 // ... his time to lay a gun on one is this much shorter ...
+		float EntryHit = 1.1f;                                  // ... and his rounds a little better (it is what he is trained for)
+		float FunnelBonus = 1.25f;                              // a man holding a corner on a door, alerted, against the one who comes through it: a doorway is a fatal funnel
+		float HiddenSeeCm = 450.f;                              // a man hidden in a corner is seen only from this near
+		float StackReadyCm = 170.f;                             // stacked: within this of his place at the door
+		float StackMaxWaitS = 30.f;                             // a squad waits this long for the last of its men
+		float SyncMaxWaitS = 45.f;                              // and this long, from the first of its squads stacked, for the others of its sync
+		float EntryGapS = 0.7f;                                 // the next man goes through this long after the one before
+		float ClearHoldS = 4.f;                                 // a room is clear when nothing has been seen in it for this long with the men at their corners
+		float BreachChargeS = 9.f;                              // a charge on a sealed bulkhead (the torches of the Mandate take CutS)
+		float BreachStunS = 1.6f;                               // what it does to the men near the door on the other side: they are stunned this long
+		float BreachNoiseCm = 2600.f;                           // and who hears it (alerted: no surprise on them)
+		float AmbushMaxS = 180.f;                               // an ambush held this long with nobody coming is given up (the squad holds the place)
+		float AmbushFirstS = 2.5f;                              // the first volley of a sprung ambush: for this long ...
+		float AmbushFirstHit = 1.3f;                            // ... its rounds are this much better (the men were laid on their targets) and the enemy is startled
+		float AmbushKillCm = 1100.f;                            // the killing ground: an enemy this near the squad's place and in sight of half of it (the full range of a rifle is 4.5 m, a third of the hits at 20)
+		float AmbushStartleS = 2.2f;                            // the enemy caught in it is startled this long
+		float SealS = 4.f;                                      // the last man at a bulkhead's console: how long it takes to close it
+		float SealClearCm = 250.f;                              // and nobody (friend or enemy) may be in the doorway
+		float EscortPointCm = 560.f;                            // the man ahead of the Captain
+		bool bDrillDoctrine = false;                            // the Mandate's boarders and holders use the same drills (stack at the objective's door and go in together; fall back and close the bulkheads)
 	};
 
 	struct FSeen
@@ -145,6 +191,16 @@ namespace AstraBoard
 		float Lane = 0.f;                        // his place across a corridor (cm from the middle)
 		float StairT = 0.f;
 		float CoverT = 0.f;                      // no new search for a corner until then
+		// the infantry orders (AstraBoardDrills.cpp)
+		bool bHidden = false;                    // in a corner with his fire held: he is seen only from close
+		int32 HoldDoor = INDEX_NONE;             // stacked at this door (the damage map's index): he does not open it, nor cut it
+		bool bBusy = false;                      // at a work of his own (the console of a bulkhead): the squad's drill does not move him
+		float EntryT = 0.f;                      // seconds left of the quick first targets of a man who came through a door in a drill
+		float StartleT = 0.f;                    // seconds left of being startled (not alerted, an enemy come out of a door he was not covering)
+		float AlertT = 999.f;                    // seconds since he heard a shot, saw an enemy or was hit: the ones who are not alerted are surprised
+		float GoAt = 0.f;                        // (entry) the time he goes through the door
+		int32 StackIdx = INDEX_NONE;             // his place in the stack
+		FVector DrillSpot = FVector::ZeroVector; // where he stacks, or the spot of the room he goes to when it is not a corner
 		// the story
 		float Time0 = 0.f;
 		int32 Kills = 0;
@@ -184,6 +240,42 @@ namespace AstraBoard
 		FVector BreachPos = FVector::ZeroVector;
 		bool bStand = false;             // stand fast where they are and shoot (no corners, no moves: the bench's duels)
 		FString Note;                    // what it was last told or decided, for the reports
+		// ---- the infantry orders (AstraBoardDrills.cpp)
+		EDrill Drill = EDrill::None;
+		float DrillT = 0.f;              // seconds in this phase
+		int32 StackPortal = INDEX_NONE;  // the opening the squad stacks at and goes through
+		int32 StackComp = INDEX_NONE;    // the compartment it stacks in (the side the room is not on)
+		int32 RoomTo = INDEX_NONE;       // the room it goes in to (clear, take)
+		TArray<int32> Queue;             // sweep: the rooms still to clear (the first is next)
+		TArray<int32> Cleared;           // the rooms it has cleared, in order
+		TArray<int32> Sector;            // sweep and hold_line: the compartments of the place
+		TArray<int32> Guarded;           // hold_line: the openings (portals) it holds
+		int32 Uncovered = 0;             // hold_line: openings of the sector it has no men for
+		int32 Sync = 0;                  // squads of one sync (a non-zero number) go through their doors together
+		int32 CoverComp = INDEX_NONE;    // the place the squad covers with its fire while another squad goes in
+		int32 Door = INDEX_NONE;         // the door the order names (breach), the damage map's index
+		bool bFireHeld = false;          // fire discipline: nobody fires until the squad is found or the order is given (an ambush)
+		bool bHoldInside = false;        // (hold) the corners of the room itself, none of the corridors outside its doors
+		bool bSealBehind = false;        // a pressure door is closed behind the squad when it has gone through
+		float StackedAt = -1.f;          // the sim's clock when the squad first stacked (the sync's wait counts from it)
+		float SprungAt = -1.f;           // (ambush) when it was sprung
+		float FirstVolleyT = 0.f;        // seconds left of the first volley's advantage
+		bool bSpotted = false;           // (ambush) a man of the squad was seen, shot at or heard
+		int32 SealPortal = INDEX_NONE;   // the pressure door being closed behind the squad
+		int32 SealMan = INDEX_NONE;      // and the man at its console
+		float SealT = 0.f;
+		TArray<int32> SealPassed;        // the men who have gone through it
+		TArray<FVector> StackSpots;      // where each man of the stack stands (by his place in it)
+		float ClearT = 0.f;              // seconds with nothing seen in the room (it is clear at ClearHoldS)
+		float SyncGoAt = -1.f;           // the clock when the squads of a sync go in together
+		bool bStackReady = false;        // every man is at his place in the stack
+		bool bCharged = false;           // the sealed bulkhead has been opened by the charge
+		float EntryAt = -1.f;            // when the first man went through
+		FVector2D EscortDir = FVector2D(1.0, 0.0);   // the way the Captain is going (escort)
+		FVector EscortLast = FVector::ZeroVector;
+		float EscortStillT = 0.f;
+		int32 SweptHostiles = 0;         // (sweep) the enemy put down in the rooms it cleared
+		FString Where;                   // the place the order names, in words (the picture's)
 	};
 
 	enum class EEvent : uint8
@@ -201,7 +293,9 @@ namespace AstraBoard
 		Order,       // a squad's task changed
 		Outcome,
 		Cut,         // the Mandate cut through a sealed bulkhead: Target is the door (the damage map's index), Start where it is
-		Carried      // Unit, who was down, has been carried out to the boats by Target: he is alive and off the ship
+		Carried,     // Unit, who was down, has been carried out to the boats by Target: he is alive and off the ship
+		Drill,       // a squad's drill moved on (stacked, going in, cleared a room, sprung an ambush, swept a place...): Text says it, Unit is the squad's leader, Target the squad
+		Sealed       // a squad closed a pressure door behind it: Target is the door (the damage map's index), Start where it is
 	};
 	struct FBoardEvent
 	{
@@ -240,11 +334,30 @@ namespace AstraBoard
 		float Skill = 0.f;
 	};
 
+	/** An order to a squad with everything it says (the marines' `marine_order`): the task, the place, and what goes with it. */
+	struct FOrder
+	{
+		ETask Task = ETask::Hold;
+		int32 Comp = INDEX_NONE;          // the place (a room or a corridor)
+		FVector Pos = FVector::ZeroVector;
+		float Radius = 0.f;               // hold: how far round the place
+		int32 Door = INDEX_NONE;          // breach: the door the order names (the damage map's index)
+		TArray<int32> Sector;             // sweep, hold_line: the compartments of the place when it is a deck's section or a radius round a spot
+		int32 CoverComp = INDEX_NONE;     // the place the squad covers with its fire
+		bool bFireHeld = false;           // nobody fires until the squad is found or the order is given
+		bool bInside = false;             // (hold) the corners of the room itself
+		bool bSealBehind = false;         // close the pressure doors behind the squad
+		int32 Sync = 0;                   // squads of one non-zero number go through their doors together
+		FString Where;                    // the place in words, for the reports
+		FString Note;
+	};
+
 	struct FBook
 	{
 		int32 Shots = 0, Hits = 0, Misses = 0;
 		int32 Killed[2] = {0, 0}, Down[2] = {0, 0}, Exited[2] = {0, 0}, Spawned[2] = {0, 0}, Carried[2] = {0, 0};   // Down: who is down now
 		int32 Contacts = 0, Flanks = 0, Retreats = 0, Reloads = 0, Suppressed = 0, Rescues = 0;
+		int32 DrillEntries = 0, DrillRooms = 0, DrillAmbushes = 0, DrillSeals = 0, DrillCharges = 0;     // the infantry orders: doors gone through in a drill, rooms cleared, ambushes sprung, doors closed behind a squad, bulkheads charged
 		double FirstContactT = -1.0, FirstBloodT = -1.0, EndT = -1.0;
 		int32 CaptainHits = 0;
 		float MarineRoundsFired = 0.f;
@@ -313,7 +426,12 @@ public:
 
 	// ------------------------------------------------------------------------------------------------ orders (the squad drill the mind's words come to)
 	void Order(int32 SquadId, AstraBoard::ETask Task, int32 Comp, const FVector& Pos, float Radius = 0.f, const FString& Note = FString());
+	/** An order with everything it says: the task and the place, and what goes with them (fire held, the doors closed behind the squad, the place it covers, the sync it goes in with). The infantry orders
+	 *  (sweep, breach, take, ambush, hold the line, escort) are carried out by their drills (AstraBoardDrills.cpp). */
+	void OrderEx(int32 SquadId, const AstraBoard::FOrder& O);
 	void Respond(int32 SquadId);              // no order: the squad goes to meet what is coming
+	/** The squad's drill in words, for the picture and the reports ("stacked at deck 7 section D (Capacitor Hall), waiting for Bravo"); empty when it has none. */
+	FString DrillText(const FSquad& S) const;
 	void SealDoor(int32 Door, bool bSealed);
 	bool IsDoorSealed(int32 Door) const { return Doors.IsSealed(Door); }
 	const FBoardDoors& DoorState() const { return Doors; }
@@ -453,6 +571,21 @@ private:
 	void ColumnTo(FSquad& S, const FVector& To, float Speed);
 	void HoldAround(FSquad& S, const FVector& At, float Radius, bool bInside = false);   // bInside: the corners of the room itself only (the attackers' objective)
 	bool FlankFor(FSquad& S, const FVector& Enemy);
+	// --- the infantry orders (AstraBoardDrills.cpp)
+	void ResetDrill(FSquad& S);
+	void StepDrill(FSquad& S, const TArray<int32>& Able);       // the order's own phases, from the squad's plan (twice a second)
+	void DrillRoom(FSquad& S, const TArray<int32>& Able);       // breach, take, and every room of a sweep: approach, stack, (charge), entry, clear, hold
+	void DrillSweepNext(FSquad& S);                             // the next room of a sweep, or its end
+	void DrillAmbush(FSquad& S, const TArray<int32>& Able);
+	void DrillHoldLine(FSquad& S, const TArray<int32>& Able);
+	void DrillEscort(FSquad& S, const TArray<int32>& Able);
+	void StepSealBehind(FSquad& S, const TArray<int32>& Able);  // the last man closes a pressure door behind the squad
+	bool FindEntry(FSquad& S, int32 Room, const FUnit& From);   // the door the squad goes in by and where it stacks
+	void MakeStackSpots(FSquad& S, int32 Count);
+	void PickEntryDests(FSquad& S, const TArray<int32>& Men, TArray<FVector>& OutSpots, TArray<int32>& OutSlots);
+	void AlertAround(const FVector& At, float Cm, AstraBoard::ESide Alerter, float StunS);
+	void Announce(const FSquad& S, const FString& Text);
+	bool Held(const FUnit& U) const;                            // his squad has his fire held (an ambush)
 	void Emit(AstraBoard::EEvent Type, int32 Unit, int32 Target = INDEX_NONE, const FVector& Start = FVector::ZeroVector, const FVector& End = FVector::ZeroVector,
 	          float Dmg = 0.f, bool bHit = false, const FString& Text = FString());
 	FUnit& Spawn(AstraBoard::ESide Side, AstraBoard::ERole Role, const FString& Name, const FVector& Pos, int32 SquadId);

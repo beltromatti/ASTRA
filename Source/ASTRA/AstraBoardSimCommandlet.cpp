@@ -205,11 +205,19 @@ namespace
 						{
 							continue;
 						}
-						static const TCHAR* Names[] = {TEXT("shot"), TEXT("hit"), TEXT("DOWN"), TEXT("DIED"), TEXT("RETREAT"), TEXT("EXIT"), TEXT("contact"), TEXT("rescue"), TEXT("reload"), TEXT("spawn"), TEXT("ORDER"), TEXT("OUTCOME"), TEXT("CUT"), TEXT("CARRIED")};
+						static const TCHAR* Names[] = {TEXT("shot"), TEXT("hit"), TEXT("DOWN"), TEXT("DIED"), TEXT("RETREAT"), TEXT("EXIT"), TEXT("contact"), TEXT("rescue"), TEXT("reload"), TEXT("spawn"), TEXT("ORDER"), TEXT("OUTCOME"), TEXT("CUT"), TEXT("CARRIED"), TEXT("DRILL"), TEXT("SEALED")};
 						const FUnit* U = Sim.Unit(E.Unit);
 						const FUnit* T = Sim.Unit(E.Target);
 						BNote(FString::Printf(TEXT("t=%5.1f %-7s %s%s%s %s"), E.T, Names[(int32)E.Type], U ? *U->Name : TEXT(""), T ? *FString::Printf(TEXT(" -> %s"), *T->Name) : TEXT(""),
 						                      U ? *FString::Printf(TEXT(" @ %s"), *Map.Describe(U->Comp)) : TEXT(""), *E.Text));
+					}
+					for (const FSquad& Sq : Sim.Squads())
+					{
+						if (Sq.Task >= ETask::Sweep && Sq.Drill != EDrill::None && Sq.Drill != EDrill::Done && Sq.Drill != EDrill::Hold)
+						{
+							BNote(FString::Printf(TEXT("t=%5.1f   %s: drill %s (%.1f s)%s%s"), Sim.Time(), *Sq.Name, DrillName(Sq.Drill), Sq.DrillT, Sq.bStackReady ? TEXT(", stack ready") : TEXT(""),
+							                      Sq.SyncGoAt >= 0.f ? *FString::Printf(TEXT(", sync go at %.1f"), Sq.SyncGoAt) : TEXT("")));
+						}
 					}
 					if (FMath::FloorToInt(Sim.Time()) % 5 == 0)
 					{
@@ -1078,6 +1086,651 @@ static void BoardScenarioOrders(FRig& Rig, int32 Seed, int32 Seeds)
 	BRecord->SetObjectField(TEXT("orders"), Rec);
 }
 
+
+// ================================================================================================================== the infantry orders (ABBORDAGGI-4)
+
+namespace
+{
+	/** A room the drills are tried in: its doors, the compartment outside each, and a spot about eighteen metres of way from each door where a squad starts. */
+	struct FArena
+	{
+		int32 Room = INDEX_NONE;
+		TArray<int32> Doors;              // portal indices
+		TArray<int32> Outside;            // compartments
+		TArray<FVector> Starts;
+	};
+
+	/** About 18 m of way from a door, outside the room, through corridors only. */
+	bool ArenaStart(const FAstraBoardMap& M, int32 DoorPortal, int32 Room, FVector& OutStart, float MinM = 14.f, float MaxM = 26.f)
+	{
+		const FBoardPortal& P = M.GetPortals()[DoorPortal];
+		const int32 C0 = P.Other(Room);
+		const FVector DoorPos = P.PosIn(C0);
+		TArray<int32> Frontier;
+		Frontier.Add(C0);
+		TSet<int32> Seen;
+		Seen.Add(C0);
+		Seen.Add(Room);
+		for (int32 Depth = 0; Depth < 6; ++Depth)
+		{
+			TArray<int32> Next;
+			for (const int32 C : Frontier)
+			{
+				for (const int32 Pi : M.GetComps()[C].Portals)
+				{
+					const FBoardPortal& Q = M.GetPortals()[Pi];
+					const int32 O = Q.Other(C);
+					if (Q.bVertical() || Seen.Contains(O))
+					{
+						continue;
+					}
+					Seen.Add(O);
+					Next.Add(O);
+					const FVector At = M.Inset(O, M.CentreOf(O), 90.f);
+					TArray<FVector> Pts;
+					float Metres = 0.f;
+					FBoardRouteOptions Opt;
+					if (M.Route(At, DoorPos, Pts, Opt, &Metres) && Metres >= MinM && Metres <= MaxM && M.GetComps()[O].Deck == M.GetComps()[Room].Deck)
+					{
+						OutStart = At;
+						return true;
+					}
+				}
+			}
+			Frontier = Next;
+		}
+		return false;
+	}
+
+	/** Rooms with exactly NumDoors doors (open portals and stairs do not count, nor does a bulkhead), at least 5 x 5 m, with a corridor outside each and room for a squad to start; the first MaxCount in the plan's order. */
+	void FindArenas(const FAstraBoardMap& M, int32 NumDoors, int32 MaxCount, TArray<FArena>& Out)
+	{
+		Out.Reset();
+		for (int32 R = 0; R < M.GetComps().Num() && Out.Num() < MaxCount; ++R)
+		{
+			const FBoardComp& C = M.GetComps()[R];
+			if (C.bCorridor || C.Box.GetSize().X < 500.0 || C.Box.GetSize().Y < 500.0 || (NumDoors == 1 && (C.bHall || C.Box.GetSize().X > 1600.0 || C.Box.GetSize().Y > 1600.0)) || C.Box.GetSize().X > 4200.0 || C.Box.GetSize().Y > 4200.0)
+			{
+				continue;
+			}
+			FArena A;
+			A.Room = R;
+			bool bOk = true;
+			for (const int32 Pi : C.Portals)
+			{
+				const FBoardPortal& P = M.GetPortals()[Pi];
+				const int32 O = P.Other(R);
+				if (P.Kind != FBoardPortal::EKind::Door || (!M.GetComps()[O].bCorridor && !M.GetComps()[O].bHall))
+				{
+					if (NumDoors == 1)
+					{
+						bOk = false;                          // one door and nothing else: an open side, a stair, a bulkhead is not that
+						break;
+					}
+					continue;                                 // (a room with several ways in: the arena's doors are the doors to corridors)
+				}
+				if (NumDoors == 2 && A.Outside.Contains(O))
+				{
+					continue;                                 // (two doors onto two different corridors)
+				}
+				A.Doors.Add(Pi);
+				A.Outside.Add(O);
+			}
+			if (!bOk || A.Doors.Num() < NumDoors)
+			{
+				continue;
+			}
+			A.Doors.SetNum(NumDoors);
+			A.Outside.SetNum(NumDoors);
+			for (int32 d = 0; d < A.Doors.Num() && bOk; ++d)
+			{
+				FVector S = FVector::ZeroVector;
+				bOk = d == 0 ? ArenaStart(M, A.Doors[d], R, S) : ArenaStart(M, A.Doors[d], R, S, 32.f, 48.f);       // (the second squad is further from its door: the sync's reason)
+				A.Starts.Add(S);
+			}
+			if (bOk && (NumDoors < 2 || FVector::Dist2D(A.Starts[0], A.Starts[1]) > 800.0))
+			{
+				Out.Add(A);
+			}
+		}
+	}
+
+	/** Men of a squad round a spot, a metre and a half apart (inside the compartment). */
+	TArray<int32> MakeMen(FAstraBoardSim& Sim, const FAstraBoardMap& M, ESide Side, const FString& Squad, int32 N, const FVector& At, const TCHAR* Prefix, int32& Counter)
+	{
+		TArray<int32> Ids;
+		const int32 Sq = Sim.AddSquad(Side, Squad);
+		const int32 Comp = M.CompAt(At, 60.f);
+		for (int32 k = 0; k < N; ++k)
+		{
+			const FVector P = M.Inset(Comp, At + FVector((k % 3) * 120.0 - 120.0, (k / 3) * 120.0 - 60.0, 0.0), 60.f);
+			const ERole Role = k == 0 ? ERole::Leader : ERole::Rifleman;
+			Ids.Add(Sim.AddUnit(Side, Role, FString::Printf(TEXT("%s %d"), Prefix, ++Counter), P, Sq));
+		}
+		return Ids;
+	}
+
+	struct FDrillResult
+	{
+		bool bTaken = false;
+		double T = 0.0;
+		int32 MarinesLost = 0, FoesLost = 0, MarinesAble = 0;
+		int32 Rooms = 0, Entries = 0;
+	};
+
+	/** What a fight came to, for a table. */
+	struct FDrillTable
+	{
+		int32 N = 0, Taken = 0;
+		double T = 0.0, MarinesLost = 0.0, FoesLost = 0.0, Rooms = 0.0;
+		void Add(const FDrillResult& R)
+		{
+			++N;
+			Taken += R.bTaken ? 1 : 0;
+			T += R.T;
+			MarinesLost += R.MarinesLost;
+			FoesLost += R.FoesLost;
+			Rooms += R.Rooms;
+		}
+		FString Text() const
+		{
+			const double Nn = FMath::Max(1, N);
+			return FString::Printf(TEXT("taken %2d of %2d, in %5.1f s, marines lost %4.1f, enemy lost %4.1f"), Taken, N, T / Nn, MarinesLost / Nn, FoesLost / Nn);
+		}
+	};
+
+	FDrillResult DrillResultOf(const FAstraBoardSim& Sim, const FRunResult& R)
+	{
+		FDrillResult D;
+		D.bTaken = R.Outcome == EOutcome::AttackerTakes;
+		D.T = R.T;
+		D.MarinesLost = R.Book.Killed[0] + R.Book.Down[0];
+		D.FoesLost = R.Book.Killed[1] + R.Book.Down[1];
+		D.MarinesAble = R.AquilaAble;
+		D.Rooms = R.Book.DrillRooms;
+		D.Entries = R.Book.DrillEntries;
+		(void)Sim;
+		return D;
+	}
+}
+
+/** Take: the marines (two squads of six, or one) take a room held by Mandate soldiers. The default drill walks in; the order stacks at the door and goes in together. Against guards who are at their posts
+ *  (not alerted, spread about the room) and against guards who hold the door (alerted, in the corners beside it), with one door and with two (a sync: both squads in at the one moment). */
+static void BoardScenarioTake(FRig& Rig, int32 Seed, int32 Seeds)
+{
+	TArray<FArena> One, Two;
+	FindArenas(*Rig.Map, 1, 6, One);
+	FindArenas(*Rig.Map, 2, 6, Two);
+	if (One.IsEmpty() || Two.IsEmpty())
+	{
+		// what the rooms are like, for the arena's rule
+		TMap<FString, int32> Hist;
+		for (int32 R = 0; R < Rig.Map->GetComps().Num(); ++R)
+		{
+			const FBoardComp& C = Rig.Map->GetComps()[R];
+			if (C.bCorridor || C.bHall || C.Box.GetSize().X < 500.0 || C.Box.GetSize().Y < 500.0)
+			{
+				continue;
+			}
+			int32 Doors = 0, Open = 0, Blast = 0, Vert = 0, Corr = 0;
+			for (const int32 Pi : C.Portals)
+			{
+				const FBoardPortal& P = Rig.Map->GetPortals()[Pi];
+				Doors += P.Kind == FBoardPortal::EKind::Door ? 1 : 0;
+				Open += P.Kind == FBoardPortal::EKind::Open ? 1 : 0;
+				Blast += P.Kind == FBoardPortal::EKind::Blast ? 1 : 0;
+				Vert += P.bVertical() ? 1 : 0;
+				Corr += (Rig.Map->GetComps()[P.Other(R)].bCorridor || Rig.Map->GetComps()[P.Other(R)].bHall) ? 1 : 0;
+			}
+			Hist.FindOrAdd(FString::Printf(TEXT("doors %d open %d blast %d vert %d, %d to corridors"), Doors, Open, Blast, Vert, Corr)) += 1;
+		}
+		Hist.ValueSort([](int32 A, int32 B) { return A > B; });
+		int32 Shown = 0;
+		for (const TPair<FString, int32>& KV : Hist)
+		{
+			BNote(FString::Printf(TEXT("%5d rooms: %s"), KV.Value, *KV.Key));
+			if (++Shown >= 14)
+			{
+				break;
+			}
+		}
+		BCheck("take: arenas", false, TEXT("no room with one door / with two doors found in the plan"));
+		return;
+	}
+	BNote(FString::Printf(TEXT("%d rooms with one door, %d with two; the first of each: %s, %s"), One.Num(), Two.Num(), *Rig.Map->Describe(One[0].Room), *Rig.Map->Describe(Two[0].Room)));
+	const FAstraBoardMap& M = *Rig.Map;
+	struct FMode { const TCHAR* Name; int32 Kind; };                    // 0 the drill alone, 1 take, 2 take with a sync (two doors)
+	const FMode Modes[] = {{TEXT("the drill alone (walks in)"), 0}, {TEXT("take: stack, in together"), 1}};
+	for (const bool bPrepared : {false, true})
+	{
+		for (const int32 Doors : {1, 2})
+		{
+			const TArray<FArena>& Arenas = Doors == 1 ? One : Two;
+			const int32 NGuards = Doors == 1 ? 6 : 10;
+			BNote(FString::Printf(TEXT("%s guards (%s), %d door%s, %d marines against %d guards, %d rooms x %d seeds:"), bPrepared ? TEXT("alerted") : TEXT("unalerted"),
+			                      bPrepared ? TEXT("in the corners beside the door") : TEXT("at their posts about the room"), Doors, Doors == 1 ? TEXT("") : TEXT("s"), Doors == 1 ? 6 : 12, NGuards, FMath::Min(Arenas.Num(), GTrace ? 1 : 4), Seeds));
+			for (const FMode& Mode : Modes)
+			{
+				for (const int32 Sync : (Doors == 2 && Mode.Kind == 1) ? TArray<int32>({0, 1}) : TArray<int32>({0}))
+				{
+					FDrillTable Tab;
+					for (int32 ai = 0; ai < FMath::Min(Arenas.Num(), GTrace ? 1 : 4); ++ai)
+					{
+						const FArena& A = Arenas[ai];
+						for (int32 s = 0; s < Seeds; ++s)
+						{
+							FAstraBoardSim Sim;
+							Sim.Init(Rig.Map.ToSharedRef(), Seed + s * 13 + ai);
+							Sim.Tuning = Rig.Tuning;
+							Sim.Tuning.bShipSensors = false;
+							Sim.Tuning.HoldS = 5.f;
+							FRandomStream Rng(Seed + s * 7 + ai * 101);
+							const FVector Door0 = M.GetPortals()[A.Doors[0]].PosIn(A.Room);
+							Sim.SetMission(ESide::Aquila, A.Outside[0], A.Starts[0], A.Room, false);
+							// the guards: six men
+							int32 Counter = 0;
+							const int32 Gs = Sim.AddSquad(ESide::Mandate, TEXT("Guard"));
+							TArray<int32> Guards;
+							for (int32 k = 0; k < NGuards; ++k)
+							{
+								const FVector P = bPrepared ? M.Inset(A.Room, Door0, 90.f) : M.Inset(A.Room, M.CentreOf(A.Room) + FVector(Rng.FRandRange(-250.f, 250.f), Rng.FRandRange(-250.f, 250.f), 0.f), 80.f);
+								Guards.Add(Sim.AddUnit(ESide::Mandate, k == 0 ? ERole::Leader : ERole::Rifleman, FString::Printf(TEXT("Guard %d"), ++Counter), P, Gs));
+							}
+							if (bPrepared)
+							{
+								FOrder O;
+								O.Task = ETask::Hold;
+								O.Comp = A.Room;
+								O.Pos = M.CentreOf(A.Room);
+								O.Radius = 400.f;
+								O.bInside = true;
+								Sim.OrderEx(Gs, O);
+								Sim.Tuning.bShipSensors = false;
+							}
+							else
+							{
+								Sim.Order(Gs, ETask::Idle, A.Room, M.CentreOf(A.Room), 0.f, TEXT("at their posts"));
+							}
+							// the marines: six a door
+							TArray<int32> Squads;
+							for (int32 d = 0; d < Doors; ++d)
+							{
+								const int32 Before = Sim.Squads().Num();
+								MakeMen(Sim, M, ESide::Aquila, FString::Printf(TEXT("Boarding %c"), TEXT('A') + d), 6, A.Starts[d], TEXT("Marine"), Counter);
+								Squads.Add(Before);
+							}
+							for (const int32 Sq : Squads)
+							{
+								if (Mode.Kind == 0)
+								{
+									Sim.BriefAttackers(Sq);
+								}
+								else
+								{
+									FOrder O;
+									O.Task = ETask::Take;
+									O.Comp = A.Room;
+									O.Pos = M.CentreOf(A.Room);
+									O.Sync = Sync ? 1 : 0;
+									O.Where = M.Describe(A.Room);
+									Sim.OrderEx(Sq, O);
+								}
+							}
+							const FRunResult R = RunSim(Sim, 150.0);
+							Tab.Add(DrillResultOf(Sim, R));
+						}
+					}
+					BNote(FString::Printf(TEXT("    %-34s %s"), Mode.Kind == 1 && Doors == 2 ? (Sync ? TEXT("take, both doors, one sync") : TEXT("take, each door by itself")) : Mode.Name, *Tab.Text()));
+				}
+			}
+		}
+	}
+}
+
+/** Breach: a sealed pressure bulkhead between the marines and four Mandate soldiers in the corridor beyond. The default drill waits at it while its men cut through with torches (CutS, quietly); the order
+ *  stacks, sets a charge (nine seconds, and the men near the door beyond hear it and are stunned by it) and goes in. */
+static void BoardScenarioBreach(FRig& Rig, int32 Seed, int32 Seeds)
+{
+	const FAstraBoardMap& M = *Rig.Map;
+	TArray<int32> Blasts;
+	for (int32 i = 0; i < M.GetPortals().Num() && Blasts.Num() < 4; ++i)
+	{
+		const FBoardPortal& P = M.GetPortals()[i];
+		if (P.Kind == FBoardPortal::EKind::Blast && M.GetComps()[P.A].bCorridor && M.GetComps()[P.B].bCorridor && M.GetComps()[P.A].Deck == M.GetComps()[P.B].Deck
+		    && M.GetComps()[P.A].Box.GetSize().GetMax() > 1200.0 && M.GetComps()[P.B].Box.GetSize().GetMax() > 1200.0)
+		{
+			Blasts.Add(i);
+		}
+	}
+	if (Blasts.IsEmpty())
+	{
+		BCheck("breach: arenas", false, TEXT("no pressure bulkhead between two corridors in the plan"));
+		return;
+	}
+	BNote(FString::Printf(TEXT("%d bulkheads between corridors; the first: %s | %s"), Blasts.Num(), *M.Describe(M.GetPortals()[Blasts[0]].A), *M.Describe(M.GetPortals()[Blasts[0]].B)));
+	for (const bool bAlerted : {false, true})
+	{
+		BNote(FString::Printf(TEXT("a sealed bulkhead, six marines, four guards %s beyond it, %d bulkheads x %d seeds:"), bAlerted ? TEXT("alerted, in the corners") : TEXT("at their posts"), Blasts.Num(), Seeds));
+		for (const int32 Mode : {0, 1})
+		{
+			FDrillTable Tab;
+			double Through = 0.0;
+			int32 Counted = 0;
+			for (int32 bi = 0; bi < Blasts.Num(); ++bi)
+			{
+				const FBoardPortal& P = M.GetPortals()[Blasts[bi]];
+				for (int32 s = 0; s < Seeds; ++s)
+				{
+					FAstraBoardSim Sim;
+					Sim.Init(Rig.Map.ToSharedRef(), Seed + s * 17 + bi);
+					Sim.Tuning = Rig.Tuning;
+					Sim.Tuning.bShipSensors = false;
+					Sim.Tuning.HoldS = 5.f;
+					FRandomStream Rng(Seed + s * 5 + bi * 77);
+					// the marines on side A (about 12 m from the door, along its corridor), the guards on side B (4 to 9 m beyond it)
+					const FVector DoorA = P.PosIn(P.A), DoorB = P.PosIn(P.B);
+					const FVector2D Away(-P.Normal.X, -P.Normal.Y);                    // from the door into A
+					FVector Start = M.Inset(P.A, DoorA + FVector(Away.X, Away.Y, 0.0) * 1200.0, 80.f);
+					Sim.SetMission(ESide::Aquila, P.A, Start, P.B, false);
+					Sim.SealDoor(P.Door, true);
+					int32 Counter = 0;
+					const int32 Gs = Sim.AddSquad(ESide::Mandate, TEXT("Guard"));
+					for (int32 k = 0; k < 4; ++k)
+					{
+						const FVector At = M.Inset(P.B, DoorB + FVector(-Away.X, -Away.Y, 0.0) * Rng.FRandRange(400.f, 900.f) + FVector(Rng.FRandRange(-60.f, 60.f), Rng.FRandRange(-60.f, 60.f), 0.0), 70.f);
+						Sim.AddUnit(ESide::Mandate, k == 0 ? ERole::Leader : ERole::Rifleman, FString::Printf(TEXT("Guard %d"), ++Counter), At, Gs);
+					}
+					if (bAlerted)
+					{
+						FOrder O;
+						O.Task = ETask::Hold;
+						O.Comp = P.B;
+						O.Pos = DoorB;
+						O.Radius = 600.f;
+						Sim.OrderEx(Gs, O);
+					}
+					else
+					{
+						Sim.Order(Gs, ETask::Idle, P.B, DoorB, 0.f, TEXT("at their posts"));
+					}
+					const int32 Sq = Sim.Squads().Num();
+					MakeMen(Sim, M, ESide::Aquila, TEXT("Boarding A"), 6, Start, TEXT("Marine"), Counter);
+					if (Mode == 0)
+					{
+						Sim.BriefAttackers(Sq);
+					}
+					else
+					{
+						FOrder O;
+						O.Task = ETask::Breach;
+						O.Comp = P.B;
+						O.Pos = DoorB;
+						O.Door = P.Door;
+						O.Where = M.Describe(P.B);
+						Sim.OrderEx(Sq, O);
+					}
+					double TCut = -1.0;
+					const FRunResult R = RunSim(Sim, 120.0, [&](FAstraBoardSim& S)
+					{
+						if (TCut < 0.0 && !S.IsDoorSealed(P.Door))
+						{
+							TCut = S.Time();
+						}
+					});
+					Tab.Add(DrillResultOf(Sim, R));
+					if (TCut >= 0.0)
+					{
+						Through += TCut;
+						++Counted;
+					}
+				}
+			}
+			BNote(FString::Printf(TEXT("    %-30s %s; the bulkhead open at %4.1f s"), Mode == 0 ? TEXT("the drill alone (torches)") : TEXT("breach: stack, charge, in"), *Tab.Text(), Counted ? Through / Counted : -1.0));
+		}
+	}
+}
+
+/** Sweep: a corridor with rooms off it (cabins, offices), two Mandate soldiers at their posts in each of four of them, six marines at one end. The default drill is told to go to the far end of the corridor: it
+ *  walks past the doors (each opens as a man comes within two and a half metres) and the men in the rooms see the backs of the column. The order clears the four rooms one after the other (stack, in
+ *  together, clear) and leaves nobody behind. */
+static void BoardScenarioSweep(FRig& Rig, int32 Seed, int32 Seeds)
+{
+	const FAstraBoardMap& M = *Rig.Map;
+	struct FRow { int32 Corridor; TArray<int32> Rooms; FVector Start, End; };
+	TArray<FRow> Rows;
+	TSet<int32> UsedRooms;
+	for (int32 c = 0; c < M.GetComps().Num() && Rows.Num() < 6; ++c)
+	{
+		const FBoardComp& C = M.GetComps()[c];
+		if (!C.bCorridor)
+		{
+			continue;
+		}
+		// the corridor as the men walk it: the chain of corridor compartments that run on from this one through open ways (a module at a time), up to ten of them
+		TArray<int32> Chain;
+		Chain.Add(c);
+		for (int32 i = 0; i < Chain.Num() && Chain.Num() < 10; ++i)
+		{
+			for (const int32 Pi : M.GetComps()[Chain[i]].Portals)
+			{
+				const FBoardPortal& P = M.GetPortals()[Pi];
+				const int32 O = P.Other(Chain[i]);
+				if (P.Kind == FBoardPortal::EKind::Open && M.GetComps()[O].bCorridor && M.GetComps()[O].Deck == C.Deck && !Chain.Contains(O) && Chain.Num() < 10)
+				{
+					Chain.Add(O);
+				}
+			}
+		}
+		TArray<TPair<double, int32>> Rooms;
+		for (const int32 Cc : Chain)
+		{
+			for (const int32 Pi : M.GetComps()[Cc].Portals)
+			{
+				const FBoardPortal& P = M.GetPortals()[Pi];
+				const int32 O = P.Other(Cc);
+				const FBoardComp& OC = M.GetComps()[O];
+				if (P.Kind == FBoardPortal::EKind::Door && !OC.bCorridor && !OC.bHall && OC.Portals.Num() == 1 && OC.Box.GetSize().X > 350.0 && OC.Box.GetSize().Y > 350.0 && !UsedRooms.Contains(O))
+				{
+					Rooms.Emplace(FVector::Dist2D(M.CentreOf(c), P.Pos), O);
+				}
+			}
+		}
+		if (Rooms.Num() < 4)
+		{
+			continue;
+		}
+		Rooms.Sort([](const TPair<double, int32>& A, const TPair<double, int32>& B) { return A.Key < B.Key; });
+		FRow Row;
+		Row.Corridor = c;
+		for (int32 i = 0; i < 4; ++i)
+		{
+			Row.Rooms.Add(Rooms[i].Value);
+			UsedRooms.Add(Rooms[i].Value);
+		}
+		// start at the first corridor module, finish at the far end of the chain
+		int32 Far = c;
+		double FarD = 0.0;
+		for (const int32 Cc : Chain)
+		{
+			const double D = FVector::Dist2D(M.CentreOf(Cc), M.CentreOf(c));
+			if (D > FarD)
+			{
+				FarD = D;
+				Far = Cc;
+			}
+		}
+		Row.Start = M.Inset(c, M.CentreOf(c), 70.f);
+		Row.End = M.Inset(Far, M.CentreOf(Far), 70.f);
+		if (FarD > 1500.0)
+		{
+			Rows.Add(Row);
+		}
+	}
+	if (Rows.IsEmpty())
+	{
+		BCheck("sweep: arenas", false, TEXT("no corridor with four rooms off it in the plan"));
+		return;
+	}
+	BNote(FString::Printf(TEXT("%d corridors with four rooms off them; the first: %s"), Rows.Num(), *M.Describe(Rows[0].Corridor)));
+	for (const int32 Mode : {0, 1})
+	{
+		FDrillTable Tab;
+		double GuardsLeft = 0.0, RoomsClear = 0.0, Done = 0.0;
+		int32 Runs = 0;
+		for (int32 ri = 0; ri < Rows.Num(); ++ri)
+		{
+			const FRow& Row = Rows[ri];
+			for (int32 s = 0; s < Seeds; ++s)
+			{
+				FAstraBoardSim Sim;
+				Sim.Init(Rig.Map.ToSharedRef(), Seed + s * 19 + ri);
+				Sim.Tuning = Rig.Tuning;
+				Sim.Tuning.bShipSensors = false;
+				FRandomStream Rng(Seed + s * 3 + ri * 61);
+				Sim.SetMission(ESide::Aquila, Row.Corridor, Row.Start, Row.Rooms.Last(), false);
+				int32 Counter = 0;
+				TArray<int32> Guards;
+				for (const int32 R : Row.Rooms)
+				{
+					const int32 Gs = Sim.AddSquad(ESide::Mandate, FString::Printf(TEXT("Post %d"), Guards.Num() / 2 + 1));
+					for (int32 k = 0; k < 2; ++k)
+					{
+						Guards.Add(Sim.AddUnit(ESide::Mandate, k == 0 ? ERole::Leader : ERole::Rifleman, FString::Printf(TEXT("Guard %d"), ++Counter),
+						                       M.Inset(R, M.CentreOf(R) + FVector(Rng.FRandRange(-120.f, 120.f), Rng.FRandRange(-120.f, 120.f), 0.0), 70.f), Gs));
+					}
+					Sim.Order(Gs, ETask::Idle, R, M.CentreOf(R), 0.f, TEXT("at their posts"));
+				}
+				const int32 Sq = Sim.Squads().Num();
+				MakeMen(Sim, M, ESide::Aquila, TEXT("Boarding A"), 6, Row.Start, TEXT("Marine"), Counter);
+				if (Mode == 0)
+				{
+					Sim.Order(Sq, ETask::Advance, Row.Corridor, Row.End, 0.f, TEXT("to the far end"));
+				}
+				else
+				{
+					FOrder O;
+					O.Task = ETask::Sweep;
+					O.Comp = Row.Rooms[0];
+					O.Pos = M.CentreOf(Row.Rooms[0]);
+					O.Sector = Row.Rooms;
+					O.Where = TEXT("the four rooms");
+					Sim.OrderEx(Sq, O);
+				}
+				const FSquad& Squad = Sim.Squads()[Sq];
+				double TDone = -1.0;
+				const FRunResult R = RunSim(Sim, 110.0, [&](FAstraBoardSim& S)
+				{
+					// the end: the sweep has swept, or the column has got to the far end (and a few seconds more: what is left behind it fires)
+					if (TDone < 0.0 && ((Mode == 1 && Squad.Drill == EDrill::Done) || (Mode == 0 && Squad.Leader != INDEX_NONE && FVector::Dist2D(S.Units()[Squad.Leader].Pos, Row.End) < 600.0)))
+					{
+						TDone = S.Time();
+					}
+					if (TDone >= 0.0 && S.Time() > TDone + 8.0)
+					{
+						S.MissionMutable().Outcome = EOutcome::TimedOut;
+					}
+				});
+				FDrillResult D = DrillResultOf(Sim, R);
+				int32 Left = 0;
+				for (const int32 G : Guards)
+				{
+					Left += Sim.Units()[G].Able() ? 1 : 0;
+				}
+				GuardsLeft += Left;
+				RoomsClear += Squad.Cleared.Num();
+				Done += TDone >= 0.0 ? TDone : R.T;
+				D.bTaken = TDone >= 0.0 && D.MarinesAble >= 3;
+				Tab.Add(D);
+				++Runs;
+			}
+		}
+		BNote(FString::Printf(TEXT("    %-26s done in %5.1f s with at least three marines on their feet %2d of %2d; marines lost %4.1f, guards put down %4.1f of 8, guards still on their feet behind them %4.1f, rooms cleared %.1f"),
+		                      Mode == 0 ? TEXT("advance to the far end") : TEXT("sweep the four rooms"), Done / FMath::Max(1, Runs), Tab.Taken, Tab.N, Tab.MarinesLost / FMath::Max(1, Tab.N), Tab.FoesLost / FMath::Max(1, Tab.N), GuardsLeft / FMath::Max(1, Runs), RoomsClear / FMath::Max(1, Runs)));
+	}
+}
+
+/** Ambush: eight Mandate soldiers come in at the breach and go for Main Engineering by the way the plan gives them; six marines wait at a place on that way. Told to hold it, they take the corners and open
+ *  fire on what they see (the drill); told to ambush it they hide in the corners with their fire held and open on the column all together when it is in the killing ground, or when they are found. */
+static void BoardScenarioAmbush(FRig& Rig, int32 Seed, int32 Seeds)
+{
+	const FAstraBoardMap& M = *Rig.Map;
+	const int32 Obj = Rig.Comp(TEXT("engineering")), Breach = Rig.Comp(*BenchBreach(Rig));
+	if (Obj == INDEX_NONE || Breach == INDEX_NONE)
+	{
+		BCheck("ambush: arenas", false, TEXT("no Main Engineering or no breach room in the plan"));
+		return;
+	}
+	const FBox& BB = M.GetComps()[Breach].Box;
+	const FVector Cut(0.5 * (BB.Min.X + BB.Max.X), BB.Max.Y > 0 ? BB.Max.Y - 80.0 : BB.Min.Y + 80.0, BB.Min.Z);
+	TArray<FVector> Pts;
+	TArray<int32> Comps;
+	float Metres = 0.f;
+	FBoardRouteOptions Opt;
+	Opt.bThroughSealed = true;
+	if (!M.Route(Cut, M.CentreOf(Obj), Pts, Opt, &Metres, &Comps))
+	{
+		BCheck("ambush: arenas", false, TEXT("no way from the breach to Main Engineering"));
+		return;
+	}
+	// the places: the compartments along the way with corners at their openings (a junction, a doorway), a third, a half and two thirds of the way
+	TArray<int32> Places;
+	for (const float Share : {0.3f, 0.45f, 0.6f})
+	{
+		for (int32 i = FMath::RoundToInt(Share * Comps.Num()); i < Comps.Num(); ++i)
+		{
+			const int32 C = Comps[i];
+			if (M.GetComps()[C].Slots.Num() >= 2 && !Places.Contains(C))
+			{
+				Places.Add(C);
+				break;
+			}
+		}
+	}
+	BNote(FString::Printf(TEXT("the way from the breach to Engineering is %.0f m through %d compartments; ambush places: %s"), Metres, Comps.Num(), *FString::JoinBy(Places, TEXT(" | "), [&](int32 C) { return M.Describe(C); })));
+	for (const int32 Boarders : GTrace ? TArray<int32>({8}) : TArray<int32>({8, 12}))
+	{
+		for (const int32 Mode : {0, 1})
+		{
+			double Contact = 0.0, FirstDown = 0.0, LossA = 0.0, LossM = 0.0, T = 0.0;
+			int32 Beaten = 0, Takes = 0, N = 0, Ambushes = 0;
+			for (int32 pi = 0; pi < (GTrace ? FMath::Min(1, Places.Num()) : Places.Num()); ++pi)
+			{
+				for (int32 s = 0; s < Seeds; ++s)
+				{
+					FAstraBoardSim Sim;
+					Sim.Init(Rig.Map.ToSharedRef(), Seed + s * 23 + pi);
+					Sim.Tuning = Rig.Tuning;
+					Sim.SpawnAttackers(ESide::Mandate, Breach, Cut, Obj, Boarders, 2.f, Boarders);
+					int32 Counter = 0;
+					for (int32 q = 0; q < 2; ++q)                                  // (two squads of six at the place, each given the order)
+					{
+						const int32 Sq = Sim.Squads().Num();
+						MakeMen(Sim, M, ESide::Aquila, FString::Printf(TEXT("Reaction %d"), q + 1), 6, M.Inset(Places[pi], M.CentreOf(Places[pi]), 80.f), TEXT("Marine"), Counter);
+						FOrder O;
+						O.Task = Mode == 0 ? ETask::Hold : ETask::Ambush;
+						O.Comp = Places[pi];
+						O.Pos = M.CentreOf(Places[pi]);
+						O.Radius = 700.f;
+						O.Where = M.Describe(Places[pi]);
+						Sim.OrderEx(Sq, O);
+					}
+					const FRunResult R = RunSim(Sim, 160.0);
+					++N;
+					Contact += R.Book.FirstContactT;
+					LossA += R.Book.Killed[0] + R.Book.Down[0];
+					LossM += R.Book.Killed[1] + R.Book.Down[1];
+					T += R.T;
+					Beaten += (R.Outcome == EOutcome::DefenderHolds || R.Outcome == EOutcome::AttackerRepelled) ? 1 : 0;
+					Takes += R.Outcome == EOutcome::AttackerTakes ? 1 : 0;
+					Ambushes += R.Book.DrillAmbushes;
+				}
+			}
+			BNote(FString::Printf(TEXT("    %2d boarders, twelve marines at the place: %-9s the Mandate beaten %2d of %2d (take Engineering %d), first contact at %4.1f s, ends %5.1f s; marines lost %4.1f, Mandate lost %4.1f, ambushes sprung %d"),
+			                      Boarders, Mode == 0 ? TEXT("hold") : TEXT("ambush"), Beaten, N, Takes, Contact / FMath::Max(1, N), T / FMath::Max(1, N), LossA / FMath::Max(1, N), LossM / FMath::Max(1, N), Ambushes));
+			(void)FirstDown;
+		}
+	}
+}
 
 // ================================================================================================================== the Captain's arms on the weapon
 
@@ -2785,6 +3438,22 @@ int32 UAstraBoardSimCommandlet::Main(const FString& Params)
 	if (Scenario == TEXT("orders"))                    // (on request only: a fight for each plan and seed)
 	{
 		BoardScenarioOrders(Rig, Seed, Seeds);
+	}
+	if (Scenario == TEXT("take") || Scenario == TEXT("drills"))                    // (on request only: the infantry orders, each with and without, on the same rooms and seeds)
+	{
+		BoardScenarioTake(Rig, Seed, Seeds);
+	}
+	if (Scenario == TEXT("breach") || Scenario == TEXT("drills"))
+	{
+		BoardScenarioBreach(Rig, Seed, Seeds);
+	}
+	if (Scenario == TEXT("sweep") || Scenario == TEXT("drills"))
+	{
+		BoardScenarioSweep(Rig, Seed, Seeds);
+	}
+	if (Scenario == TEXT("ambush") || Scenario == TEXT("drills"))
+	{
+		BoardScenarioAmbush(Rig, Seed, Seeds);
 	}
 	int32 Failed = 0;
 	for (const FBCheck& C : BChecks)

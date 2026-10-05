@@ -20,6 +20,7 @@ void FAstraBoardSim::Order(int32 SquadId, ETask Task, int32 Comp, const FVector&
 		return;
 	}
 	FSquad& S = Teams[SquadId];
+	ResetDrill(S);                                               // (the last order's drill, fire discipline, stack and doors held shut are over: the new order sets its own)
 	S.Task = Task;
 	S.TargetComp = Comp != INDEX_NONE ? Comp : Map->CompAt(Pos, 80.f);
 	S.TargetPos = Pos;
@@ -49,6 +50,7 @@ void FAstraBoardSim::Respond(int32 SquadId)
 {
 	if (Teams.IsValidIndex(SquadId))
 	{
+		ResetDrill(Teams[SquadId]);
 		Teams[SquadId].bOrdered = false;
 		Teams[SquadId].Task = ETask::Idle;
 		Teams[SquadId].PlanT = 1.f;
@@ -70,6 +72,11 @@ void FAstraBoardSim::StepSquad(FSquad& S, float Dt)
 	S.TaskT += Dt;
 	S.PlanT += Dt;
 	S.FlankT += Dt;
+	S.DrillT += Dt;
+	if (S.FirstVolleyT > 0.f)
+	{
+		S.FirstVolleyT = FMath::Max(0.f, S.FirstVolleyT - Dt);
+	}
 	if (S.MusterT > 0.f)
 	{
 		S.MusterT = FMath::Max(0.f, S.MusterT - Dt);
@@ -216,7 +223,7 @@ void FAstraBoardSim::ColumnTo(FSquad& S, const FVector& To, float Speed)
 /** Fighting positions round a place: each man a corner of his own, the ones that cover the way the enemy comes first. */
 void FAstraBoardSim::HoldAround(FSquad& S, const FVector& At, float Radius, bool bInside)
 {
-	// the way the enemy comes from: what is known of them, else the planned route's start
+	// the way the enemy comes from: what is known of them, else the planned route's start; a squad given a place to cover (the other squad goes in there) looks at that place
 	FVector Approach = Mis.BreachPos;
 	TArray<FSeen> Seen;
 	Intel(S.Side, Seen);
@@ -228,6 +235,10 @@ void FAstraBoardSim::HoldAround(FSquad& S, const FVector& At, float Radius, bool
 			C += X.Pos;
 		}
 		Approach = C / Seen.Num();
+	}
+	if (S.CoverComp != INDEX_NONE && Map->GetComps().IsValidIndex(S.CoverComp))
+	{
+		Approach = Map->CentreOf(S.CoverComp);
 	}
 	const int32 HomeComp = Map->CompAt(At, 120.f);
 	if (HomeComp == INDEX_NONE)
@@ -771,7 +782,7 @@ void FAstraBoardSim::PlanDefend(FSquad& S)
 	TArray<int32> Able;
 	for (const int32 M : S.Members)
 	{
-		if (People[M].Able() && People[M].Carrying == INDEX_NONE)
+		if (People[M].Able() && People[M].Carrying == INDEX_NONE && !People[M].bBusy)
 		{
 			Able.Add(M);
 		}
@@ -859,8 +870,20 @@ void FAstraBoardSim::PlanDefend(FSquad& S)
 			}
 		}
 	}
+	if (S.bSealBehind && S.bOrdered)
+	{
+		StepSealBehind(S, Able);                                    // (the last man closes a pressure door behind the squad)
+	}
 	switch (Task)
 	{
+	case ETask::Sweep:
+	case ETask::Breach:
+	case ETask::Take:
+	case ETask::Ambush:
+	case ETask::HoldLine:
+	case ETask::Escort:
+		StepDrill(S, Able);                                         // the infantry orders: a drill with phases of its own (AstraBoardDrills.cpp)
+		break;
 	case ETask::Follow:
 	{
 		const FUnit* C = Unit(CaptainUnit);
@@ -938,7 +961,7 @@ void FAstraBoardSim::PlanDefend(FSquad& S)
 	}
 	case ETask::Hold:
 	{
-		HoldAround(S, At, Radius);
+		HoldAround(S, At, Radius, S.bHoldInside);
 		break;
 	}
 	case ETask::Assault:
