@@ -36,3 +36,6 @@
 *.ini text eol=lf
 *.py  text eol=lf
 *.bat text eol=crlf
+
+# README and docs images: plain git (not LFS), so viewing the README spends no LFS bandwidth
+docs/media/*.jpg !filter !diff !merge -text

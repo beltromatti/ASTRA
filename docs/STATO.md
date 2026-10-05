@@ -37,6 +37,10 @@ signed and notarized Mac build; a GitHub alpha release; the repository public.
   MetaHuman crew experiment in `Content/ASTRA/Crew/MetaHumans` is not cooked; to resume it, enable `MetaHumanCharacter`, `MetaHumanSDK`,
   `MetaHumanGenerator` and `MetaHuman` in `ASTRA.uproject`), the NNE denoiser is off (100 MB that cooked itself), the release is a Shipping
   build. A packaged mind keeps Python's bytecode in its data folder, never inside the signed app (`PYTHONPYCACHEPREFIX`).
+- **The release** (5 Oct, night): `ASTRA-0.1.0-alpha-macOS-AppleSilicon.zip`, 1405 MB, Shipping, signed with the Developer ID (hardened
+  runtime) and checked on a clean data folder (the key verified, the menu, the mind started from the bundle's uv in 21 s). **Notarization
+  refused by Apple** (HTTP 403, an agreement to accept on the developer account: RICHIESTE); once accepted,
+  `tools/release_mac.sh 0.1.0-alpha --skip-build` notarizes the same build and the release's file is replaced.
 - **The macOS release pipeline** (`tools/release_mac.sh`): Shipping, uv inside, the secrets check, Developer ID signature with the hardened
   runtime, notarization with the App Store Connect API key, stapling, Gatekeeper's check, one zip under 2 GiB. The identity and the key
   live in `.release.env` (ignored by git).
