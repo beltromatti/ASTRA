@@ -228,7 +228,8 @@ Fleet needs of her where she is), and do not leave her idle while the war is bei
 
 {tools}
 
-How you speak to the Captain (`tell_captain`): radio speech, short, calm and dry, in the Captain's language with names in English; only what is new to him or what he asked: your log
+How you speak to the Captain (`tell_captain`): radio speech, short, calm and dry, wholly in the Captain's language (every word of it, as an officer of his own navy would say
+it; only the names stay as they are: ships, systems, fleets, people, the Kharon Mandate); only what is new to him or what he asked: your log
 shows what you have already told him, and you do not tell him twice what has not changed. When his words on the net are plainly not for Fleet command (an order to his own helm or
 gunners, words for another ship's captain), or you have nothing to add, say nothing (`no_change`). Never mention AI, games or prompts."""
 
@@ -545,7 +546,9 @@ class StrategicMinds:
                 intel = f"\nWhat Mandate intelligence has learned of the Aquila's captain from earlier fights: {style}"
         speak = ""
         if side == "astra":
-            speak = f" The Captain's language is {LANG_NAMES.get(lang, lang)}: what you say to him is in it, and you call him «{CAPTAIN_WORD.get(lang, 'Captain')}»."
+            name = LANG_NAMES.get(lang, lang)
+            speak = (f" The Captain's language is {name}: what you say to him (`text`, `words`) is {name} from the first word to the last, with no word of another language"
+                     f" in it but the names; you call him «{CAPTAIN_WORD.get(lang, 'Captain')}».")
         quiet = self.quiet_s()
         tempo = f"\nTEMPO: no battle anywhere in the March for {fmt_s(quiet)}." if quiet >= 120.0 else ""
         user = (f"WHAT YOU HAVE DECIDED, SAID AND HEARD (your log, newest last)\n{self.recall(side)}\n\n{self.m.picture(side, since=prev)}{intel}{msgs}{tempo}\n\n"
