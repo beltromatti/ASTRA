@@ -850,6 +850,39 @@ class SuccessionTests(Fixture):
         self.assertEqual([p for p in self.minds.pulses if any("taken command" in w for w in p["why"])], [])
 
 
+class FanOutTests(Fixture):
+    """5 October: every sentence of the Captain's that went out on the fleet net woke every allied captain and the admiral (six calls to the model, nearly always for «no change»).
+    The router now says whom the words are for, and only they are woken."""
+
+    sides = ("astra",)
+
+    def fleet(self) -> dict[str, Any]:
+        groups = [group("7th Fleet picket", 1, [member("T-01", "praetorian")], leader="T-01"), group("Screen", 2, [member("T-02", "vigilant")], leader="T-02"),
+                  group("Reserve", 3, [member("T-44", "constance")], leader="T-44"), group("Rear", 4, [member("T-45", "steadfast")], leader="T-45")]
+        return astra_state(groups, ENEMIES(), None, contacts=[{"id": i, "name": f"ASN {n}", "status": "friendly", "range_km": 5.0, "bearing_deg": 20, "hull_pct": 100}
+                                                              for i, n in (("T-01", "Praetorian"), ("T-02", "Vigilant"), ("T-44", "Constance"), ("T-45", "Steadfast"))])
+
+    async def test_words_for_one_ship_wake_one_captain_and_words_for_the_fleet_wake_them_all(self) -> None:
+        self.llm.policy = null_policy
+        st = self.fleet()
+        await self.feed(st)
+        await self.feed(st, 9)
+        n0 = len(self.llm.calls)
+        self.assertEqual(self.minds.captain_to_fleet("Castellan, rapporto.", "it", to="castellan"), 1)
+        await self.feed(st, 1)
+        one = len(self.llm.calls) - n0
+        n1 = len(self.llm.calls)
+        self.assertEqual(self.minds.captain_to_fleet("Tutta la flotta, rapporto.", "it"), 4)
+        await self.feed(st, 1)
+        everyone = len(self.llm.calls) - n1
+        self.assertEqual((one, everyone), (1, 4))
+        n2 = len(self.llm.calls)
+        self.assertEqual(self.minds.captain_to_fleet("Vigilant, qui l'Aquila.", "it", to="vigilant"), 1, "a ship's name finds her captain")
+        self.assertEqual(self.minds.captain_to_fleet("Nobody by that name.", "it", to="the ghost"), 0, "and a name nobody has finds nobody")
+        await self.feed(st, 1)
+        self.assertEqual(len(self.llm.calls) - n2, 1)
+
+
 class ChainOfCommandTests(Fixture):
     sides = ("astra",)
 

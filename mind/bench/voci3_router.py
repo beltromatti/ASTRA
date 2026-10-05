@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from astra_mind import models, router
 from astra_mind.context import Channel, Context
 from astra_mind.openrouter import OpenRouter
+from astra_mind.server import _FOR_ALL, _FOR_THE_ADMIRAL
 
 ENEMY = dict(party="T-40", name="Ferryman Varek Solm (the Acheron)", kind="enemy")
 ENEMY2 = dict(party="T-56", name="the commander of the Nyx", kind="enemy")
@@ -32,14 +33,19 @@ class Case:
     heard_s: float | None = None      # seconds since the party spoke to the Captain (None: not in this exchange: the channel has been quiet)
     last_words: str = ""
     why: str = ""
+    to: str = ""                      # on the fleet net, whom the words are for: admiral | ship | all ("": not graded)
 
 
 CASES = [
     # for the party
     Case("Solm, vi diamo la possibilità di arrendervi. Siete nello spazio della nostra federazione, andate via ora o sarete distrutti.", ENEMY, True, 12.0, "Aquila, arrendetevi.", "a demand"),
     Case("Dite a Solm che si deve arrendere e che deve lasciare immediatamente Aurelia o verrà distrutto.", ENEMY, True, None, "", "pass it on"),
-    Case("Rourg, chiedo il permesso di portare solo la mia nave dall'altra parte del gate in avanscoperta.", FLEET, True, None, "", "a request to the admiral"),
-    Case("No, ammiraglio, non obbedisco: abbiamo la forza per distruggerli.", FLEET, True, 8.0, "Capitano, tenete la posizione.", "an answer to what he just said"),
+    Case("Rourg, chiedo il permesso di portare solo la mia nave dall'altra parte del gate in avanscoperta.", FLEET, True, None, "", "a request to the admiral", to="admiral"),
+    Case("No, ammiraglio, non obbedisco: abbiamo la forza per distruggerli.", FLEET, True, 8.0, "Capitano, tenete la posizione.", "an answer to what he just said", to="admiral"),
+    Case("Ammiraglio Rourke, ci servono rinforzi sul fianco sinistro.", FLEET, True, None, "", "a request to the admiral", to="admiral"),
+    Case("Tutta la flotta, concentrate il fuoco sulla Acheron.", FLEET, True, None, "", "to the whole fleet", to="all"),
+    Case("Vigilant, qui l'Aquila: rispondete.", FLEET, True, None, "", "calling one ship", to="ship"),
+    Case("Castellan, come state laggiù?", FLEET, True, None, "", "asking one captain", to="ship"),
     # for the bridge: our own boats, marines, fighters, people, systems
     Case("Insomma, come faccio ad andare dai kestrel e equipaggio? Datemi subito una risposta.", FLEET, False, None, "", "5/10: went to the fleet"),
     Case("Mi sai dire dove posso trovare i Kestrel?", FLEET, False, None, "", "5/10: went to the fleet"),
@@ -70,17 +76,23 @@ async def main_async(args: argparse.Namespace) -> int:
     try:
         for c in CASES:
             outs = []
+            addressed = []
             for _ in range(args.runs):
                 r = await router.for_party(llm, c.said, context_of(c))
                 outs.append(r.external)
+                addressed.append(r.to)
             right = [bool(o) == c.out for o in outs]
+            if c.to and c.out:
+                # whom it is for, graded the way the server reads it: Fleet command alone, the whole fleet, or a ship (anything else the model wrote)
+                kinds = ["admiral" if t.lower() in _FOR_THE_ADMIRAL else "all" if t.lower() in _FOR_ALL else "ship" for t in addressed]
+                right = [ok and k == c.to for ok, k in zip(right, kinds)]
             total += len(outs)
             bad += right.count(False)
             if args.verbose or not all(right):
                 kind = "OUT " if c.out else "stay"
-                print(f"{'ok  ' if all(right) else 'FAIL'} [{c.channel['party']:5s}] should {kind} ({c.why}): {c.said[:80]}")
-                for o in outs:
-                    print(f"        -> {('OUT: ' + o[:90]) if o else 'stays on the bridge'}")
+                print(f"{'ok  ' if all(right) else 'FAIL'} [{c.channel['party']:5s}] should {kind}{(' to ' + c.to) if c.to else ''} ({c.why}): {c.said[:80]}")
+                for o, t in zip(outs, addressed):
+                    print(f"        -> {('OUT' + (' to ' + t if t else '') + ': ' + o[:80]) if o else 'stays on the bridge'}")
     finally:
         await llm.close()
     print(f"\n=== {total - bad}/{total} decisions right in {len(CASES)} cases x {args.runs}; {models.LEDGER.summary()}")

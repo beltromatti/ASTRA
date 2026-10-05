@@ -163,6 +163,12 @@ CHANNEL_IDLE_S = 75.0          # a channel with the fleet, an ally or an enemy i
 _NOT_PERISHABLE = _re.compile(r"^(flight: controller call|bridge: after-action|comms: fleet net news)|has come to the Captain's quarters in person", _re.I)
 
 
+# what the router says on the fleet net for whom the words are (router.REPLY_FLEET): its two words, `admiral` and `all` (and what the model writes for them when it spells them out:
+# the protocol is in English), anything else is a ship or a captain, found by name (war.deliver); a name nobody answers to is everyone, so no word of the Captain's is lost
+_FOR_THE_ADMIRAL = {"admiral", "rourke", "fleet command", "vice admiral", "vice admiral rourke"}
+_FOR_ALL = {"all", "everyone", "everybody", "all ships", "fleet", "the fleet", ""}
+
+
 def _presses(event: str) -> bool:
     """News that does not wait for the picture's pace (PICTURE_GAP_S): a hail (the enemy calls the Aquila), a call to the Captain on a net, the flight controller's call to a Captain
     in a Falcon. A warning of danger has its own way through (`_URGENT_EVENT`)."""
@@ -1116,9 +1122,9 @@ class Mind:
         return party == "fleet" or (party == FLIGHT_PARTY and self.flight.can_answer()) or (party == MARINES_PARTY and self.marines.can_answer()) or self.war.can_answer(party) \
             or (party in COMMANDERS and party not in self.enemy.dead)
 
-    async def _to_party(self, party: str, words: str, lang: str) -> None:
+    async def _to_party(self, party: str, words: str, lang: str, to: str = "") -> None:
         """What the Captain said TO the party on the channel goes out: the enemy commander answers, the admiral, or the allied captains (each judges
-        whether the words were for them)."""
+        whether the words were for them). On the fleet net `to` is whom the router found them for: only the admiral, only one ship's captain, or everyone."""
         self.exchange.said(party)
         if party == FLIGHT_PARTY:
             self.flight.captain_to_net(words, lang)                # (the CAG, the leaders, the wingmen, the Chief: whoever it was for answers)
@@ -1127,6 +1133,13 @@ class Mind:
             self.marines.captain_to_net(words, lang)               # (the Major, the squad leaders: whoever it was for answers)
             return
         if party == "fleet":
+            who = " ".join((to or "all").lower().split())
+            if who in _FOR_THE_ADMIRAL:
+                await self.director.admiral_reply(words, lang, self._battle_state())      # (only Rourke: the allied captains are not woken for words to the admiral)
+                return
+            if who not in _FOR_ALL and self.war.captain_to_fleet(words, lang, to=who):
+                self.war.kick()                                    # (one ship's captain, or the group that holds her: Rourke does not answer words for a ship)
+                return
             self.war.captain_to_fleet(words, lang)
             self.war.kick()
             await self.director.admiral_reply(words, lang, self._battle_state())
@@ -1190,7 +1203,7 @@ class Mind:
             r = await router_mod.for_party(self.llm, text, ctx)
             log.info("%s live: out on it (%s, %.0f ms): %r", label, r.how, r.ms, r.external[:80])
             if r.external:
-                await self._to_party(r.party, r.external, lang)
+                await self._to_party(r.party, r.external, lang, r.to)
                 if " ".join(r.external.split()) == " ".join(text.split()):
                     # every word of it went out on the net, verbatim: there is nothing left for the bridge, and the crew's turn (a model call to say nothing) is not needed
                     # (the officers see the order in the console and hear the answer on the radio, in their events)
@@ -1206,7 +1219,7 @@ class Mind:
                 r = await router_mod.for_party(self.llm, text, ctx)
                 log.info("channel open with %s: out on it (%s, %.0f ms): %r", ch.party, r.how, r.ms, r.external[:80])
                 if r.external:
-                    party_task = asyncio.create_task(self._to_party(r.party, r.external, lang))
+                    party_task = asyncio.create_task(self._to_party(r.party, r.external, lang, r.to))
         t = await turn_task
         if party_task is not None:
             await party_task
