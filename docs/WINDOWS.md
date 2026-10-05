@@ -5,6 +5,21 @@ portare ASTRA lì costa una mattina di compilazione e una prova, non un rifacime
 cross-compilazione da macOS: `docs/ricerca/01`), quindi tutto ciò che è solo-Windows è piccolo, isolato dietro guardie, e **tutto il resto è provato qui**.
 Contratti: [ARCHITETTURA.md §1, regola 4](ARCHITETTURA.md). Piano: [PIANO.md](PIANO.md) F8.*
 
+## 0. Alpha 0.1.0 (5 October 2026): what changed for Windows
+
+- **Build it on a PC**: `tools\windows\Setup-EpicContent.ps1`, then
+  `powershell -NoProfile -ExecutionPolicy Bypass -File tools\windows\Pacchetto-Windows.ps1 -Config Shipping -Zip`. Shipping is the release
+  build; Development keeps the console and the harness. The zip goes on the GitHub release beside the Mac one.
+- **The OpenRouter key**: the game asks for it on its first start (a page with PASTE, VERIFY AND START, GET A KEY) and keeps it in
+  `%LOCALAPPDATA%\ASTRA\.env`; `Setup-ASTRA.bat` is optional now (it only prepares the crew's environment ahead of the first start). The
+  package can never carry a key file (`/XF .env .env.*`).
+- **Lighter content**: the MetaHuman plugins and the NNE denoiser are off (`ASTRA.uproject`), about 900 MB less in the package.
+- **Python's bytecode** of a packaged mind goes to `%LOCALAPPDATA%\ASTRA\pycache` (`PYTHONPYCACHEPREFIX`), never beside its sources.
+- **New settings**: display mode (full screen, borderless, window), frame rate, motion blur, field of view, master volume, mouse
+  sensitivity and inversion, the talk and orders keys; on the first start on Windows the engine's hardware benchmark picks the quality.
+- Still to do on the first PC: tune `Config/Windows/WindowsEngine.ini` (every value was measured on the MacBook Air), hear the system voices
+  (SAPI) and check the microphone path (sounddevice, Parakeet ONNX).
+
 ## 1. In breve
 
 | Cosa | Stato | Come lo so |
