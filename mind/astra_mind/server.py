@@ -146,8 +146,10 @@ EXTERNAL_SPEAKERS["computer"] = ("Ship's computer", "estelle")          # the li
 # the player talking to the story itself (game master mode): "Regista, ...", "Director, ...", "Narratore, ..."
 import re as _re  # noqa: E402
 # events whose report is a warning of danger: the crew says them before any routine talk (voice priority URGENT)
+# (a breach is danger when it opens, not when it is sealed: 5 Oct, «the breach at the Reaction-Mass Tank is sealed» was told as a warning and cut, in a
+# battle, the same report three times in a row)
 _URGENT_EVENT = _re.compile(r"missiles? inbound|rockets? inbound|torpedoes away|hull integrity critical|containment failing|abandon ship|"
-                           r"breach|new contacts|is cycling|coming through|" + _re.escape(URGENT_MARK), _re.I)    # (URGENT_MARK: a net's sender said it is danger now, nets.py)
+                           r"breach(?![^.;]*\b(?:sealed|closed|patched|held)\b)|new contacts|is cycling|coming through|" + _re.escape(URGENT_MARK), _re.I)    # (URGENT_MARK: a net's sender said it is danger now, nets.py)
 URGENT_GATHER_S = 0.6          # what comes with a warning of danger joins it (a hit: its breach, fire and wounded arrive together)
 URGENT_WAIT_S = 3.0            # ... and it waits for the line being said to end, this long at most
 ROUTINE_WAIT_S = 25.0          # routine news waits for a quiet bridge this long at most: in a fleet battle the bridge is never quiet,
