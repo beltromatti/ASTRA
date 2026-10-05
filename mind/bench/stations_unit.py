@@ -132,7 +132,7 @@ class ToolsTest(unittest.TestCase):
         self.assertIsNone(cmd)
         self.assertIn("target", err)
         cmd, err = S.normalize({"station": "helm", "mode": "intercept", "params": {"target": "T-23", "standoff_km": 900}})
-        self.assertEqual(cmd["params"]["standoff_km"], 40)               # clamped
+        self.assertEqual(cmd["params"]["standoff_km"], 45)               # clamped (the rails reach 45 km since BATTAGLIA-3)
         cmd, err = S.normalize({"station": "tactical", "mode": "engagement.engage", "params": {"targets": "T-23"}})
         self.assertEqual(cmd["mode"], "engage")
         self.assertEqual(cmd["params"]["targets"], ["T-23"])
@@ -641,7 +641,7 @@ class WireTest(unittest.IsolatedAsyncioTestCase):
         for gone in ("ew_jam", "ew_off", "sigint_on", "sigint_off", "holo_fleet", "listen_off"):
             self.assertNotIn(gone, S.MODE_INDEX)
         self.assertNotIn("weapons", S.MODE_INDEX["datapad_push"].param("page").enum)
-        self.assertEqual(set(S.MODE_INDEX["datapad_push"].param("page").enum), {"overview", "contact", "damage", "fleet", "orders"})
+        self.assertEqual(set(S.MODE_INDEX["datapad_push"].param("page").enum), {"overview", "contact", "damage", "fleet", "orders", "log"})   # (the log: the bridge's log page, VOCI-3)
 
     def test_the_wire_round_trips(self) -> None:
         for name, md in S.MODE_INDEX.items():

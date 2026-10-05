@@ -67,6 +67,12 @@ namespace
 	const float WarSystemFragility[AstraWar::NumSystems] = {2.4f, 3.0f, 2.2f, 1.6f, 0.9f, 2.0f};
 
 	int32 WarOpposite(int32 F) { return F ^ 1; }
+
+	/** What a craft is called in the bench's books of kills. */
+	FName WarCraftKindName(int32 Kind)
+	{
+		return FName(Kind == 1 ? TEXT("bomber") : (Kind == 2 ? TEXT("drone") : (Kind == 3 ? TEXT("boat") : TEXT("fighter"))));
+	}
 }
 
 // ---------------------------------------------------------------------------------------------- where a shot strikes
@@ -186,6 +192,9 @@ void UAstraBattleSubsystem::InitShipModel(FAstraBattleShip& S)
 	S.LaserRange = C->LaserRange;
 	S.PDChannels = C->PDChannels;
 	S.PDRange = C->PDRange;
+	S.LaserFalloff = C->LaserFalloff;
+	S.TrackMrad = C->TrackMrad;
+	S.DispMrad = C->DispMrad;
 	S.ShieldRegen = C->ShieldRegen;
 	S.Mounts.Reset();
 	for (const AstraWar::FMountDef& D : C->Mounts)
@@ -216,8 +225,11 @@ void UAstraBattleSubsystem::BuildDurability(FAstraBattleShip& S, float Hull, flo
 	}
 	// the pace of the war (the lead, 1/10, from the game: a carrier cruiser caught alone by four warships went from 99 % to 19 % in
 	// 100 s, no time left to answer): every hull, plate and shield half as tough again as GUERRA's bench tuning; uniform, so the
-	// balance between the classes and the bench's symmetry hold, and a mistake still costs dearly but leaves minutes to answer it
-	static AstraWar::FTuneVar KShield(TEXT("shield_scale"), 1.5f), KArmour(TEXT("armour_scale"), 1.5f), KStruct(TEXT("struct_scale"), 1.8f);
+	// balance between the classes and the bench's symmetry hold, and a mistake still costs dearly but leaves minutes to answer it.
+	// BATTAGLIA-3: the guns now reach tens of kilometres and fire in a stream (data/war/classes.json), so a ship is hit all through the approach, not in
+	// the last ten kilometres; the same scale again (and the structure a little more) makes a destroyer last a couple of minutes under one cruiser's guns,
+	// a cruiser many, a fleet battle a quarter of an hour (tools/war.py suite): the sectors, plates and sections give way one after another in view
+	static AstraWar::FTuneVar KShield(TEXT("shield_scale"), 2.0f), KArmour(TEXT("armour_scale"), 2.0f), KStruct(TEXT("struct_scale"), 2.6f);
 	FAstraShipDamage& D = S.Dmg;
 	D = FAstraShipDamage();
 	D.bModel = true;
@@ -439,7 +451,7 @@ void UAstraBattleSubsystem::SetHullFraction(FAstraBattleShip& S, float Frac)
 }
 
 // ---------------------------------------------------------------------------------------------- the blow
-void UAstraBattleSubsystem::ApplyHit(FAstraBattleShip& To, const FVector& FromDir, float Damage, const FVector& HitPos, EAstraHitKind Kind, int32 SourceId)
+void UAstraBattleSubsystem::ApplyHit(FAstraBattleShip& To, const FVector& FromDir, float Damage, const FVector& HitPos, EAstraHitKind Kind, int32 SourceId, float FireRangeM)
 {
 	if (!To.bAlive || To.bFixture || Damage <= 0.f)
 	{
@@ -447,16 +459,19 @@ void UAstraBattleSubsystem::ApplyHit(FAstraBattleShip& To, const FVector& FromDi
 	}
 	if (To.Dmg.bModel)
 	{
-		ApplyHitModel(To, FromDir, Damage, HitPos, Kind, SourceId);
+		ApplyHitModel(To, FromDir, Damage, HitPos, Kind, SourceId, FireRangeM);
 	}
 	else
 	{
-		ApplyHitLump(To, FromDir, Damage, HitPos, Kind, SourceId);
+		ApplyHitLump(To, FromDir, Damage, HitPos, Kind, SourceId, FireRangeM);
 	}
 }
 
-void UAstraBattleSubsystem::ApplyHitModel(FAstraBattleShip& To, const FVector& FromDir, float Damage, const FVector& HitPos, EAstraHitKind Kind, int32 SourceId)
+void UAstraBattleSubsystem::ApplyHitModel(FAstraBattleShip& To, const FVector& FromDir, float Damage, const FVector& HitPos, EAstraHitKind Kind, int32 SourceId, float FireRangeM)
 {
+	To.LastHitBy = SourceId;                                          // (a kill is credited to whoever struck last: the bench's books, the Captain's wing calling its own)
+	To.LastHitKind = (uint8)Kind;
+	To.LastHitRangeM = FireRangeM;
 	FAstraShipDamage& D = To.Dmg;
 	const EAstraDamageType Type = AstraDamageTypeOf(Kind);
 	const FWarHitProfile P = WarProfileOf(Type, Damage);
@@ -522,6 +537,7 @@ void UAstraBattleSubsystem::ApplyHitModel(FAstraBattleShip& To, const FVector& F
 		{
 			D.Sector[F] = 0.f;
 			++Stats.SectorsCollapsed;
+			NoteFightEvent(To, FFightEvent::EKind::ShieldFell, (uint8)Sec, (uint8)F, -1, HitPos);
 		}
 	}
 	// --- 2. the plate over that face of that section
@@ -557,6 +573,12 @@ void UAstraBattleSubsystem::ApplyHitModel(FAstraBattleShip& To, const FVector& F
 		{
 			Stats.NoteFocus(Src->Side == EAstraSide::Astra ? 0 : (Src->Side == EAstraSide::Mandate ? 1 : -1), To.Id, Damage);
 		}
+	}
+	if (Ships.Num() && SourceId == Ships[0].Id && !To.bPlayer)
+	{
+		PlayerHitAt = Time;                                          // a shot of the Aquila's has struck (the main viewscreen cuts to it)
+		PlayerHitTarget = To.ContactId;
+		NoteFightEvent(To, FFightEvent::EKind::PlayerHit, (uint8)Sec, (uint8)F, -1, HitPos, Damage, Damage - ShieldTook);
 	}
 	// --- what it looks like
 	const float Felt = StructTook + 0.25f * PlateTook;            // what the hull feels of it (the crew's incidents, the scars, the shudder)
@@ -608,9 +630,12 @@ void UAstraBattleSubsystem::ApplyHitModel(FAstraBattleShip& To, const FVector& F
 		Shake = FMath::Min(1.f, Shake + (Felt > 20.f ? 0.8f : 0.35f));
 		if (UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>())
 		{
-			// what the shields stop becomes heat in the emitters (half what it was before GUERRA: with the war's volumes of fire a focused
-			// attack took the Aquila from 26 to 95 % in thirty seconds, and the heat, not the enemy, killed her)
-			Ship->AddHeat(ShieldTook * 0.006f * (Type == EAstraDamageType::Energy ? 1.5f : 1.f));
+			// what the shields stop becomes heat in the emitters (GUERRA halved it, BATTAGLIA-3 took a third off it again: a ship that fires all her mounts and is shot at by three settles
+			// near 70 % with the radiators out, the knee of the heat factor; the overload (battle short, a torn radiator wing) is what takes her past it)
+			static AstraWar::FTuneVar KSoakHeat(TEXT("soak_heat"), 0.004f);
+			const float Soaked = ShieldTook * KSoakHeat.Get() * (Type == EAstraDamageType::Energy ? 1.5f : 1.f);
+			Ship->AddHeat(Soaked);
+			HeatBooks.Soak += Soaked;
 			if (bHitBox)
 			{
 				// what is left of the blow goes inside, to the compartments behind the plating where it struck (docs/DISTRUZIONE.md)
@@ -749,7 +774,12 @@ void UAstraBattleSubsystem::DamageInside(FAstraBattleShip& S, int32 Sec, float T
 			continue;
 		}
 		const float dH = Frac * WarSystemFragility[k] * SystemMul * (bSpread ? 0.5f : 1.f) * WarSystemExposure[k][F] * FMath::FRandRange(0.4f, 1.6f);
+		const float WasSys = D.Sys[k];
 		D.Sys[k] = FMath::Max(0.f, D.Sys[k] - dH);
+		if (WasSys >= 0.35f && D.Sys[k] < 0.35f)
+		{
+			NoteFightEvent(S, FFightEvent::EKind::SystemOut, (uint8)Sec, (uint8)F, k, S.Pos);   // (an engine, a sensor suite, a hangar... put out of the fight)
+		}
 	}
 	for (FAstraMount& M : S.Mounts)
 	{
@@ -758,7 +788,12 @@ void UAstraBattleSubsystem::DamageInside(FAstraBattleShip& S, int32 Sec, float T
 			continue;
 		}
 		const float Align = FVector::DotProduct(M.Dir, N) > 0.3f ? 1.f : 0.5f;
+		const float WasMount = M.Health;
 		M.Health = FMath::Max(0.f, M.Health - Frac * 2.2f * SystemMul * Align * FMath::FRandRange(0.3f, 1.7f));
+		if (WasMount >= 0.35f && M.Health < 0.35f)
+		{
+			NoteFightEvent(S, FFightEvent::EKind::MountOut, (uint8)Sec, (uint8)F, -1, S.Pos + S.Att.RotateVector(M.Dir * (S.Box.Valid() ? S.Box.Hx : (double)S.Radius)));   // (a turret of its guns)
+		}
 	}
 	// a real bite out of the section: one thing in it is struck outright
 	if (Frac > 0.06f && FMath::FRand() < 0.5f)
@@ -801,6 +836,8 @@ void UAstraBattleSubsystem::OnSectionGutted(FAstraBattleShip& S, int32 Sec)
 	D.GuttedT[Sec] = 0.f;
 	D.Burn[Sec] = 90.f;
 	D.Breach[Sec] = 90.f;
+	NoteFightEvent(S, FFightEvent::EKind::SectionGutted, (uint8)Sec, D.LastHitFacing, -1,
+	               S.Pos + S.Att.RotateVector(FVector(S.Box.Valid() ? S.Box.Hx * (Sec == AstraWar::SecBow ? 0.6 : (Sec == AstraWar::SecStern ? -0.6 : 0.0)) : 0.0, 0.0, 0.0)));
 	FleetOnGutted(S, Sec);                                          // what lived in its rooms is lost, and so are the people in them (FLOTTA-VIVA)
 	for (int32 k = 0; k < AstraWar::NumSystems; ++k)
 	{
@@ -823,7 +860,7 @@ void UAstraBattleSubsystem::OnSectionGutted(FAstraBattleShip& S, int32 Sec)
 	// the hull may break apart at the gutted section (a few seconds' warning): rarely at the first, likely at the second, and
 	// surely at the third (the middle holds the rest together, so it is likelier to let go). The Aquila never does: her end
 	// is the reactor's.
-	static AstraWar::FTuneVar KP1(TEXT("breakup_p1"), 0.25f), KP2(TEXT("breakup_p2"), 0.7f);
+	static AstraWar::FTuneVar KP1(TEXT("breakup_p1"), 0.15f), KP2(TEXT("breakup_p2"), 0.6f);
 	int32 Gutted = 0;
 	for (int32 s = 0; s < AstraWar::NumSections; ++s)
 	{
@@ -850,6 +887,7 @@ void UAstraBattleSubsystem::DisableShip(FAstraBattleShip& S, const TCHAR* Why)
 		return;
 	}
 	const bool bWasCommander = S.Side == EAstraSide::Mandate && S.bHostile && MandateCommander() == S.ContactId;
+	NoteKillStats(S, EAstraFate::Disabled);
 	S.bDisabled = true;
 	S.DeathHow = EAstraFate::Disabled;
 	if (FxOn())
@@ -910,6 +948,39 @@ void UAstraBattleSubsystem::DisableShip(FAstraBattleShip& S, const TCHAR* Why)
 void UAstraBattleSubsystem::KillModelShip(FAstraBattleShip& S, EAstraFate How, EAstraHitKind Cause, int32 Section)
 {
 	Destroy(S, Cause, How, (uint8)Section);
+}
+
+void UAstraBattleSubsystem::NoteKillStats(const FAstraBattleShip& S, EAstraFate How)
+{
+	const int32 Side = AstraSideIdx(S.Side);
+	if (Side < 0 || S.bGhost || S.bFixture)
+	{
+		return;
+	}
+	FAstraWarStats::FKill K;
+	K.T = Time;
+	K.VictimSide = (int8)Side;
+	K.VictimTier = (int8)S.SizeTier;
+	K.bVictimCraft = S.bCraft;
+	K.VictimClass = S.bPlayer ? FName(TEXT("aquila")) : (S.bCraft ? WarCraftKindName(S.CraftKind) : S.ClassKey);
+	K.bFleeing = S.bFleeing;
+	K.Weapon = (uint8)FAstraWarStats::WeaponOf((EAstraHitKind)S.LastHitKind);
+	K.How = (uint8)How;
+	if (const FAstraBattleShip* Killer = S.LastHitBy >= 0 ? FindById(S.LastHitBy) : nullptr)
+	{
+		K.KillerSide = (int8)AstraSideIdx(Killer->Side);
+		K.bKillerAquila = Killer->bPlayer;
+		K.bKillerCraft = Killer->bCraft;
+		K.KillerClass = Killer->bCraft ? WarCraftKindName(Killer->CraftKind) : Killer->ClassKey;
+		K.KillRangeKm = S.LastHitRangeM >= 0.f ? S.LastHitRangeM / 1000.f : (float)(FVector::Dist(Killer->Pos, S.Pos) / 1000.0);
+	}
+	else
+	{
+		K.KillerSide = -1;
+		K.KillerClass = FName(TEXT("unknown"));
+		K.KillRangeKm = S.LastHitRangeM >= 0.f ? S.LastHitRangeM / 1000.f : -1.f;
+	}
+	Stats.NoteKill(K);
 }
 
 // ---------------------------------------------------------------------------------------------- each tick
@@ -977,7 +1048,10 @@ void UAstraBattleSubsystem::TickShields(FAstraBattleShip& S, float Dt)
 	{
 		if (UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>())
 		{
-			Ship->AddHeat((S.Shield - SumBefore) * 0.03f / D.ShieldScale);   // the emitters recharging run hot (halved with the above)
+			static AstraWar::FTuneVar KRechargeHeat(TEXT("recharge_heat"), 0.018f);
+			const float Recharged = (S.Shield - SumBefore) * KRechargeHeat.Get() / D.ShieldScale;   // the emitters recharging run hot
+			Ship->AddHeat(Recharged);
+			HeatBooks.Recharge += Recharged;
 		}
 	}
 }
@@ -1097,33 +1171,65 @@ int32 UAstraBattleSubsystem::BearingBarrels(const FAstraBattleShip& S, EAstraMou
 	return N;
 }
 
-void UAstraBattleSubsystem::FireMounts(FAstraBattleShip& S, FAstraBattleShip& T, double Dist)
+void UAstraBattleSubsystem::FireMounts(FAstraBattleShip& S, FAstraBattleShip& T, double Dist, FFireBudget* Budget)
 {
+	static AstraWar::FTuneVar KRailHeat(TEXT("rail_heat"), 0.24f), KLaserHeat(TEXT("laser_heat"), 0.08f);
 	const float Pwr = FMath::Clamp(PowerFactorOf(S) * S.WeaponPower, 0.25f, 1.5f);
-	const double Tof = Dist / 12000.0;
-	const FVector Local = S.Att.UnrotateVector(T.Pos + T.Vel * Tof - S.Pos).GetSafeNormal();
+	// where the barrels must point: the slugs go to the intercept (a ship fires across its own motion), the beams along the line to the target
+	FVector TPos, TVel;
+	FireSolutionOf(S, T, TPos, TVel);
+	FVector Clean;
+	double Tof = 0.0;
+	SolveIntercept(S, TPos, TVel, 12000.0, Clean, Tof);
+	const FVector LocalRail = S.Att.UnrotateVector(Clean).GetSafeNormal();
+	const FVector LocalBeam = S.Att.UnrotateVector(TPos - S.Pos).GetSafeNormal();
+	UAstraShipSubsystem* Ship = S.bPlayer && GetWorld() ? GetWorld()->GetSubsystem<UAstraShipSubsystem>() : nullptr;
+	int32 Fouled = -1;                                   // is a friend in the line of fire (looked at once, when a rail mount is ready to fire)
 	for (FAstraMount& M : S.Mounts)
 	{
-		if (M.T > 0.f || M.Fit() < 0.2f || !M.CanBear(Local))
+		if (M.T > 0.f || M.Fit() < 0.2f)
 		{
 			continue;
 		}
 		if (M.Kind == EAstraMountKind::Rail)
 		{
-			if (S.RailDamage <= 0.f || Dist >= S.RailRange)
+			if (S.RailDamage <= 0.f || Dist >= S.RailRange || !M.CanBear(LocalRail) || (Budget && Budget->Rail <= 0))
 			{
+				continue;
+			}
+			if (Fouled < 0)
+			{
+				Fouled = LineOfFireFouled(S, TPos) ? 1 : 0;
+			}
+			if (Fouled == 1)
+			{
+				M.T = 0.4f;                              // a ship of its own side is in the line of fire: the mount holds until it is clear
 				continue;
 			}
 			S.LitT = 40.f;                                  // the muzzle flashes and the rails' pulse: every sensor sees it
 			M.T = S.RailCd * M.Cd * FMath::FRandRange(0.8f, 1.2f) / Pwr;
 			for (int32 i = 0; i < M.Barrels; ++i)
 			{
-				FireRail(S, T, (0.0012f + Dist / 30e6) * (S.bJammed ? 3.f : 1.f));
+				FireRail(S, T, 0.f);
+			}
+			if (Budget)
+			{
+				--Budget->Rail;
+			}
+			if (Ship)
+			{
+				HullSound(TEXT("SW_Rail_Fire"), 0.9f, 0.3f);
+				PlayerSinceFired = 0.f;
+				PlayerShotAt = Time;
+				PlayerShotTarget = T.ContactId;
+				Ship->RailgunDraw();                      // the capacitors pull on the ship's power: the lights sag for a moment
+				Ship->AddHeat(KRailHeat.Get() * M.Barrels);   // the capacitors and the barrels dump their heat
+				HeatBooks.Rail += KRailHeat.Get() * M.Barrels;
 			}
 		}
 		else
 		{
-			if (S.LaserDamage <= 0.f || Dist >= S.LaserRange)
+			if (S.LaserDamage <= 0.f || Dist >= S.LaserRange || !M.CanBear(LocalBeam) || (Budget && Budget->Laser <= 0))
 			{
 				continue;
 			}
@@ -1131,6 +1237,18 @@ void UAstraBattleSubsystem::FireMounts(FAstraBattleShip& S, FAstraBattleShip& T,
 			for (int32 i = 0; i < M.Barrels; ++i)
 			{
 				FireLaser(S, T);
+			}
+			if (Budget)
+			{
+				--Budget->Laser;
+			}
+			if (Ship)
+			{
+				PlayerSinceFired = 0.f;
+				PlayerShotAt = Time;
+				PlayerShotTarget = T.ContactId;
+				Ship->AddHeat(KLaserHeat.Get() * M.Barrels);
+				HeatBooks.Laser += KLaserHeat.Get() * M.Barrels;
 			}
 		}
 	}
@@ -1232,4 +1350,46 @@ void UAstraBattleSubsystem::ConsumeDeathEvents(TArray<FAstraDeathEvent>& Out)
 {
 	Out.Append(DeathEvents);
 	DeathEvents.Reset();
+}
+
+void UAstraBattleSubsystem::NoteFightEvent(const FAstraBattleShip& S, FFightEvent::EKind Kind, uint8 Section, uint8 Face, int32 System, const FVector& Pos, float Damage, float Through)
+{
+	FFightEvent E;
+	E.Kind = Kind;
+	E.Time = Time;
+	E.ShipId = S.Id;
+	E.ContactId = S.ContactId;
+	E.Name = S.Name;
+	E.Class = S.ClassKey.IsNone() ? FString() : S.ClassKey.ToString();
+	E.bAstra = S.Side == EAstraSide::Astra;
+	E.bByPlayer = Ships.Num() && S.LastHitBy == Ships[0].Id && !S.bPlayer;
+	E.bKnown = S.bPlayer || S.Side == EAstraSide::Astra || S.Track >= 2;
+	E.Section = Section;
+	E.Face = Face;
+	E.System = System;
+	E.Damage = Damage;
+	E.Through = Through;
+	E.Pos = Pos;
+	if (FightEvents.Num() >= 96)
+	{
+		FightEvents.RemoveAt(0);                      // (nobody is reading: the oldest go)
+	}
+	FightEvents.Add(MoveTemp(E));
+}
+
+void UAstraBattleSubsystem::ConsumeFightEvents(TArray<FFightEvent>& Out)
+{
+	Out.Append(FightEvents);
+	FightEvents.Reset();
+}
+
+UAstraBattleSubsystem::FPlayerFireState UAstraBattleSubsystem::GetPlayerFireState() const
+{
+	FPlayerFireState F;
+	F.ShotTarget = PlayerShotTarget;
+	F.ShotAgeS = FMath::Max(0.f, Time - PlayerShotAt);
+	F.bFiringNow = F.ShotAgeS < 2.5f;
+	F.HitTarget = PlayerHitTarget;
+	F.HitAgeS = FMath::Max(0.f, Time - PlayerHitAt);
+	return F;
 }

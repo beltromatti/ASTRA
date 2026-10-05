@@ -1,0 +1,5905 @@
+{
+ "session": "s2",
+ "start": "2026-10-05T00:19:56",
+ "duration_s": 2560.42,
+ "captain": [
+  {
+   "t": 129.14,
+   "text": "cosa è l'aurelia arsenal?",
+   "lang": "it",
+   "how": "typed",
+   "reply": {
+    "first_s": 0.89,
+    "total_s": 1.14,
+    "lines": [
+     [
+      "xo",
+      "È il cantiere orbitale di Aurelia, Capitano: infrastruttura ASTRA, sessantuno chilometri a bearing zero-zero-sette, dove ci hanno costruito e ci riparano."
+     ],
+     [
+      "xo",
+      "Nessuna arma, scudi a zero, equipaggio civile: se qualcuno arriva in forze, è il primo bersaglio del sistema e noi siamo l'unica scorta qui."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 195.65,
+   "text": "Portiamoci sulla Lethe.",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 0.96,
+    "total_s": 0.96,
+    "lines": [
+     [
+      "helm",
+      "Prua sulla Lethe, tengo dieci chilometri, tutta forza: la porto in portata dei railgun."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 212.45,
+   "text": "Voglio sapere perché i droni sono stati lanciati senza il mio consenso.",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 0.78,
+    "total_s": 1.06,
+    "lines": [
+     [
+      "flight",
+      "Capitano, i droni sono a bordo, dodici in hangar: ho lanciato solo Alpha, otto Falcon, in CAP."
+     ],
+     [
+      "xo",
+      "Il lancio l'ho lasciato fare io, Capitano: la Lethe corre su Brightwater e la CAP è coperta mentre ci portiamo su di lei."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 238.38,
+   "text": "Voglio Alfa e bravo che inseguono la Lethe.",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 1.1,
+    "total_s": 1.37,
+    "lines": [
+     [
+      "flight",
+      "Alpha e Bravo in caccia sulla Lethe: Alpha è già in volo, Bravo lanciato adesso, sette Hammer."
+     ],
+     [
+      "tactical",
+      "Capitano, la Lethe è a sessantuno chilometri e i Falcon arrivano prima di noi: se la colpiscono, il Mandate saprà che ci siamo."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 263.02,
+   "text": "Timoniere è tutta velocità sulla Lethe più veloce.",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 0.94,
+    "total_s": 1.18,
+    "lines": [
+     [
+      "helm",
+      "Già tutta forza sulla Lethe, Capitano: quattrocentottanta metri al secondo, sto virando su due-tre-sei, tengo dieci chilometri."
+     ],
+     [
+      "xo",
+      "Capitano, la Lethe è ferma a sessantaquattro chilometri: non la prendiamo, e tra un minuto il Gate ci mette tre navi alle spalle."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 309.96,
+   "text": "Dove sono le altre navi nemiche? Non le vedo sullo schermo olografico.",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 0.75,
+    "total_s": 1.28,
+    "lines": [
+     [
+      "sensors",
+      "Capitano, l'unico contatto ostile tracciato è la Lethe, a cinquantacinque virgola cinque chilometri su bearing due-cinque-quattro."
+     ],
+     [
+      "sensors",
+      "Le tre navi del Gate sono ancora in transito, non sono in Aurelia: le vedremo quando usciranno, tra un minuto circa."
+     ],
+     [
+      "ops",
+      "Sullo schermo ho la Lethe, Capitano: se vuole, ci metto anche il Gate e la zona d'uscita."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 353.33,
+   "text": "Ritirate immediatamente Alfa e Bravo a bordo, virate la nave verso la squadra mandate.",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 1.61,
+    "total_s": 1.73,
+    "lines": [
+     [
+      "flight",
+      "Alpha e Bravo richiamati: rientrano tutti, otto Falcon e sette Hammer, appontaggio in corso."
+     ],
+     [
+      "helm",
+      "Prua sull'Acheron, rotta zero-cinque-se"
+     ]
+    ]
+   }
+  },
+  {
+   "t": 401.32,
+   "text": "Apritemi un canale con il solmo.",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 0.97,
+    "total_s": 0.97,
+    "lines": [
+     [
+      "comms",
+      "Canale aperto con l'Acheron, Capitano: parla pure, l'Archon Solm ascolta."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 418.38,
+   "text": "Solm, vi diamo la possibilità di arrendervi. Siete nello spazio della nostra federazione, andate via ora e non verrete distrutti. Questa è guerra.",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 0.87,
+    "total_s": 0.87,
+    "lines": [
+     [
+      "xo",
+      "Capitano, il canale è aperto e le sue parole sono andate all'Acheron: aspettiamo la risposta di Solm."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 481.19,
+   "text": "Alarmerosso.",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 0.95,
+    "total_s": 1.28,
+    "lines": [
+     [
+      "xo",
+      "Allarme rosso, Capitano: posti di combattimento, tutti ai propri posti."
+     ],
+     [
+      "tactical",
+      "Quattro Mandate a trentatré chilometri, l'Acheron jamma ancora: railgun senza soluzione finché non ho un cross-fix o un ping."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 513.4,
+   "text": "Fuoco o volontà sul plegeton timoniere portaci sul plegeton.",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 2.21,
+    "total_s": 2.43,
+    "lines": [
+     [
+      "tactical",
+      "Fuoco a volontà, Capitano: ostili in portata entro dieci chilometri, il Phlegethon è a quattordici virgola nove."
+     ],
+     [
+      "helm",
+      "Prua sul Phlegethon, tengo dieci chilometri, tutta forza: la porto io in portata."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 538.16,
+   "text": "Timoniere portaci più vicino a quattro chilometri, continua ad inseguirlo attivamente.",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 0.93,
+    "total_s": 0.93,
+    "lines": [
+     [
+      "helm",
+      "Prua sul Phlegethon, tengo quattro chilometri, tutta forza: la porto io in portata dei laser."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 757.03,
+   "text": "Timoniere, portaci verso i nemici.",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 1.79,
+    "total_s": 1.79,
+    "lines": [
+     [
+      "helm",
+      "Prua sul gruppo mandate, tengo dieci chilometri, tutta forza: la Nyx è a trentanove virgola sette."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 769.09,
+   "text": "Voglio fuoco o volontà su tutti gli ostili istantaneamente.",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 1.19,
+    "total_s": 1.19,
+    "lines": [
+     [
+      "tactical",
+      "Fuoco su tutti gli ostili, Capitano: la Moros a quattordici virgola sei è la prima, poi la Keres, i nuovi compresi."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 775.02,
+   "text": "Alfa e Bravo fuori puntati nemici.",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 1.11,
+    "total_s": 1.12,
+    "lines": [
+     [
+      "flight",
+      "Alpha e Bravo lanciati, Capitano: otto Falcon e sette Hammer sulla Moros, dodici virgola tre chilometri."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 803.35,
+   "text": "Timoniere a velocità massima contro i nemici rimasti.",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 1.02,
+    "total_s": 1.02,
+    "lines": [
+     [
+      "helm",
+      "Prua sul gruppo mandate, tengo dieci chilometri, tutta forza: la Nyx è a trentadue virgola due."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 810.35,
+   "text": "Droni, Alfa e Bravo sui nemici rimasti subito.",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 1.57,
+    "total_s": 1.58,
+    "lines": [
+     [
+      "flight",
+      "Dodici Wasp, otto Falcon e sette Hammer lanciati sulla Tartarus, Capitano: trentuno chilometri, la portano in portata."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 817.91,
+   "text": "Voglio foca volontad.",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 0.85,
+    "total_s": 0.85,
+    "lines": [
+     [
+      "tactical",
+      "Fuoco a volontà già in corso su tutti gli ostili, Capitano: la Tartarus a trenta chilometri, railgun assegnati, aprono da soli a dieci."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 914.88,
+   "text": "Simoniere, portaci verso il resto della flotta.",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 1.27,
+    "total_s": 1.27,
+    "lines": [
+     [
+      "helm",
+      "Rientro in formazione col Main Body, in coda al Valiant a tre chilometri: rotta due-tre-cinque, tutta forza."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 924.97,
+   "text": "Grazie, ora voglio che portate Alfa Bravo i droni a bordo.",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 1.53,
+    "total_s": 1.53,
+    "lines": [
+     [
+      "flight",
+      "Richiamo Alpha, Bravo e i droni, Capitano: otto Falcon, tre Hammer e dodici Wasp rientrano, la Tartarus a trentotto chilometri."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 1007.8,
+   "text": "Alarme verde",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 0.99,
+    "total_s": 0.99,
+    "lines": [
+     [
+      "xo",
+      "Alarme verde, Capitano: si rientra dai posti di combattimento, ma i sei ostili in ritirata restano in traccia."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 1049.38,
+   "text": "Dov'è la mia arma?",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 0.97,
+    "total_s": 0.97,
+    "lines": [
+     [
+      "xo",
+      "Capitano, lei non porta nulla: il fucile AR-181 e la pistola M27S sono nella rastrelliera dell'armeria dei marine, deck otto, e una M27S è nell'armadietto del suo Ready Room, deck uno. L'armaiolo Zaman può portarle quello che vuole."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 1077.76,
+   "text": "Mi serve sia fucile che pistola qua a bordo subito.",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 0.85,
+    "total_s": 1.39,
+    "lines": [
+     [
+      "xo",
+      "Capitano, l'armaiolo Zaman sale dall'armeria dei marine con fucile e pistola: sessantotto secondi, glieli mette in mano dove si trova."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 1099.09,
+   "text": "Voglio parare con l'ammiraglio.",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 1.19,
+    "total_s": 1.19,
+    "lines": [
+     [
+      "comms",
+      "Capitano, la rete di flotta è aperta: dica pure, l'ammiraglio Rourke è in ascolto."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 1101.95,
+   "text": "la rete di",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 0.75,
+    "total_s": 0.75,
+    "lines": [
+     [
+      "comms",
+      "Capitano, la rete di flotta è aperta e l'ammiraglio Rourke è in ascolto: dica pure."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 1128.66,
+   "text": "Ammiraglio, chiedo il permesso di andare a Toul con tutto il grosso della flotta e affrontarli e vincere la guerra.",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 0.77,
+    "total_s": 0.77,
+    "lines": [
+     [
+      "comms",
+      "Capitano, il suo messaggio è passato all'ammiraglio Rourke sulla rete di flotta: chiede il permesso di andare a Thule con tutto il grosso e affrontarli."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 1185.07,
+   "text": "Ammiraglio Ruth, mi senti?",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 0.87,
+    "total_s": 0.87,
+    "lines": [
+     [
+      "comms",
+      "Capitano, la rete di flotta è aperta e l'ammiraglio Rourke è in ascolto: il suo messaggio è già passato, attendiamo la sua risposta."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 1199.84,
+   "text": "Su quale nave è l'ammiraglio?",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 0.91,
+    "total_s": 0.91,
+    "lines": [
+     [
+      "comms",
+      "Capitano, il vice ammiraglio Rourke comanda la Settima Flotta da lontano, non da una nave qui: sulla rete risponde lui, e il gruppo più vicino è il Main Body del Valiant, a cinque virgola otto chilometri."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 1216.14,
+   "text": "Allora mettimi in contatto col capitano del Valiant.",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 0.92,
+    "total_s": 0.92,
+    "lines": [
+     [
+      "comms",
+      "Capitano, canale aperto col Valiant: il capitano Sorensen è in linea."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 1245.33,
+   "text": "Voglio andare a Toul portando tutto il main body e tutte le navi dell'Aleanza per andare a stanare i nemici nella loro base e riprenderci il sistema. Chiedo il vostro supporto pieno nell'operazione.",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 1.55,
+    "total_s": 1.55,
+    "lines": [
+     [
+      "xo",
+      "Capitano, il canale col Valiant è aperto: Sorensen ascolta. Ma le ricordo che a Thule il Mandate tiene diciotto navi contro le nostre dodici, e che l'ordine di lasciare Aurelia non è mio né suo: è dell'ammiraglio Rourke."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 1312.42,
+   "text": "Voglio vedere sullo schermo il V63.",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 2.17,
+    "total_s": 2.17,
+    "lines": [
+     [
+      "ops",
+      "Capitano, schermo principale sulla sezione di prua del Keres, tredici virgola sette chilometri, ingrandita al massimo."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 1338.05,
+   "text": "Come sono messi i Marin?",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 1.0,
+    "total_s": 1.0,
+    "lines": [
+     [
+      "xo",
+      "Capitano, i marine stanno bene: settantasei pronti a partire, nessun ferito, e i due Kestrel sono liberi nel ponte di lancio, deck otto. L'armaiolo Zaman le ha già messo in mano fucile e pistola."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 1390.9,
+   "text": "Rourke, penso di disapprovare questo ordine, perché abbiamo la forza militare per distruggerli. Siamo meno numericamente, ma le nostre navi sono molto più potenti. Chiedo il permesso di guidare tutta la flotta, il main body e le mie navi contro Toul per la resa dei conti finale.",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 1.21,
+    "total_s": 1.21,
+    "lines": [
+     [
+      "xo",
+      "Capitano, il canale col Valiant è aperto, non con Rourke: se vuole che l'ammiraglio senta questo, Martin deve passarlo sulla rete di flotta. E le ricordo che a Thule sono diciotto contro le nostre dodici, con altri cinque scafi entrati in tre gruppi."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 1405.9,
+   "text": "Martin, passa questo messaggio che ti ho appena dato sulla rete di flotta.",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 1.14,
+    "total_s": 1.14,
+    "lines": [
+     [
+      "comms",
+      "Capitano, messaggio passato sulla rete di flotta all'ammiraglio Rourke: la sua richiesta di guidare tutto il grosso su Thule per la resa dei conti."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 1478.08,
+   "text": "Possiamo preparare un abbordaggio su qualche nave che abbiamo a schermo?",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 1.09,
+    "total_s": 1.1,
+    "lines": [
+     [
+      "tactical",
+      "Capitano, ora no: l'unico scafo ostile a schermo è la Tartarus, a settantasette chilometri, e i Kestrel non arrivano oltre qualche chilometro. L'unica nave ferma e vicina è la Resolve, ma è nostra e senza energia: non si abborda un relitto amico."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 1525.59,
+   "text": "Rourg, chiedo il permesso di portare solo la mia nave dall'altra parte del gate in avance coperta di queste diciotto navi. Provo ad attirarle verso Aurelia. non apro il fuoco.",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 1.53,
+    "total_s": 1.53,
+    "lines": [
+     [
+      "comms",
+      "Capitano, richiesta passata sulla rete: solo l'Aquila oltre il Gate di Thule, in avanscoperta coperta, senza aprire il fuoco."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 1625.47,
+   "text": "Riportate lo schermo a visualizzazione normale.",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 1.18,
+    "total_s": 1.18,
+    "lines": [
+     [
+      "ops",
+      "Capitano, schermo principale tornato alla visualizzazione normale: inquadratura automatica sulla rotta, nessun bersaglio fisso."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 1677.66,
+   "text": "Bene, signori, vi dirò una cosa. Adesso parla il capitano alla nave. Noi abbiamo ricevuto l'ordine di non andare a Tool. Io voglio però dare dei preziosi dati alla nostra flotta. Noi dobbiamo farci avanti, avere la forza di riuscire. In questa operazione difficile noi non apriremo fuoco, manderemo droni e utilizzeremo radar per capire l'entità della flotta nemica e torneremo ad Aurelia in modo da dare alla flotta delle preziose informazioni. Preparatevi.",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 1.29,
+    "total_s": 2.11,
+    "lines": [
+     [
+      "xo",
+      "Capitano, l'ordine dell'ammiraglio è di restare al Gate, e questo lo porta di là: lo eseguo, ma lo metto a verbale come suo. Vuole che Martin lo annunci sulla rete di flotta prima che il Gate canti?"
+     ],
+     [
+      "sensors",
+      "Capitano, in avanscoperta tengo EMCON ristretto e radar passivo: un ping attivo a Thule ci accende come un faro a sessanta chilometri. I droni leggono i nomi sugli scafi, quello sì."
+     ],
+     [
+      "helm",
+      "Capitano, rotta per il Gate di Thule, zero-sette-cinque, cinquantasei virgola sette chilometri: mi dia l'ordine e ci porto dentro."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 1705.25,
+   "text": "Martin annuncia sulla flotta il mio ordine.",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 4.27,
+    "total_s": 4.27,
+    "lines": [
+     [
+      "comms",
+      "Capitano, annuncio passato sulla rete di flotta a tutte le navi: l'Aquila passa il Gate di Thule in avanscoperta coperta, senza aprire il fuoco, e torna con i dati."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 1743.93,
+   "text": "Perfetto, signori allarme rosso.",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 0.87,
+    "total_s": 0.87,
+    "lines": [
+     [
+      "xo",
+      "Capitano, allarme rosso su tutta la nave: posti di combattimento, compartimenti stagni chiusi, duecentosei uomini in postazione. La nave è sua."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 1752.26,
+   "text": "Simoniere, portaci a Tool.",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 1.49,
+    "total_s": 1.49,
+    "lines": [
+     [
+      "helm",
+      "Capitano, rotta uno-sei-sette sul Janus Gate, sessanta virgola cinque chilometri, tutta forza: ci arrivo in circa quattro minuti. Il passaggio lo comando io solo al suo ordine."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 1774.51,
+   "text": "Voglio sapere gli armamenti che abbiamo e tutto quello che c'è a bordo.",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 1.97,
+    "total_s": 1.97,
+    "lines": [
+     [
+      "xo",
+      "Capitano, le armi: quattro torri binate di railgun, gittata dieci chilometri, una salva ogni sette secondi; dodici batterie laser a quattro chilometri; due lanciatori VLS con sessanta missili, otto per salva, venticinque chilometri; due tubi lanciasiluri; ventiquattro postazioni di difesa ravvicinata in automatico; sei decoy a bordo, due per lancio. Scudi su, cento per cento, sei settori. A bordo: quattrocentoventi di equipaggio, sessanta piloti, ottanta marine, e lei al comando. Alpha otto Falcon, Bravo sette Hammer, dodici droni Wasp, tutti a bordo pronti. Due Kestrel liberi con settantasei marine pronti a partire. Scafo novantotto per cento, calore quattro, reattore settantotto, nessun ferito, nessun danno."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 1842.83,
+   "text": "Teletrasporto dai Marin per vedere se sono pronti ad un arrembaggio.",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 1.34,
+    "total_s": 1.34,
+    "lines": [
+     [
+      "xo",
+      "Capitano, ho girato la domanda alla Ostrander sulla sua richiesta: i marine sono settantasei, pronti, e i due Kestrel liberi. Ma un arrembaggio si fa coi Kestrel, non col teletrasporto: la Ostrander le dirà lei cosa può passare."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 1872.28,
+   "text": "No, teletrasportatemi nella sala dei Kestrel.",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 1.03,
+    "total_s": 1.03,
+    "lines": [
+     [
+      "xo",
+      "Capitano, ho passato l'ordine alla Ostrander: lei, dalla plancia al ponte dei Kestrel, deck otto. La conferma è sua."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 1898.37,
+   "text": "Teletransportor",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 0.73,
+    "total_s": 0.74,
+    "lines": [
+     [
+      "xo",
+      "Capitano, la Ostrander ha già il suo ordine: lei dalla plancia al ponte dei Kestrel, deck otto. La conferma è sua, non mia."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 1911.52,
+   "text": "Chiamala di nuovo.",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 0.96,
+    "total_s": 0.97,
+    "lines": [
+     [
+      "xo",
+      "Capitano, ordine ripassato alla Ostrander: lei dalla plancia al ponte dei Kestrel, deck otto. La conferma è sua."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 1930.09,
+   "text": "Teletrasportatemi subito al deck otto dai Chestrel.",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 0.77,
+    "total_s": 0.77,
+    "lines": [
+     [
+      "xo",
+      "Capitano, ordine passato alla Ostrander: lei dalla plancia al ponte dei Kestrel, deck otto. La conferma è sua."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 1961.96,
+   "text": "Esiste su registro una sala dei Marins?",
+   "lang": "it",
+   "how": "voice",
+   "reply": null
+  },
+  {
+   "t": 1972.89,
+   "text": "Ostrangger, teletransportami nella sala de marin.",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 1.03,
+    "total_s": 1.03,
+    "lines": [
+     [
+      "xo",
+      "Capitano, ordine alla Ostrander: lei dal ponte di volo all'armeria dei marine, deck otto. La conferma è sua."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 1995.21,
+   "text": "Mi dica cosa si può fare.",
+   "lang": "it",
+   "how": "voice",
+   "reply": null
+  },
+  {
+   "t": 2023.68,
+   "text": "Insomma, come faccio ad andare dai kestrel e equipaggio? Datemi subito una risposta.",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 1.41,
+    "total_s": 1.42,
+    "lines": [
+     [
+      "xo",
+      "Capitano, lei è già sul ponte di volo, deck nove, sezione B: da lì i Kestrel del ponte otto si raggiungono a piedi, per la scaletta di poppa, due minuti. Il fascio non arriva al ponte otto, è schermato: se vuole, la Ostrander la porta al ponte nove e da lì scende lei."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 2078.14,
+   "text": "Teletrasportatemi dai miei orologi.",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 0.89,
+    "total_s": 0.89,
+    "lines": [
+     [
+      "xo",
+      "Capitano, non ho capito \"i miei orologi\": se intende i suoi piloti, sono sul ponte di volo dove lei è già; se intende altro, me lo dica per nome e passo l'ordine alla Ostrander."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 2083.16,
+   "text": "Teletrasportatemi dai miei alloggi.",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 1.01,
+    "total_s": 1.01,
+    "lines": [
+     [
+      "xo",
+      "Capitano, ordine alla Ostrander: lei dal ponte di volo ai suoi alloggi, deck uno. La conferma è sua."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 2155.66,
+   "text": "Marines ci siamo?",
+   "lang": "it",
+   "how": "voice",
+   "reply": null
+  },
+  {
+   "t": 2178.85,
+   "text": "Come siamo messi?",
+   "lang": "it",
+   "how": "voice",
+   "reply": null
+  },
+  {
+   "t": 2188.95,
+   "text": "Mi sai dire dove posso trovare i Kestrel?",
+   "lang": "it",
+   "how": "voice",
+   "reply": null
+  },
+  {
+   "t": 2322.83,
+   "text": "Perché continuano a ripetermi la stessa cosa?",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 1.0,
+    "total_s": 1.01,
+    "lines": [
+     [
+      "comms",
+      "Capitano, è il Dalca dell'Intrepid: si sta portando sulla linea di schermo a quattro virgola cinque chilometri e ripete il suo rapporto a ogni chilometro, come gli hanno ordinato. Non è un guasto, è la sua procedura."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 2338.82,
+   "text": "Teletrasporto nei miei alloggi ora.",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 0.84,
+    "total_s": 0.84,
+    "lines": [
+     [
+      "chief",
+      "Capitano, lei è già nei suoi alloggi: la Ostrander l'ha portata lì otto minuti fa, e il fascio non ripete un viaggio che è già fatto. Se vuole tornare in plancia, quello sì lo faccio fare subito."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 2356.95,
+   "text": "Voglio andare subito in me alloggi, teletrasporto.",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 0.86,
+    "total_s": 0.86,
+    "lines": [
+     [
+      "xo",
+      "Capitano, lei è già nei suoi alloggi, deck uno, sezione A: la Ostrander l'ha portata lì otto minuti fa, arrivo pulito. Non c'è nulla da teletrasportare: se vuole tornare in plancia, quello lo faccio fare subito."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 2363.34,
+   "text": "Non sono più nei miei alloggi, sono andato al decotto.",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 0.93,
+    "total_s": 0.93,
+    "lines": [
+     [
+      "xo",
+      "Capitano, il locatore la dà nella spina, deck otto, sezione F: è già al ponte dei marine, dove stanno i Kestrel. Da lì l'armeria è a poppa, trenta passi."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 2403.55,
+   "text": "Ehi, teletrasportatemi subito nei miei alloggi.",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 1.99,
+    "total_s": 1.99,
+    "lines": [
+     [
+      "xo",
+      "Capitano, lei è già nei suoi alloggi, deck uno sezione A: la Ostrander l'ha portata lì otto minuti fa, arrivo pulito. Il locatore la dà nella spina, deck otto sezione E, dai marine: se vuole gli alloggi, la porto io con la sua parola."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 2413.26,
+   "text": "No, serra, io non sono nei miei alloggi, sono al deck otto, voglio teletrasporto ora nei miei alloggi.",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 0.93,
+    "total_s": 0.93,
+    "lines": [
+     [
+      "xo",
+      "Capitano, ordine alla Ostrander: lei dal deck otto, sezione E, ai suoi alloggi, deck uno. La conferma è sua."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 2441.26,
+   "text": "E tu che sei?",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 0.97,
+    "total_s": 0.97,
+    "lines": [
+     [
+      "xo",
+      "Capitano, sono Serra, comandante in seconda: lei è nel corridoio uno-a di tribordo, deck uno, e la nave è mia finché non torna in plancia. Vuole che la riporti al suo posto?"
+     ]
+    ]
+   }
+  },
+  {
+   "t": 2455.17,
+   "text": "Capitano in plancia.",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 1.21,
+    "total_s": 1.21,
+    "lines": [
+     [
+      "xo",
+      "Capitano, ben tornato. Nave in rotta uno-sei-sette verso il Gate, tutta forza, quattrocentottanta metri al secondo, allarme rosso, scafo novantotto, calore trentuno, nessun contatto ostile sul plot. Il Main Body, Constance e il picket si sono messi in schermo sulla nostra scia a quattro virgola cinque chilometri. L'unica cosa che conta: il Gate di Thule è a duecentosettanta chilometri, e di là diciotto navi."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 2481.97,
+   "text": "Timoniere portaci a Tool ora.",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 2.21,
+    "total_s": 2.21,
+    "lines": [
+     [
+      "helm",
+      "Capitano, rotta tre-quattro-cinque, marca più sei, sul Janus Gate, tutta forza: duecentottantuno virgola due chilometri, ci arrivo in circa dieci minuti. Il passaggio lo comando io solo al suo ordine."
+     ]
+    ]
+   }
+  },
+  {
+   "t": 2514.22,
+   "text": "Ma come abbiamo fatto a finire così lontani dal Janus Gate? io ti avevo già detto di andarci e timonire?",
+   "lang": "it",
+   "how": "voice",
+   "reply": {
+    "first_s": 0.99,
+    "total_s": 0.99,
+    "lines": [
+     [
+      "helm",
+      "Capitano, la colpa è mia: la prima rotta che le ho dato, uno-sei-sette, era sbagliata, e in dieci minuti ci ha portati a duecentottanta chilometri dal Gate. Ora sto già virando su tre-quattro-cinque, marca più sei: il Gate è a duecentonovantaquattro virgola cinque, ci arrivo in circa dieci minuti a tutta forza."
+     ]
+    ]
+   }
+  }
+ ],
+ "producers": [
+  {
+   "t": 61.45,
+   "kind": "report",
+   "speaker": "xo",
+   "text": "Capitano, siamo in rotta verso l'orbita alta di New Ravenna, in pattuglia con il picket della 7th Fleet: Praetorian a quattro virgola tre chilometri, Vigilant a due virgola otto.",
+   "urgent": false
+  },
+  {
+   "t": 61.95,
+   "kind": "report",
+   "speaker": "xo",
+   "text": "Il sistema è calmo, otto contatti tutti tracciati; l'unico che non mi piace è T-11, a trentuno chilometri, deriva a motore freddo e non identificato.",
+   "urgent": false
+  },
+  {
+   "t": 130.14,
+   "kind": "answer",
+   "speaker": "xo",
+   "text": "È il cantiere orbitale di Aurelia, Capitano: infrastruttura ASTRA, sessantuno chilometri a bearing zero-zero-sette, dove ci hanno costruito e ci riparano.",
+   "urgent": false
+  },
+  {
+   "t": 131.04,
+   "kind": "answer",
+   "speaker": "xo",
+   "text": "Nessuna arma, scudi a zero, equipaggio civile: se qualcuno arriva in forze, è il primo bersaglio del sistema e noi siamo l'unica scorta qui.",
+   "urgent": false
+  },
+  {
+   "t": 147.87,
+   "kind": "report",
+   "speaker": "sensors",
+   "text": "T-11 è una fregata Lethe del Mandate, in accelerazione su Brightwater: cinquantatré chilometri, non ci ha ancora visti.",
+   "urgent": false
+  },
+  {
+   "t": 148.37,
+   "kind": "report",
+   "speaker": "xo",
+   "text": "Capitano, la Lethe va sui civili: propongo di portarci in rotta d'intercetto con la prua su di lei, standoff dieci chilometri.",
+   "urgent": false
+  },
+  {
+   "t": 189.75,
+   "kind": "report",
+   "speaker": "sensors",
+   "text": "T-11 tiene la prua su Brightwater, quarantanove virgola otto chilometri: la tengo in traccia focalizzata.",
+   "urgent": false
+  },
+  {
+   "t": 196.62,
+   "kind": "answer",
+   "speaker": "helm",
+   "text": "Prua sulla Lethe, tengo dieci chilometri, tutta forza: la porto in portata dei railgun.",
+   "urgent": false
+  },
+  {
+   "t": 213.27,
+   "kind": "answer",
+   "speaker": "flight",
+   "text": "Capitano, i droni sono a bordo, dodici in hangar: ho lanciato solo Alpha, otto Falcon, in CAP.",
+   "urgent": false
+  },
+  {
+   "t": 214.17,
+   "kind": "answer",
+   "speaker": "xo",
+   "text": "Il lancio l'ho lasciato fare io, Capitano: la Lethe corre su Brightwater e la CAP è coperta mentre ci portiamo su di lei.",
+   "urgent": false
+  },
+  {
+   "t": 226.16,
+   "kind": "report",
+   "speaker": "helm",
+   "text": "La Lethe ha virato e ci sta aprendo: cinquantasette chilometri, la inseguo e chiudo.",
+   "urgent": false
+  },
+  {
+   "t": 239.48,
+   "kind": "answer",
+   "speaker": "flight",
+   "text": "Alpha e Bravo in caccia sulla Lethe: Alpha è già in volo, Bravo lanciato adesso, sette Hammer.",
+   "urgent": false
+  },
+  {
+   "t": 240.38,
+   "kind": "answer",
+   "speaker": "tactical",
+   "text": "Capitano, la Lethe è a sessantuno chilometri e i Falcon arrivano prima di noi: se la colpiscono, il Mandate saprà che ci siamo.",
+   "urgent": false
+  },
+  {
+   "t": 251.72,
+   "kind": "report",
+   "speaker": "sensors",
+   "text": "La Lethe ci sta allargando: sessantatré chilometri e in aumento, tiene la prua su Brightwater.",
+   "urgent": false
+  },
+  {
+   "t": 261.82,
+   "kind": "report",
+   "speaker": "comms",
+   "text": "Capitano, il Gate di Aurelia sta ciclando: circa tre navi del Mandate, un Acheron e due Styx, in arrivo tra un minuto e dieci.",
+   "urgent": false
+  },
+  {
+   "t": 262.32,
+   "kind": "report",
+   "speaker": "xo",
+   "text": "Sono a cinquantanove chilometri dal Gate e ci metteranno due minuti a raggiungerci: la Lethe davanti, una forza dietro.",
+   "urgent": false
+  },
+  {
+   "t": 263.96,
+   "kind": "answer",
+   "speaker": "helm",
+   "text": "Già tutta forza sulla Lethe, Capitano: quattrocentottanta metri al secondo, sto virando su due-tre-sei, tengo dieci chilometri.",
+   "urgent": false
+  },
+  {
+   "t": 264.86,
+   "kind": "answer",
+   "speaker": "xo",
+   "text": "Capitano, la Lethe è ferma a sessantaquattro chilometri: non la prendiamo, e tra un minuto il Gate ci mette tre navi alle spalle.",
+   "urgent": false
+  },
+  {
+   "t": 279.65,
+   "kind": "net",
+   "speaker": "castellan",
+   "text": "Aquila, Praetorian: chiudo su di voi e vi metto il picket attorno. Se ",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 297.38,
+   "kind": "report",
+   "speaker": "sensors",
+   "text": "La Lethe ha virato su due-cinque-zero e ci sta chiudendo: cinquantanove chilometri, la traccia tiene.",
+   "urgent": false
+  },
+  {
+   "t": 310.71,
+   "kind": "answer",
+   "speaker": "sensors",
+   "text": "Capitano, l'unico contatto ostile tracciato è la Lethe, a cinquantacinque virgola cinque chilometri su bearing due-cinque-quattro.",
+   "urgent": false
+  },
+  {
+   "t": 311.61,
+   "kind": "answer",
+   "speaker": "sensors",
+   "text": "Le tre navi del Gate sono ancora in transito, non sono in Aurelia: le vedremo quando usciranno, tra un minuto circa.",
+   "urgent": false
+  },
+  {
+   "t": 312.51,
+   "kind": "answer",
+   "speaker": "ops",
+   "text": "Sullo schermo ho la Lethe, Capitano: se vuole, ci metto anche il Gate e la zona d'uscita.",
+   "urgent": false
+  },
+  {
+   "t": 325.98,
+   "kind": "net",
+   "speaker": "castellan",
+   "text": "Aquila, Praetorian: quattro contatti oltre il Gate — un incrociatore Acheron e tre caccia Styx, più la Lethe a 49 chilometri. Il picket resta in schermo su di voi; quando arrivano li prendiamo a 4,5 chilometri, fuori portata laser.",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 338.74,
+   "kind": "net",
+   "speaker": "bravo_lead",
+   "text": "Bravo Lead: sei siluri in acqua sulla Lethe, i camion rientrano.",
+   "urgent": false,
+   "answer": false,
+   "via": "net"
+  },
+  {
+   "t": 342.29,
+   "kind": "enemy",
+   "speaker": "cmdr_t40",
+   "name": "Archon Varek Solm",
+   "text": "Capitano, qui parla l'Archon Varek Solm, del Kharon Mandate. Ho quattro vascelli in avvicinamento alla vostra ultima posizione nota: vi troverò, e la distanza la scelgo io. Vi offro una scelta, e la offro una volta sola: spegnete i motori, abbassate gli scudi, e le vostre vite sono salve.",
+   "answer": false,
+   "urgent": false
+  },
+  {
+   "t": 342.98,
+   "kind": "report",
+   "speaker": "xo",
+   "text": "Capitano, la Lethe è distrutta e l'Acheron con tre Styx è a ottantacinque chilometri: l'Archon ci offre la resa, e la scelta è sua.",
+   "urgent": false
+  },
+  {
+   "t": 353.92,
+   "kind": "net",
+   "speaker": "bravo_lead",
+   "text": "Bravo Lead: sei siluri in acqua sulla Lethe, i camion rientrano.",
+   "urgent": false,
+   "answer": false,
+   "via": "net"
+  },
+  {
+   "t": 354.96,
+   "kind": "answer",
+   "speaker": "flight",
+   "text": "Alpha e Bravo richiamati: rientrano tutti, otto Falcon e sette Hammer, appontaggio in corso.",
+   "urgent": false
+  },
+  {
+   "t": 355.86,
+   "kind": "answer",
+   "speaker": "helm",
+   "text": "Prua sull'Acheron, rotta zero-cinque-se",
+   "urgent": false
+  },
+  {
+   "t": 385.95,
+   "kind": "other",
+   "speaker": "bravo_lead",
+   "text": "Bravo Lead: quattro siluri in acqua sulla Lethe, i camion rientrano.",
+   "urgent": false,
+   "answer": false
+  },
+  {
+   "t": 388.06,
+   "kind": "report",
+   "speaker": "tactical",
+   "text": "Quattro Mandate in gruppo a settantasei chilometri, fuori portata: tengo il fuoco di ritorno e gli scudi verso di loro.",
+   "urgent": false
+  },
+  {
+   "t": 399.33,
+   "kind": "net",
+   "speaker": "deck_chief",
+   "text": "Deck: Alpha a bordo, otto su otto. Riarmo in sessanta secondi.",
+   "urgent": false,
+   "answer": false,
+   "via": "net"
+  },
+  {
+   "t": 403.63,
+   "kind": "enemy",
+   "speaker": "cmdr_t40",
+   "name": "Archon Varek Solm",
+   "text": "Capitano, siete un bersaglio solo, e il mio gruppo vi sta già cercando. Non vi chiedo di arrendervi a un nemico che vi odia: vi chiedo di non morire per un silenzio. Spegnete i motori e gli scudi, e risponderò della vostra ciurma come della mia.",
+   "answer": false,
+   "urgent": false
+  },
+  {
+   "t": 403.83,
+   "kind": "answer",
+   "speaker": "comms",
+   "text": "Canale aperto con l'Acheron, Capitano: parla pure, l'Archon Solm ascolta.",
+   "urgent": false
+  },
+  {
+   "t": 420.17,
+   "kind": "enemy",
+   "speaker": "cmdr_t40",
+   "name": "Archon Varek Solm",
+   "text": "Capitano, non chiedo permesso per restare, e non me ne vado da un cancello che ho il dovere di tenere. Ho visto cosa significa essere abbandonati da chi doveva proteggere: non accadrà di nuovo, non sotto il mio comando. Ritiratevi, o spegnete i motori — la terza via la sceglierete voi, ma non sarà lunga.",
+   "answer": false,
+   "urgent": false
+  },
+  {
+   "t": 420.37,
+   "kind": "answer",
+   "speaker": "xo",
+   "text": "Capitano, il canale è aperto e le sue parole sono andate all'Acheron: aspettiamo la risposta di Solm.",
+   "urgent": false
+  },
+  {
+   "t": 427.76,
+   "kind": "net",
+   "speaker": "ally_t44",
+   "text": "Aquila, Constance: siamo a ottantadue chilometri, in avvicinamento per",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 430.81,
+   "kind": "net",
+   "speaker": "ally_t48",
+   "text": "Aquila, Valiant: il Main Body è in tiro sul gruppo del Gate, 3,2 km, fuoco su T-40. Il picket ci copre il davanti; noi chiudiamo dietro di loro.",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 441.33,
+   "kind": "net",
+   "speaker": "deck_chief",
+   "text": "Deck: Bravo sette su sette a bordo, riarmo in novanta secondi.",
+   "urgent": false,
+   "answer": false,
+   "via": "net"
+  },
+  {
+   "t": 446.15,
+   "kind": "report",
+   "speaker": "tactical",
+   "text": "Capitano, l'Acheron ha lanciato quattro Harpy su di noi, la più vicina a cinquantasei chilometri: punto difesa automatico, missili pronti.",
+   "urgent": false
+  },
+  {
+   "t": 459.7,
+   "kind": "net",
+   "speaker": "deck_chief",
+   "text": "Deck: Alpha riarmato, otto Falcon pronti sul ponte.",
+   "urgent": false,
+   "answer": false,
+   "via": "net"
+  },
+  {
+   "t": 474.31,
+   "kind": "net",
+   "speaker": "alpha_lead",
+   "text": "Alpha Lead: un Harpy abbattuto, ne restano tre.",
+   "urgent": false,
+   "answer": false,
+   "via": "net"
+  },
+  {
+   "t": 482.15,
+   "kind": "answer",
+   "speaker": "xo",
+   "text": "Allarme rosso, Capitano: posti di combattimento, tutti ai propri posti.",
+   "urgent": false
+  },
+  {
+   "t": 483.05,
+   "kind": "answer",
+   "speaker": "tactical",
+   "text": "Quattro Mandate a trentatré chilometri, l'Acheron jamma ancora: railgun senza soluzione finché non ho un cross-fix o un ping.",
+   "urgent": false
+  },
+  {
+   "t": 488.59,
+   "kind": "report",
+   "speaker": "xo",
+   "text": "Capitano, l'azione è finita: i Mandate si ritirano, l'Acheron a trentadue chilometri con sei falle e dodici incendi a bordo.",
+   "urgent": false
+  },
+  {
+   "t": 489.03,
+   "kind": "net",
+   "speaker": "alpha_lead",
+   "text": "Alpha Lead: un Harpy abbattuto, ne restano tre.",
+   "urgent": false,
+   "answer": false,
+   "via": "net"
+  },
+  {
+   "t": 489.09,
+   "kind": "report",
+   "speaker": "tactical",
+   "text": "Nessun ostile resta in combattimento, Capitano: quattro in ritirata, il Phlegethon a ventinove chilometri è il più vicino.",
+   "urgent": false
+  },
+  {
+   "t": 493.43,
+   "kind": "report",
+   "speaker": "xo",
+   "text": "Capitano, l'azione è finita: i Mandate si ritirano, l'Acheron a ventinove chilometri con sei falle e dieci incendi a bordo.",
+   "urgent": false
+  },
+  {
+   "t": 493.81,
+   "kind": "net",
+   "speaker": "castellan",
+   "text": "Aquila, Praetorian: vi siete allontanata di sette chilometri; il picke",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 498.17,
+   "kind": "report",
+   "speaker": "xo",
+   "text": "Capitano, i Mandate si ritirano: quattro in fuga, l'Acheron a ventisette chilometri con sei falle e nove incendi a bordo.",
+   "urgent": false
+  },
+  {
+   "t": 500.59,
+   "kind": "report",
+   "speaker": "xo",
+   "text": "Capitano, l'azione è finita: i Mandate si ritirano, l'Acheron a venticinque virgola otto chilometri con sei falle e nove incendi a bordo.",
+   "urgent": false
+  },
+  {
+   "t": 501.67,
+   "kind": "net",
+   "speaker": "admiral",
+   "text": "Capitano, buon lavoro. Il grosso della Flotta e il gruppo di Constance sono già in rotta per Aurelia: tenete il Gate, non inseguite chi si è ritirato. Se il contatto a Thule si muove verso di noi, lo vedrete arrivare prima voi di me.",
+   "urgent": false,
+   "answer": false,
+   "via": "tell_captain"
+  },
+  {
+   "t": 506.6,
+   "kind": "net",
+   "speaker": "ally_t48",
+   "text": "Aquila, Valiant: i Mandate si ritirano fuori tiro; il Main Body annull",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 515.62,
+   "kind": "answer",
+   "speaker": "tactical",
+   "text": "Fuoco a volontà, Capitano: ostili in portata entro dieci chilometri, il Phlegethon è a quattordici virgola nove.",
+   "urgent": false
+  },
+  {
+   "t": 516.52,
+   "kind": "answer",
+   "speaker": "helm",
+   "text": "Prua sul Phlegethon, tengo dieci chilometri, tutta forza: la porto io in portata.",
+   "urgent": false
+  },
+  {
+   "t": 539.1,
+   "kind": "answer",
+   "speaker": "helm",
+   "text": "Prua sul Phlegethon, tengo quattro chilometri, tutta forza: la porto io in portata dei laser.",
+   "urgent": false
+  },
+  {
+   "t": 555.71,
+   "kind": "other",
+   "speaker": "alpha_lead",
+   "text": "Alpha Lead: tre Harpy abbattuti, zero rimasti. Cielo nostro, Capitano.",
+   "urgent": false,
+   "answer": false
+  },
+  {
+   "t": 561.87,
+   "kind": "net",
+   "speaker": "deck_chief",
+   "text": "Deck: Bravo riarmato, sette Hammer pronti sul ponte. Al tuo ordine, Ca",
+   "urgent": false,
+   "answer": false,
+   "via": "net"
+  },
+  {
+   "t": 565.06,
+   "kind": "report",
+   "speaker": "comms",
+   "text": "Capitano, la Deep Vein chiede aiuto: quattro ostili a sedici chilometri da lei, corre verso l'Arsenal.",
+   "urgent": false
+  },
+  {
+   "t": 565.56,
+   "kind": "report",
+   "speaker": "xo",
+   "text": "Capitano, Rourke ordina di tenere il Gate e non inseguire chi si ritira: i quattro Mandate davanti a noi sono in fuga, la Deep Vein è a quindici chilometri.",
+   "urgent": false
+  },
+  {
+   "t": 568.86,
+   "kind": "other",
+   "speaker": "admiral",
+   "text": "Aquila, qui Rourke. Il campo è nostro: il gruppo d'attacco di Solm si è rotto e si è ritirato, cinque vascelli mandatari distrutti, e il Gate di Aurelia è ancora aperto. Non è stato gratis — abbiamo perduto il Vigilant e il Praetorian ha due fasci di carena aperti, ma i cantieri di Port Aurelius lavoreranno tutta la notte e i morti avranno i loro nomi. Avete tenuto la linea quando era più facile cedere, e questo lo ricorderanno. Nessuno vi ha abbandonati.",
+   "urgent": false,
+   "answer": false
+  },
+  {
+   "t": 591.03,
+   "kind": "report",
+   "speaker": "xo",
+   "text": "Capitano, il Phlegethon è morto a tre virgola sei chilometri, senza energia: la Cocytus è a due chilometri e i Mandate si ritirano.",
+   "urgent": false
+  },
+  {
+   "t": 606.1,
+   "kind": "report",
+   "speaker": "comms",
+   "text": "Capitano, il Gate di Thule sta ciclando: circa diciotto navi in arrivo tra poco più di un minuto.",
+   "urgent": false
+  },
+  {
+   "t": 612.31,
+   "kind": "report",
+   "speaker": "xo",
+   "text": "Capitano, il Phlegethon è distrutto a tre virgola otto chilometri: la Cocytus si ritira a due, e la Deep Vein resta a ventiquattro con quattro ostili addosso.",
+   "urgent": false
+  },
+  {
+   "t": 617.59,
+   "kind": "net",
+   "speaker": "admiral",
+   "text": "Capitano, avviso: il Gate di Thule sta ciclando, circa diciotto navi in arrivo tra poco più di un minuto. Il grosso e Constance sono a due minuti e mezzo: tenete duro al Gate, non vi fate prendere in mezzo. Se il peso è troppo, ripiegate sulle difese del mondo e noi vi copriamo l'ingresso.",
+   "urgent": false,
+   "answer": false,
+   "via": "tell_captain"
+  },
+  {
+   "t": 620.99,
+   "kind": "report",
+   "speaker": "xo",
+   "text": "Capitano, la Cocytus è distrutta a tre virgola quattro chilometri: la Styx si ritira a ventiquattro per cento di scafo, e la Deep Vein resta a ventiquattro con quattro ostili addosso.",
+   "urgent": false
+  },
+  {
+   "t": 626.13,
+   "kind": "report",
+   "speaker": "xo",
+   "text": "Capitano, la Styx è distrutta a otto virgola otto chilometri: la Cocytus è a tre virgola quattro, scudi al trentatré per cento e in ritirata.",
+   "urgent": false
+  },
+  {
+   "t": 632.98,
+   "kind": "net",
+   "speaker": "ally_t44",
+   "text": "Aquila, Constance: i sei contatti nuovi a quaranta gradi sono l'avangu",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 633.3,
+   "kind": "net",
+   "speaker": "castellan",
+   "text": "Aquila, Praetorian: la forza di Thule è entrata dal Gate, sei cont",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 635.06,
+   "kind": "net",
+   "speaker": "ally_t48",
+   "text": "Aquila, Valiant: Main Body a otto chilometri da voi, otto scafi intatti, in linea davanti al Gate. Nemici ancora a cinquantotto chilometri: se il peso arriva, dite e vi facciamo schermo.",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 651.99,
+   "kind": "report",
+   "speaker": "tactical",
+   "text": "Capitano, l'Acheron T-56 ha lanciato quattro Harpy su di noi, la più vicina a cinquantaquattro chilometri: punto difesa automatico, missili pronti.",
+   "urgent": false
+  },
+  {
+   "t": 678.6,
+   "kind": "report",
+   "speaker": "tactical",
+   "text": "Capitano, l'Acheron T-56 ha lanciato otto Harpy su di noi, la più vicina a quarantasette chilometri: punto difesa automatico, missili pronti.",
+   "urgent": false
+  },
+  {
+   "t": 684.06,
+   "kind": "net",
+   "speaker": "ally_t48",
+   "text": "Aquila, Valiant: vi facciamo schermo, otto scafi in arrivo su di voi; ",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 709.64,
+   "kind": "report",
+   "speaker": "sensors",
+   "text": "Capitano, l'Acheron è solo un rilevamento a duecentootto, senza distanza: la Vanguard T-56 è a cinquantuno chilometri, otto scafi in arrivo.",
+   "urgent": false
+  },
+  {
+   "t": 719.35,
+   "kind": "report",
+   "speaker": "sensors",
+   "text": "Capitano, la T-40 non è più sul quadro: nessuna traccia da focalizzare, resta un rilevamento a duecentootto.",
+   "urgent": false
+  },
+  {
+   "t": 719.85,
+   "kind": "report",
+   "speaker": "tactical",
+   "text": "Scudi verso la minaccia: il gruppo a quarantanove chilometri, razzi in arrivo, punto difesa già in traccia.",
+   "urgent": false
+  },
+  {
+   "t": 733.2,
+   "kind": "report",
+   "speaker": "comms",
+   "text": "Capitano, l'Evening Star II chiede aiuto: dodici caccia ostili a sedici chilometri, corre verso l'Arsenale.",
+   "urgent": false
+  },
+  {
+   "t": 734.52,
+   "kind": "net",
+   "speaker": "alpha_lead",
+   "text": "Alpha Lead: uno abbattuto, ne restano sette. Alpha tiene la pattuglia.",
+   "urgent": false,
+   "answer": false,
+   "via": "net"
+  },
+  {
+   "t": 737.07,
+   "kind": "report",
+   "speaker": "tactical",
+   "text": "Capitano, otto siluri in arrivo dai bombardieri: scudi a prua al centosette per cento, punto difesa in traccia.",
+   "urgent": false
+  },
+  {
+   "t": 741.6,
+   "kind": "report",
+   "speaker": "xo",
+   "text": "Capitano, falle a deck nove sezione B, ponte di volo: squadra uno in arrivo, scafo al novantotto per cento.",
+   "urgent": false
+  },
+  {
+   "t": 749.21,
+   "kind": "net",
+   "speaker": "alpha_lead",
+   "text": "Alpha Lead: cinque abbattuti, ne restano due. Alpha tiene la pattuglia",
+   "urgent": false,
+   "answer": false,
+   "via": "net"
+  },
+  {
+   "t": 758.91,
+   "kind": "answer",
+   "speaker": "helm",
+   "text": "Prua sul gruppo mandate, tengo dieci chilometri, tutta forza: la Nyx è a trentanove virgola sette.",
+   "urgent": false
+  },
+  {
+   "t": 763.71,
+   "kind": "net",
+   "speaker": "alpha_lead",
+   "text": "Alpha Lead: tre abbattuti, zero caccia nemici rimasti. Cielo pulito so",
+   "urgent": false,
+   "answer": false,
+   "via": "net"
+  },
+  {
+   "t": 770.31,
+   "kind": "answer",
+   "speaker": "tactical",
+   "text": "Fuoco su tutti gli ostili, Capitano: la Moros a quattordici virgola sei è la prima, poi la Keres, i nuovi compresi.",
+   "urgent": false
+  },
+  {
+   "t": 776.14,
+   "kind": "answer",
+   "speaker": "flight",
+   "text": "Alpha e Bravo lanciati, Capitano: otto Falcon e sette Hammer sulla Moros, dodici virgola tre chilometri.",
+   "urgent": false
+  },
+  {
+   "t": 780.87,
+   "kind": "report",
+   "speaker": "tactical",
+   "text": "Capitano, la Moros è distrutta a dieci chilometri: ora batto la Keres, a dieci virgola sei, in ritirata.",
+   "urgent": false
+  },
+  {
+   "t": 794.18,
+   "kind": "report",
+   "speaker": "tactical",
+   "text": "Capitano, la Keres è distrutta: nessun ostile resta in combattimento, i sei superstiti si ritirano a trentuno chilometri.",
+   "urgent": false
+  },
+  {
+   "t": 800.49,
+   "kind": "report",
+   "speaker": "xo",
+   "text": "Capitano, i sei superstiti si ritirano a trentadue chilometri, fuori dalla portata dei railgun: li inseguiamo o teniamo la posizione?",
+   "urgent": false
+  },
+  {
+   "t": 804.39,
+   "kind": "answer",
+   "speaker": "helm",
+   "text": "Prua sul gruppo mandate, tengo dieci chilometri, tutta forza: la Nyx è a trentadue virgola due.",
+   "urgent": false
+  },
+  {
+   "t": 811.92,
+   "kind": "answer",
+   "speaker": "flight",
+   "text": "Dodici Wasp, otto Falcon e sette Hammer lanciati sulla Tartarus, Capitano: trentuno chilometri, la portano in portata.",
+   "urgent": false
+  },
+  {
+   "t": 811.95,
+   "kind": "net",
+   "speaker": "ally_t44",
+   "text": "Aquila, Constance: siamo a ventitré chilometri, ancora in avvicinament",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 813.2,
+   "kind": "net",
+   "speaker": "admiral",
+   "text": "Capitano, bel lavoro: il nemico si è ritirato e non abbiamo perso nessuna nave. Restate al Gate con il grosso e Constance; il Gate di Thule sta ciclando di nuovo, una nave sola in arrivo. Non inseguite: se è un'esca, la prossima ondata è nostra da ricevere qui.",
+   "urgent": false,
+   "answer": false,
+   "via": "tell_captain"
+  },
+  {
+   "t": 815.45,
+   "kind": "report",
+   "speaker": "flight",
+   "text": "Capitano, Alpha, Bravo e i droni sono in volo sulla Tartarus, trenta chilometri: la portano in portata dei siluri.",
+   "urgent": false
+  },
+  {
+   "t": 818.77,
+   "kind": "answer",
+   "speaker": "tactical",
+   "text": "Fuoco a volontà già in corso su tutti gli ostili, Capitano: la Tartarus a trenta chilometri, railgun assegnati, aprono da soli a dieci.",
+   "urgent": false
+  },
+  {
+   "t": 826.98,
+   "kind": "report",
+   "speaker": "ops",
+   "text": "Capitano, falla a deck nove sezione B sigillata: squadra uno di nuovo libera, l'incendio resta con la squadra due.",
+   "urgent": false
+  },
+  {
+   "t": 829.45,
+   "kind": "net",
+   "speaker": "cag",
+   "text": "CAG: Capitano, Alpha, Bravo e i droni sono in volo sulla Tartarus, tre",
+   "urgent": false,
+   "answer": false,
+   "via": "net"
+  },
+  {
+   "t": 853.32,
+   "kind": "report",
+   "speaker": "sensors",
+   "text": "Capitano, la Tartarus è a ventisei virgola otto e si allontana: i quattro Styx sono solo rilevamenti, senza distanza.",
+   "urgent": false
+  },
+  {
+   "t": 887.23,
+   "kind": "report",
+   "speaker": "sensors",
+   "text": "Capitano, traccia focalizzata sul T-57 a prua, rilevamento zero quattro nove: cerco la distanza prima di qualunque fuoco.",
+   "urgent": false
+  },
+  {
+   "t": 891.18,
+   "kind": "net",
+   "speaker": "bravo_lead",
+   "text": "Bravo Lead: quattordici siluri in acqua sulla Tartarus, i camion rientrano.",
+   "urgent": false,
+   "answer": false,
+   "via": "net"
+  },
+  {
+   "t": 899.95,
+   "kind": "report",
+   "speaker": "tactical",
+   "text": "Capitano, la Tartarus si apre a tribordo e resta fuori portata: propongo di ingaggiare l'Asphodel a prua, quarantatré chilometri.",
+   "urgent": false
+  },
+  {
+   "t": 916.23,
+   "kind": "answer",
+   "speaker": "helm",
+   "text": "Rientro in formazione col Main Body, in coda al Valiant a tre chilometri: rotta due-tre-cinque, tutta forza.",
+   "urgent": false
+  },
+  {
+   "t": 926.54,
+   "kind": "answer",
+   "speaker": "flight",
+   "text": "Richiamo Alpha, Bravo e i droni, Capitano: otto Falcon, tre Hammer e dodici Wasp rientrano, la Tartarus a trentotto chilometri.",
+   "urgent": false
+  },
+  {
+   "t": 932.01,
+   "kind": "net",
+   "speaker": "deck_chief",
+   "text": "Deck: Bravo a bordo, sette Hammer su sette. Riarmo in due minuti.",
+   "urgent": false,
+   "answer": false,
+   "via": "net"
+  },
+  {
+   "t": 939.04,
+   "kind": "report",
+   "speaker": "sensors",
+   "text": "Capitano, cinque contatti sono solo rilevamenti: traccia focalizzata sul T-56 a prua, cerco la distanza.",
+   "urgent": false
+  },
+  {
+   "t": 950.58,
+   "kind": "report",
+   "speaker": "sensors",
+   "text": "Capitano, il T-56 è la Nyx, cinquantaquattro chilometri a prua: tutti i contatti hanno ora la distanza, nessun decoy.",
+   "urgent": false
+  },
+  {
+   "t": 957.46,
+   "kind": "report",
+   "speaker": "comms",
+   "text": "Capitano, dalla rete di flotta: Thule è dichiarata perduta, in mano al Mandate.",
+   "urgent": false
+  },
+  {
+   "t": 968.26,
+   "kind": "net",
+   "speaker": "admiral",
+   "text": "Capitano, Thule è caduta: il Mandate l'ha rivendicata, ma era un guscio senza cantiere e non ci muoviamo per riprenderla. Il grosso nemico, diciotto navi, è ancora a Thule; la punta da otto è in casa nostra. Restate al Gate con il grosso e Constance: non inseguite F-M3, non regalate loro il distacco.",
+   "urgent": false,
+   "answer": false,
+   "via": "tell_captain"
+  },
+  {
+   "t": 986.24,
+   "kind": "report",
+   "speaker": "sensors",
+   "text": "Capitano, la Tartarus è di nuovo solo un rilevamento a uno-cinque-zero: gli altri cinque si ritirano oltre settanta chilometri.",
+   "urgent": false
+  },
+  {
+   "t": 993.75,
+   "kind": "report",
+   "speaker": "sensors",
+   "text": "Capitano, sei contatti tornati a soli rilevamenti: focalizzo l'Asfodelo sul zero-cinque-sei.",
+   "urgent": false
+  },
+  {
+   "t": 998.87,
+   "kind": "report",
+   "speaker": "sensors",
+   "text": "Capitano, T-60 e T-61 sono usciti dal raggio dei sensori: restano la Nyx a settantasette, l'Asfodelo a ottanta e la Tartarus a sessantacinque.",
+   "urgent": false
+  },
+  {
+   "t": 1008.86,
+   "kind": "answer",
+   "speaker": "xo",
+   "text": "Alarme verde, Capitano: si rientra dai posti di combattimento, ma i sei ostili in ritirata restano in traccia.",
+   "urgent": false
+  },
+  {
+   "t": 1022.47,
+   "kind": "report",
+   "speaker": "tactical",
+   "text": "Capitano, i tre ostili sono di nuovo a portata: la Tartarus a settantasette, la Nyx e l'Asfodelo a novanta.",
+   "urgent": false
+  },
+  {
+   "t": 1028.65,
+   "kind": "net",
+   "speaker": "deck_chief",
+   "text": "Deck: Alpha a bordo, otto Falcon su otto. Riarmo in un minuto. Deck: droni a bordo, dodici Wasp su dodici. Riarmo in un minuto.",
+   "urgent": false,
+   "answer": false,
+   "via": "net"
+  },
+  {
+   "t": 1028.65,
+   "kind": "net",
+   "speaker": "deck_chief",
+   "text": "Deck: Bravo riarmato, sette Hammer pronti sul ponte.",
+   "urgent": false,
+   "answer": false,
+   "via": "net"
+  },
+  {
+   "t": 1039.37,
+   "kind": "report",
+   "speaker": "sensors",
+   "text": "Capitano, i tre ostili sono di nuovo solo rilevamenti: la Tartarus a uno-quarantatré, la Nyx e l'Asfodelo a zero-cinque-nove.",
+   "urgent": false
+  },
+  {
+   "t": 1050.36,
+   "kind": "answer",
+   "speaker": "xo",
+   "text": "Capitano, lei non porta nulla: il fucile AR-181 e la pistola M27S sono nella rastrelliera dell'armeria dei marine, deck otto, e una M27S è nell'armadietto del suo Ready Room, deck uno. L'armaiolo Zaman può portarle quello che vuole.",
+   "urgent": false
+  },
+  {
+   "t": 1058.1,
+   "kind": "net",
+   "speaker": "deck_chief",
+   "text": "Deck: Alpha e droni riarmati, otto Falcon e dodici Wasp pronti sul ponte.",
+   "urgent": false,
+   "answer": false,
+   "via": "net"
+  },
+  {
+   "t": 1078.61,
+   "kind": "answer",
+   "speaker": "xo",
+   "text": "Capitano, l'armaiolo Zaman sale dall'armeria dei marine con fucile e pistola: sessantotto secondi, glieli mette in mano dove si trova.",
+   "urgent": false
+  },
+  {
+   "t": 1100.28,
+   "kind": "answer",
+   "speaker": "comms",
+   "text": "Capitano, la rete di flotta è aperta: dica pure, l'ammiraglio Rourke è in ascolto.",
+   "urgent": false
+  },
+  {
+   "t": 1102.71,
+   "kind": "answer",
+   "speaker": "comms",
+   "text": "Capitano, la rete di flotta è aperta e l'ammiraglio Rourke è in ascolto: dica pure.",
+   "urgent": false
+  },
+  {
+   "t": 1107.69,
+   "kind": "report",
+   "speaker": "engineering",
+   "text": "Capitano, a fine scontro sono tornato al profilo bilanciato: reattore al settantotto per cento, calore sedici, radiatori rientrati.",
+   "urgent": false
+  },
+  {
+   "t": 1129.52,
+   "kind": "answer",
+   "speaker": "comms",
+   "text": "Capitano, il suo messaggio è passato all'ammiraglio Rourke sulla rete di flotta: chiede il permesso di andare a Thule con tutto il grosso e affrontarli.",
+   "urgent": false
+  },
+  {
+   "t": 1185.94,
+   "kind": "answer",
+   "speaker": "comms",
+   "text": "Capitano, la rete di flotta è aperta e l'ammiraglio Rourke è in ascolto: il suo messaggio è già passato, attendiamo la sua risposta.",
+   "urgent": false
+  },
+  {
+   "t": 1200.76,
+   "kind": "answer",
+   "speaker": "comms",
+   "text": "Capitano, il vice ammiraglio Rourke comanda la Settima Flotta da lontano, non da una nave qui: sulla rete risponde lui, e il gruppo più vicino è il Main Body del Valiant, a cinque virgola otto chilometri.",
+   "urgent": false
+  },
+  {
+   "t": 1217.07,
+   "kind": "answer",
+   "speaker": "comms",
+   "text": "Capitano, canale aperto col Valiant: il capitano Sorensen è in linea.",
+   "urgent": false
+  },
+  {
+   "t": 1217.76,
+   "kind": "net",
+   "speaker": "ally_t48",
+   "text": "Valiant a Aquila: canale aperto, Capitano. Niente sui sensori, i miei otto in formazione di schermo su di voi. Dite.",
+   "urgent": false,
+   "answer": true,
+   "via": "say"
+  },
+  {
+   "t": 1239.82,
+   "kind": "report",
+   "speaker": "comms",
+   "text": "Capitano, dalla rete di flotta: dal Meridian è passato il primo convoglio di grano per Aurelia, undici navi sotto scorta, e chiedono che il picchetto non spari su chi arriva col trasponder acceso.",
+   "urgent": false
+  },
+  {
+   "t": 1246.89,
+   "kind": "answer",
+   "speaker": "xo",
+   "text": "Capitano, il canale col Valiant è aperto: Sorensen ascolta. Ma le ricordo che a Thule il Mandate tiene diciotto navi contro le nostre dodici, e che l'ordine di lasciare Aurelia non è mio né suo: è dell'ammiraglio Rourke.",
+   "urgent": false
+  },
+  {
+   "t": 1247.22,
+   "kind": "net",
+   "speaker": "ally_t48",
+   "text": "Valiant a Aquila: supporto pieno confermato, otto schermi serrati a 4.5 km su di voi. Nessun contatto sui sensori; al primo bersaglio mi sposto in attacco.",
+   "urgent": false,
+   "answer": true,
+   "via": "say"
+  },
+  {
+   "t": 1271.23,
+   "kind": "net",
+   "speaker": "ally_t64",
+   "text": "Probity a Aquila: ero a 45 km, chiudo a tutta forza per entrare nella schermata a 4.5 km. Nessun contatto sui miei sensori.",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 1308.98,
+   "kind": "net",
+   "speaker": "ally_t44",
+   "text": "Constance a Aquila: quattro scafi intatti, lascio il picket e prendo p",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 1314.6,
+   "kind": "answer",
+   "speaker": "ops",
+   "text": "Capitano, schermo principale sulla sezione di prua del Keres, tredici virgola sette chilometri, ingrandita al massimo.",
+   "urgent": false
+  },
+  {
+   "t": 1339.05,
+   "kind": "answer",
+   "speaker": "xo",
+   "text": "Capitano, i marine stanno bene: settantasei pronti a partire, nessun ferito, e i due Kestrel sono liberi nel ponte di lancio, deck otto. L'armaiolo Zaman le ha già messo in mano fucile e pistola.",
+   "urgent": false
+  },
+  {
+   "t": 1353.02,
+   "kind": "net",
+   "speaker": "admiral",
+   "text": "Capitano, aggiornamento: a Thule il nemico si sta radunando — il grosso da diciotto è ancora lì e negli ultimi minuti sono entrate altre cinque navi in tre gruppi. Non è una ritirata, è un accumulo: la prossima spinta sarà ancora su di voi. Restate al Gate con il grosso e Constance, non inseguite nulla verso Thule.",
+   "urgent": false,
+   "answer": false,
+   "via": "tell_captain"
+  },
+  {
+   "t": 1392.12,
+   "kind": "answer",
+   "speaker": "xo",
+   "text": "Capitano, il canale col Valiant è aperto, non con Rourke: se vuole che l'ammiraglio senta questo, Martin deve passarlo sulla rete di flotta. E le ricordo che a Thule sono diciotto contro le nostre dodici, con altri cinque scafi entrati in tre gruppi.",
+   "urgent": false
+  },
+  {
+   "t": 1408.96,
+   "kind": "net",
+   "speaker": "admiral",
+   "text": "Capitano, risposta breve: no. Non vi mando a Thule. Il Gate è la nostra forza — chi passa per primo si forma sotto il fuoco, e diciotto navi a Thule non valgono il rischio di perdere il Gate di Aurelia. Se vogliono Aurelia, vengono qui, e qui li aspettiamo con voi al centro. Tenete la posizione; se il Gate di Thule canta, lo saprete per primo.",
+   "urgent": false,
+   "answer": true,
+   "via": "tell_captain"
+  },
+  {
+   "t": 1409.27,
+   "kind": "answer",
+   "speaker": "comms",
+   "text": "Capitano, messaggio passato sulla rete di flotta all'ammiraglio Rourke: la sua richiesta di guidare tutto il grosso su Thule per la resa dei conti.",
+   "urgent": false
+  },
+  {
+   "t": 1433.28,
+   "kind": "report",
+   "speaker": "sensors",
+   "text": "Capitano, nuovo contatto a zero-tre-tre-due, trentacinque chilometri: è la Resolve, il picchetto di Thule Watch, senza energia e alla deriva.",
+   "urgent": false
+  },
+  {
+   "t": 1439.32,
+   "kind": "report",
+   "speaker": "comms",
+   "text": "Capitano, dalla rete di flotta: il Gate di Thule sta ciclando, circa quattro navi stanno passando, arrivo in settantuno secondi.",
+   "urgent": false
+  },
+  {
+   "t": 1479.17,
+   "kind": "answer",
+   "speaker": "tactical",
+   "text": "Capitano, ora no: l'unico scafo ostile a schermo è la Tartarus, a settantasette chilometri, e i Kestrel non arrivano oltre qualche chilometro. L'unica nave ferma e vicina è la Resolve, ma è nostra e senza energia: non si abborda un relitto amico.",
+   "urgent": false
+  },
+  {
+   "t": 1481.76,
+   "kind": "net",
+   "speaker": "admiral",
+   "text": "Capitano, aggiornamento: a Thule continuano a entrare navi — altre quattro tra poco più di un minuto, e il grosso resta a diciotto. È un accumulo, non una ritirata. Restate al Gate con il grosso e Constance: se si muovono, il primo che passa lo prendiamo sotto il fuoco di Keeper Station.",
+   "urgent": false,
+   "answer": false,
+   "via": "tell_captain"
+  },
+  {
+   "t": 1527.61,
+   "kind": "net",
+   "speaker": "admiral",
+   "text": "Capitano, no. L'Aquila non passa il Gate da sola: diciotto navi di là aspettano solo che qualcuno si offra, e se vi prendono perdiamo il Gate e voi. Il Gate è la nostra forza — chi passa per primo si forma sotto il fuoco. Restate al Gate con il grosso e Constance: se vogliono Aurelia, che vengano loro.",
+   "urgent": false,
+   "answer": true,
+   "via": "tell_captain"
+  },
+  {
+   "t": 1529.45,
+   "kind": "net",
+   "speaker": "admiral",
+   "text": "Capitano, no — e questa è la seconda volta che ve lo dico, quindi ascoltatemi bene: l'Aquila non passa il Gate da sola, né scoperta né coperta. Diciotto navi di là non aspettano altro che qualcuno si offra: se vi prendono, perdiamo voi e il Gate di Aurelia in un colpo. Il Gate è la nostra forza — chi passa per primo si forma sotto il fuoco. Restate al Gate con il grosso e Constance; se vogliono Aurelia, che siano loro a passare.",
+   "urgent": false,
+   "answer": true,
+   "via": "tell_captain"
+  },
+  {
+   "t": 1529.75,
+   "kind": "answer",
+   "speaker": "comms",
+   "text": "Capitano, richiesta passata sulla rete: solo l'Aquila oltre il Gate di Thule, in avanscoperta coperta, senza aprire il fuoco.",
+   "urgent": false
+  },
+  {
+   "t": 1626.66,
+   "kind": "answer",
+   "speaker": "ops",
+   "text": "Capitano, schermo principale tornato alla visualizzazione normale: inquadratura automatica sulla rotta, nessun bersaglio fisso.",
+   "urgent": false
+  },
+  {
+   "t": 1678.95,
+   "kind": "answer",
+   "speaker": "xo",
+   "text": "Capitano, l'ordine dell'ammiraglio è di restare al Gate, e questo lo porta di là: lo eseguo, ma lo metto a verbale come suo. Vuole che Martin lo annunci sulla rete di flotta prima che il Gate canti?",
+   "urgent": false
+  },
+  {
+   "t": 1679.85,
+   "kind": "answer",
+   "speaker": "sensors",
+   "text": "Capitano, in avanscoperta tengo EMCON ristretto e radar passivo: un ping attivo a Thule ci accende come un faro a sessanta chilometri. I droni leggono i nomi sugli scafi, quello sì.",
+   "urgent": false
+  },
+  {
+   "t": 1680.75,
+   "kind": "answer",
+   "speaker": "helm",
+   "text": "Capitano, rotta per il Gate di Thule, zero-sette-cinque, cinquantasei virgola sette chilometri: mi dia l'ordine e ci porto dentro.",
+   "urgent": false
+  },
+  {
+   "t": 1710.89,
+   "kind": "net",
+   "speaker": "ally_t44",
+   "text": "Aquila, Constance: schermo confermato a 4.5 km, resto su questo lato del Gate. Se torni con diciotto navi alle calcagna, siamo già fra te e loro.",
+   "urgent": false,
+   "answer": true,
+   "via": "say"
+  },
+  {
+   "t": 1710.92,
+   "kind": "net",
+   "speaker": "castellan",
+   "text": "Aquila, Praetorian: la schermata vi resta addosso attraverso il Gate, ",
+   "urgent": false,
+   "answer": true,
+   "via": "say"
+  },
+  {
+   "t": 1710.99,
+   "kind": "net",
+   "speaker": "ally_t48",
+   "text": "Valiant a Aquila: la mia schermata resta sul lato Aurelia del Gate, ot",
+   "urgent": false,
+   "answer": true,
+   "via": "say"
+  },
+  {
+   "t": 1711.9,
+   "kind": "net",
+   "speaker": "admiral",
+   "text": "Capitano, prendo atto: la decisione è vostra, e la rispetto. Io non vi copro oltre il Gate — il grosso, Constance e il picket restano qui a ricevere chi passa, e se diciotto vi vengono dietro non li inseguo a Thule: li aspetto al Gate. Tornate con i dati, e tornate presto.",
+   "urgent": false,
+   "answer": true,
+   "via": "tell_captain"
+  },
+  {
+   "t": 1712.2,
+   "kind": "answer",
+   "speaker": "comms",
+   "text": "Capitano, annuncio passato sulla rete di flotta a tutte le navi: l'Aquila passa il Gate di Thule in avanscoperta coperta, senza aprire il fuoco, e torna con i dati.",
+   "urgent": false
+  },
+  {
+   "t": 1744.81,
+   "kind": "answer",
+   "speaker": "xo",
+   "text": "Capitano, allarme rosso su tutta la nave: posti di combattimento, compartimenti stagni chiusi, duecentosei uomini in postazione. La nave è sua.",
+   "urgent": false
+  },
+  {
+   "t": 1753.76,
+   "kind": "answer",
+   "speaker": "helm",
+   "text": "Capitano, rotta uno-sei-sette sul Janus Gate, sessanta virgola cinque chilometri, tutta forza: ci arrivo in circa quattro minuti. Il passaggio lo comando io solo al suo ordine.",
+   "urgent": false
+  },
+  {
+   "t": 1776.48,
+   "kind": "answer",
+   "speaker": "xo",
+   "text": "Capitano, le armi: quattro torri binate di railgun, gittata dieci chilometri, una salva ogni sette secondi; dodici batterie laser a quattro chilometri; due lanciatori VLS con sessanta missili, otto per salva, venticinque chilometri; due tubi lanciasiluri; ventiquattro postazioni di difesa ravvicinata in automatico; sei decoy a bordo, due per lancio. Scudi su, cento per cento, sei settori. A bordo: quattrocentoventi di equipaggio, sessanta piloti, ottanta marine, e lei al comando. Alpha otto Falcon, Bravo sette Hammer, dodici droni Wasp, tutti a bordo pronti. Due Kestrel liberi con settantasei marine pronti a partire. Scafo novantotto per cento, calore quattro, reattore settantotto, nessun ferito, nessun danno.",
+   "urgent": false
+  },
+  {
+   "t": 1786.79,
+   "kind": "net",
+   "speaker": "castellan",
+   "text": "Aquila, Praetorian: non vi seguo attraverso il Gate. Resto di qua con ",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 1844.18,
+   "kind": "answer",
+   "speaker": "xo",
+   "text": "Capitano, ho girato la domanda alla Ostrander sulla sua richiesta: i marine sono settantasei, pronti, e i due Kestrel liberi. Ma un arrembaggio si fa coi Kestrel, non col teletrasporto: la Ostrander le dirà lei cosa può passare.",
+   "urgent": false
+  },
+  {
+   "t": 1844.69,
+   "kind": "xfer",
+   "speaker": "xfer_chief",
+   "text": "Capitano, il console non trova \"marines\" nel registro: mi serve un nome o un numero, o \"marines 6\" come reparto da imbarcare. E per l'arrembaggio: nessuna nave della schermata ha nostri fanti a bordo, quindi non ho un interno dove metterli.",
+   "answer": true,
+   "urgent": false
+  },
+  {
+   "t": 1857.19,
+   "kind": "other",
+   "speaker": "xfer_chief",
+   "text": "Capitano, sempre sul registro: \"marines\" non esiste come reparto, mi serve un nome o un numero. E nessuna nave della schermata ha nostri fanti a bordo: non ho un interno dove metterli.",
+   "urgent": false,
+   "answer": false
+  },
+  {
+   "t": 1873.31,
+   "kind": "answer",
+   "speaker": "xo",
+   "text": "Capitano, ho passato l'ordine alla Ostrander: lei, dalla plancia al ponte dei Kestrel, deck otto. La conferma è sua.",
+   "urgent": false
+  },
+  {
+   "t": 1873.78,
+   "kind": "net",
+   "speaker": "ally_t44",
+   "text": "Aquila, Constance: non posso seguirvi oltre il Gate. Resto sul lato Aurelia a 4.5 km con i miei quattro scafi, armi libere: rientrate sulla mia linea e vi copro.",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 1899.1,
+   "kind": "answer",
+   "speaker": "xo",
+   "text": "Capitano, la Ostrander ha già il suo ordine: lei dalla plancia al ponte dei Kestrel, deck otto. La conferma è sua, non mia.",
+   "urgent": false
+  },
+  {
+   "t": 1912.48,
+   "kind": "answer",
+   "speaker": "xo",
+   "text": "Capitano, ordine ripassato alla Ostrander: lei dalla plancia al ponte dei Kestrel, deck otto. La conferma è sua.",
+   "urgent": false
+  },
+  {
+   "t": 1930.87,
+   "kind": "answer",
+   "speaker": "xo",
+   "text": "Capitano, ordine passato alla Ostrander: lei dalla plancia al ponte dei Kestrel, deck otto. La conferma è sua.",
+   "urgent": false
+  },
+  {
+   "t": 1932.1,
+   "kind": "xfer",
+   "speaker": "xfer_chief",
+   "text": "Capitano, \"Deck 8 hangar\" non esiste nel registro: la mia lista ha \"Flight Deck\", che è il ponte nove. Se il deck otto è quello che intende, me lo confermi e lo cerco per nome.",
+   "answer": true,
+   "urgent": false
+  },
+  {
+   "t": 1943.55,
+   "kind": "xfer",
+   "speaker": "xfer_chief",
+   "text": "Capitano, è sul Flight Deck, ponte nove, sezione B: arrivo pulito, otto secondi. Se il ponte otto è un altro locale, me lo dica per nome.",
+   "answer": false,
+   "urgent": false
+  },
+  {
+   "t": 1963.68,
+   "kind": "person",
+   "speaker": "npc205",
+   "text": "Sul registro non lo so, Capitano. Noi alloggiamo con i reparti",
+   "answer": true,
+   "urgent": false
+  },
+  {
+   "t": 1973.93,
+   "kind": "answer",
+   "speaker": "xo",
+   "text": "Capitano, ordine alla Ostrander: lei dal ponte di volo all'armeria dei marine, deck otto. La conferma è sua.",
+   "urgent": false
+  },
+  {
+   "t": 1974.93,
+   "kind": "xfer",
+   "speaker": "xfer_chief",
+   "text": "Capitano, \"Marine Armory\" non esiste nel registro: l'armeria della nave è \"the armory\", e non è raggiungibile dal fascio, è schermata contro il modello. Se intende la sua armeria, me lo confermi e le dico cosa si può fare.",
+   "answer": true
+  },
+  {
+   "t": 1996.72,
+   "kind": "person",
+   "speaker": "npc216",
+   "text": "Capitano, per ora siamo a posto: Alpha e Bravo sono in coperta, pronti. Ma se devono rientrare i gruppi ancora fuori, io posso far liberare le corsie adesso.",
+   "answer": true,
+   "urgent": false
+  },
+  {
+   "t": 1997.12,
+   "kind": "person",
+   "speaker": "npc208",
+   "text": "Capitano, i nostri Falcon possono restare in volo di pattugliamento ancora un po', ma i piloti sono stanchi. Se vuole, rientriamo e teniamo due in allarme.",
+   "answer": true,
+   "urgent": false
+  },
+  {
+   "t": 1997.52,
+   "kind": "person",
+   "speaker": "npc160",
+   "text": "Capitano, sugli Hammers in coperta il carico è pronto e i motori sono",
+   "answer": true,
+   "urgent": false
+  },
+  {
+   "t": 2025.25,
+   "kind": "net",
+   "speaker": "castellan",
+   "text": "Aquila, Praetorian: il Kestrel è di qua dal Gate, a 37 km da voi sul l",
+   "urgent": false,
+   "answer": true,
+   "via": "say"
+  },
+  {
+   "t": 2025.28,
+   "kind": "net",
+   "speaker": "ally_t48",
+   "text": "Valiant al Capitano: il Gate di Thule è in mano al Mandate, non possia",
+   "urgent": false,
+   "answer": true,
+   "via": "say"
+  },
+  {
+   "t": 2025.41,
+   "kind": "net",
+   "speaker": "ally_t44",
+   "text": "Aquila, Constance: il Kestrel è a 37 km da voi, rilevamento 344°, sul ",
+   "urgent": false,
+   "answer": true,
+   "via": "say"
+  },
+  {
+   "t": 2025.54,
+   "kind": "net",
+   "speaker": "admiral",
+   "text": "Capitano, i Kestrel sono vostri: andateci con le vostre lance, è una manovra della vostra nave e non serve il permesso di Fleet. Io non ho altro da aggiungere — il Gate resta tenuto dal grosso, Constance e il picket.",
+   "urgent": false,
+   "answer": true,
+   "via": "tell_captain"
+  },
+  {
+   "t": 2025.68,
+   "kind": "net",
+   "speaker": "ally_t64",
+   "text": "Aquila, Probity: i Kestrel sono a 37 km da voi, rilevamento 344°, sul ",
+   "urgent": false,
+   "answer": true,
+   "via": "say"
+  },
+  {
+   "t": 2025.84,
+   "kind": "answer",
+   "speaker": "xo",
+   "text": "Capitano, lei è già sul ponte di volo, deck nove, sezione B: da lì i Kestrel del ponte otto si raggiungono a piedi, per la scaletta di poppa, due minuti. Il fascio non arriva al ponte otto, è schermato: se vuole, la Ostrander la porta al ponte nove e da lì scende lei.",
+   "urgent": false
+  },
+  {
+   "t": 2079.03,
+   "kind": "answer",
+   "speaker": "xo",
+   "text": "Capitano, non ho capito \"i miei orologi\": se intende i suoi piloti, sono sul ponte di volo dove lei è già; se intende altro, me lo dica per nome e passo l'ordine alla Ostrander.",
+   "urgent": false
+  },
+  {
+   "t": 2084.18,
+   "kind": "answer",
+   "speaker": "xo",
+   "text": "Capitano, ordine alla Ostrander: lei dal ponte di volo ai suoi alloggi, deck uno. La conferma è sua.",
+   "urgent": false
+  },
+  {
+   "t": 2085.07,
+   "kind": "xfer",
+   "speaker": "xfer_chief",
+   "text": "Capitano, dai suoi alloggi: preso dal Flight Deck, ponte nove, serratura in un secondo e mezzo, qualità cento. Otto secondi di ciclo, è già in partenza.",
+   "answer": true,
+   "urgent": false
+  },
+  {
+   "t": 2095.91,
+   "kind": "xfer",
+   "speaker": "xfer_chief",
+   "text": "Capitano, è nei suoi alloggi: arrivo pulito, qualità cento, otto secondi di ciclo. I pad sono liberi.",
+   "answer": false,
+   "urgent": false
+  },
+  {
+   "t": 2156.4,
+   "kind": "person",
+   "speaker": "npc510",
+   "text": "Presente, Capitano. Sezione B al completo, pronti a muoverci.",
+   "answer": true,
+   "urgent": false
+  },
+  {
+   "t": 2179.52,
+   "kind": "person",
+   "speaker": "npc485",
+   "text": "Armi pronte e contate, Capitano: fucili e munizioni in ordine, nessun guasto. Qui siamo in sei, tutti al loro posto.",
+   "answer": true,
+   "urgent": false
+  },
+  {
+   "t": 2189.78,
+   "kind": "net",
+   "speaker": "castellan",
+   "text": "Aquila, Praetorian: i Kestrel sono a 62 km da voi, rilevamento 346°, s",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 2189.91,
+   "kind": "person",
+   "speaker": "npc524",
+   "text": "Kestrel? Non sono di noi, Capitano: qui in armeria non ne abbiamo. Provi dal ponte di volo, forse è roba dei piloti.",
+   "answer": true,
+   "urgent": false
+  },
+  {
+   "t": 2190.68,
+   "kind": "net",
+   "speaker": "ally_t48",
+   "text": "Capitano, Valiant: i Kestrel sono nostri — T-47, a 62 km da voi per ri",
+   "urgent": false,
+   "answer": true,
+   "via": "say"
+  },
+  {
+   "t": 2190.72,
+   "kind": "net",
+   "speaker": "admiral",
+   "text": "Capitano, i Kestrel sono nel vostro hangar di poppa, alloggiamento di poppa, ponte C: le vostre lance li raggiungono in due minuti. Nessun'altra nave di Fleet li ha — sono vostri. Il Gate resta tenuto dal grosso e da Constance.",
+   "urgent": false,
+   "answer": true,
+   "via": "tell_captain"
+  },
+  {
+   "t": 2190.74,
+   "kind": "net",
+   "speaker": "ally_t66",
+   "text": "Aquila, Intrepid: Reserve in schermata su di voi a 4.5 km, lato Aurelia, sezione T-66 in linea con Probity. Nessun contatto ostile.",
+   "urgent": false,
+   "answer": true,
+   "via": "say"
+  },
+  {
+   "t": 2190.96,
+   "kind": "net",
+   "speaker": "ally_t44",
+   "text": "Aquila, Constance: i Kestrel sono a 62 km da voi, rilevamento 346°, su",
+   "urgent": false,
+   "answer": true,
+   "via": "say"
+  },
+  {
+   "t": 2191.5,
+   "kind": "net",
+   "speaker": "ally_t66",
+   "text": "Aquila, Intrepid: i Kestrel sono in linea con il picket, 62 km da voi ",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 2193.98,
+   "kind": "net",
+   "speaker": "ally_t64",
+   "text": "Aquila, Intrepid: assumo il comando della Reserve; la mia sezione rien",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 2196.18,
+   "kind": "net",
+   "speaker": "ally_t66",
+   "text": "Aquila, Intrepid: assumo il comando della Reserve. La mia sezione si p",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 2207.79,
+   "kind": "net",
+   "speaker": "ally_t66",
+   "text": "Aquila, Intrepid: Reserve in schermata su di voi a 4.5 km, lato Aurelia, sezione T-66 in linea con Probity. Nessun contatto ostile.",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 2219.79,
+   "kind": "net",
+   "speaker": "ally_t66",
+   "text": "Aquila, Intrepid: Reserve in schermata su di voi a 4.5 km, lato Aureli",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 2254.27,
+   "kind": "net",
+   "speaker": "ally_t66",
+   "text": "Aquila, Aurelia Reserve: T-66 in command, closing from 21 km to take station on T-64's screen line at 4.5 km. Plot is clear; we cover you.",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 2256.94,
+   "kind": "net",
+   "speaker": "ally_t64",
+   "text": "Aquila, Aurelia Reserve: T-66 in comando. Porto la mia sezione sulla linea di schermo di T-64; plot pulito, ti copriamo.",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 2259.03,
+   "kind": "net",
+   "speaker": "ally_t66",
+   "text": "Aquila, Aurelia Reserve: T-66 in comando. Chiudo da 5.5 a 4.5 km sulla linea di schermo; plot pulito, ti copriamo.",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 2269.84,
+   "kind": "net",
+   "speaker": "ally_t64",
+   "text": "Aquila, Aurelia Reserve: T-66 in comando. Chiudo dai 5.5 km a 4.5 km sulla linea di schermo; plot pulito, ti copriamo.",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 2277.71,
+   "kind": "net",
+   "speaker": "ally_t64",
+   "text": "Aquila, Aurelia Reserve: T-66 in comando. Chiudo dai 5.5 km sulla line",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 2285.75,
+   "kind": "net",
+   "speaker": "ally_t64",
+   "text": "Aquila, Aurelia Reserve: T-66 in comando, Probity e Intrepid sulla tua",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 2288.66,
+   "kind": "net",
+   "speaker": "ally_t64",
+   "text": "Aquila, Aurelia Reserve: T-66 in comando, chiudo dai 5.5 km sulla linea di schermo a 4.5 km. Plot pulito, ti copriamo.",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 2290.73,
+   "kind": "net",
+   "speaker": "ally_t66",
+   "text": "Aquila, Aurelia Reserve: T-66 in comando, ordine di schermo confermato",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 2298.22,
+   "kind": "net",
+   "speaker": "ally_t66",
+   "text": "Aquila, Aurelia Reserve: T-66 in comando, schermo confermato a 4.5 km. Plot pulito, chiudo dai 15 km sulla tua linea con la Probity; nessun contatto.",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 2306.18,
+   "kind": "net",
+   "speaker": "ally_t66",
+   "text": "Aquila, Aurelia Reserve: T-66 in comando, schermo confermato a 4.5 km. Plot pulito, chiudo dai 15 km sulla tua linea con la Probity; nessun contatto.",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 2312.28,
+   "kind": "net",
+   "speaker": "ally_t66",
+   "text": "Aquila, Aurelia Reserve: T-66 in comando, schermo confermato a 4.5 km.",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 2318.26,
+   "kind": "net",
+   "speaker": "ally_t66",
+   "text": "Aquila, Aurelia Reserve: T-66 in comando, schermo confermato a 4.5 km.",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 2322.47,
+   "kind": "net",
+   "speaker": "ally_t66",
+   "text": "Aquila, Aurelia Reserve: T-66 in comando, schermo confermato a 4.5 km.",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 2323.83,
+   "kind": "answer",
+   "speaker": "comms",
+   "text": "Capitano, è il Dalca dell'Intrepid: si sta portando sulla linea di schermo a quattro virgola cinque chilometri e ripete il suo rapporto a ogni chilometro, come gli hanno ordinato. Non è un guasto, è la sua procedura.",
+   "urgent": false
+  },
+  {
+   "t": 2339.67,
+   "kind": "answer",
+   "speaker": "chief",
+   "text": "Capitano, lei è già nei suoi alloggi: la Ostrander l'ha portata lì otto minuti fa, e il fascio non ripete un viaggio che è già fatto. Se vuole tornare in plancia, quello sì lo faccio fare subito.",
+   "urgent": false
+  },
+  {
+   "t": 2340.49,
+   "kind": "net",
+   "speaker": "ally_t66",
+   "text": "Aquila, Aurelia Reserve: T-66 in comando, schermo confermato a 4.5 km. Plot pulito, chiudo dai 53 km sulla tua linea con la Probity; nessun contatto.",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 2349.66,
+   "kind": "net",
+   "speaker": "ally_t66",
+   "text": "Aquila, Aurelia Reserve: T-66 in comando, schermo confermato a 4.5 km.",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 2354.74,
+   "kind": "net",
+   "speaker": "ally_t66",
+   "text": "Aquila, Aurelia Reserve: T-66 in comando, schermo confermato a 4.5 km.",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 2357.82,
+   "kind": "answer",
+   "speaker": "xo",
+   "text": "Capitano, lei è già nei suoi alloggi, deck uno, sezione A: la Ostrander l'ha portata lì otto minuti fa, arrivo pulito. Non c'è nulla da teletrasportare: se vuole tornare in plancia, quello lo faccio fare subito.",
+   "urgent": false
+  },
+  {
+   "t": 2364.28,
+   "kind": "answer",
+   "speaker": "xo",
+   "text": "Capitano, il locatore la dà nella spina, deck otto, sezione F: è già al ponte dei marine, dove stanno i Kestrel. Da lì l'armeria è a poppa, trenta passi.",
+   "urgent": false
+  },
+  {
+   "t": 2371.15,
+   "kind": "net",
+   "speaker": "ally_t66",
+   "text": "Aquila, Aurelia Reserve: T-66 in comando, schermo confermato a 4.5 km.",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 2373.95,
+   "kind": "other",
+   "speaker": "ally_t66",
+   "text": "Aquila, Aurelia Reserve: T-66 in comando, schermo confermato a 4.5 km.",
+   "urgent": false,
+   "answer": false
+  },
+  {
+   "t": 2376.16,
+   "kind": "net",
+   "speaker": "ally_t66",
+   "text": "Aquila, Aurelia Reserve: T-66 in comando, schermo confermato a 4.5 km. Plot pulito, chiudo dai 68 km sulla tua linea con la Probity; nessun contatto.",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 2378.08,
+   "kind": "net",
+   "speaker": "ally_t64",
+   "text": "Aquila, Aurelia Reserve: T-66 in comando, schermo confermato a 4.5 km. Plot pulito; chiudo dai 72 km sulla tua linea con la Probity.",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 2384.09,
+   "kind": "net",
+   "speaker": "ally_t66",
+   "text": "Aquila, Aurelia Reserve: T-66 in comando, schermo sull'Aquila conferma",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 2387.67,
+   "kind": "net",
+   "speaker": "ally_t64",
+   "text": "Aquila, Aurelia Reserve: T-66 in comando, schermo sull'Aquila conferma",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 2394.79,
+   "kind": "other",
+   "speaker": "castellan",
+   "text": "Aquila, Praetorian: il picket è a 104 km da voi, uno schermo a quella distanza non è uno schermo. Chiudo a 4.5 km sulla vostra scia e tengo l'arco verso il Gate.",
+   "urgent": false,
+   "answer": false
+  },
+  {
+   "t": 2402.84,
+   "kind": "net",
+   "speaker": "castellan",
+   "text": "Aquila, Praetorian: siamo a 110 km da voi, a quella distanza lo schermo non è uno schermo. Chiudo con il Vigilant sulla vostra scia e porto l'arco verso il Gate.",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 2405.28,
+   "kind": "net",
+   "speaker": "castellan",
+   "text": "Aquila, Praetorian: siamo a 110 km da voi, a quella distanza lo scherm",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 2405.28,
+   "kind": "net",
+   "speaker": "ally_t44",
+   "text": "Aquila, Constance: nessun contatto qui. Chiudo da 93 km e mi metto in ",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 2405.55,
+   "kind": "answer",
+   "speaker": "xo",
+   "text": "Capitano, lei è già nei suoi alloggi, deck uno sezione A: la Ostrander l'ha portata lì otto minuti fa, arrivo pulito. Il locatore la dà nella spina, deck otto sezione E, dai marine: se vuole gli alloggi, la porto io con la sua parola.",
+   "urgent": false
+  },
+  {
+   "t": 2414.2,
+   "kind": "answer",
+   "speaker": "xo",
+   "text": "Capitano, ordine alla Ostrander: lei dal deck otto, sezione E, ai suoi alloggi, deck uno. La conferma è sua.",
+   "urgent": false
+  },
+  {
+   "t": 2415.09,
+   "kind": "xfer",
+   "speaker": "xfer_chief",
+   "text": "Capitano, preso dal passaggio di tribordo, deck otto sezione E: serratura in un secondo e mezzo, qualità cento, ciclo di otto secondi. È in arrivo nei suoi alloggi.",
+   "answer": true,
+   "urgent": false
+  },
+  {
+   "t": 2420.95,
+   "kind": "net",
+   "speaker": "ally_t66",
+   "text": "Aquila, Intrepid: nessun contatto sul plot. La Reserve chiude da 92 km",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 2442.23,
+   "kind": "answer",
+   "speaker": "xo",
+   "text": "Capitano, sono Serra, comandante in seconda: lei è nel corridoio uno-a di tribordo, deck uno, e la nave è mia finché non torna in plancia. Vuole che la riporti al suo posto?",
+   "urgent": false
+  },
+  {
+   "t": 2456.38,
+   "kind": "answer",
+   "speaker": "xo",
+   "text": "Capitano, ben tornato. Nave in rotta uno-sei-sette verso il Gate, tutta forza, quattrocentottanta metri al secondo, allarme rosso, scafo novantotto, calore trentuno, nessun contatto ostile sul plot. Il Main Body, Constance e il picket si sono messi in schermo sulla nostra scia a quattro virgola cinque chilometri. L'unica cosa che conta: il Gate di Thule è a duecentosettanta chilometri, e di là diciotto navi.",
+   "urgent": false
+  },
+  {
+   "t": 2476.13,
+   "kind": "net",
+   "speaker": "ally_t48",
+   "text": "Aquila, Valiant: nessun contatto sul plot. Il Main Body chiude da 100 ",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 2478.1,
+   "kind": "net",
+   "speaker": "ally_t64",
+   "text": "Aquila, Intrepid: ho la Reserve. Nessun contatto; l'Intrepid rientra in schermo a 4.5 km in linea con la Probity.",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 2484.07,
+   "kind": "net",
+   "speaker": "ally_t66",
+   "text": "Aquila, Intrepid: Reserve in schermo a 4.5 km sulla vostra scia, in li",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 2484.19,
+   "kind": "answer",
+   "speaker": "helm",
+   "text": "Capitano, rotta tre-quattro-cinque, marca più sei, sul Janus Gate, tutta forza: duecentottantuno virgola due chilometri, ci arrivo in circa dieci minuti. Il passaggio lo comando io solo al suo ordine.",
+   "urgent": false
+  },
+  {
+   "t": 2490.38,
+   "kind": "net",
+   "speaker": "ally_t66",
+   "text": "Aquila, Intrepid: ho la Reserve. Nessun contatto; l'Intrepid rientra i",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 2494.46,
+   "kind": "net",
+   "speaker": "ally_t64",
+   "text": "Aquila, Intrepid: ho la Reserve. Nessun contatto; l'Intrepid rientra i",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 2496.52,
+   "kind": "net",
+   "speaker": "ally_t66",
+   "text": "Aquila, Intrepid: ho la Reserve. Nessun contatto; l'Intrepid rientra i",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 2515.22,
+   "kind": "answer",
+   "speaker": "helm",
+   "text": "Capitano, la colpa è mia: la prima rotta che le ho dato, uno-sei-sette, era sbagliata, e in dieci minuti ci ha portati a duecentottanta chilometri dal Gate. Ora sto già virando su tre-quattro-cinque, marca più sei: il Gate è a duecentonovantaquattro virgola cinque, ci arrivo in circa dieci minuti a tutta forza.",
+   "urgent": false
+  },
+  {
+   "t": 2520.11,
+   "kind": "net",
+   "speaker": "ally_t66",
+   "text": "Aquila, Intrepid: ho la Reserve. Nessun contatto; l'Intrepid rientra in schermo a 4.5 km in linea con la Probity.",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 2521.62,
+   "kind": "net",
+   "speaker": "ally_t66",
+   "text": "Aquila, Intrepid: ho la Reserve. Nessun contatto; l'Intrepid rientra i",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 2532.26,
+   "kind": "net",
+   "speaker": "ally_t66",
+   "text": "Aquila, Intrepid: ho la Reserve. Nessun contatto; l'Intrepid rientra in schermo a 4.5 km in linea con la Probity.",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 2536.97,
+   "kind": "net",
+   "speaker": "ally_t66",
+   "text": "Aquila, Intrepid: ho la Reserve. Nessun contatto; l'Intrepid rientra in schermo a 4.5 km in linea con la Probity.",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 2543.11,
+   "kind": "net",
+   "speaker": "ally_t66",
+   "text": "Aquila, Intrepid: ho la Reserve. Nessun contatto;",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 2544.93,
+   "kind": "net",
+   "speaker": "ally_t66",
+   "text": "Aquila, Intrepid: ho la Reserve. Nessun contatto; l'Intrepid rientra i",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 2546.98,
+   "kind": "net",
+   "speaker": "ally_t66",
+   "text": "Aquila, Intrepid: ho la Reserve. Nessun contatto; l'Intrepid rientra i",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  },
+  {
+   "t": 2549.54,
+   "kind": "net",
+   "speaker": "ally_t66",
+   "text": "Aquila, Intrepid: ho la Reserve. Nessun contatto; l'Intrepid rientra i",
+   "urgent": false,
+   "answer": false,
+   "via": "say"
+  }
+ ],
+ "events": [
+  {
+   "t": 60.29,
+   "text": "bridge: the Captain has just come onto the bridge — the XO greets them and briefs the situation in two or three short lines (where we are, the patrol with the 7th Fleet, anything on the sensors worth their attention)",
+   "report": true
+  },
+  {
+   "t": 137.14,
+   "text": "sensors: contact T-11 has lit its drive and is accelerating towards the freighter Brightwater (T-07); drive signature matches a Kharon Mandate frigate, Lethe class",
+   "report": true
+  },
+  {
+   "t": 137.17,
+   "text": "sensors: the Mandate ships have not found us: we are outside their sensors (our signature about 25 km)",
+   "report": true
+  },
+  {
+   "t": 137.27,
+   "text": "flight: launching Alpha on combat air patrol over the Aquila",
+   "report": true
+  },
+  {
+   "t": 137.27,
+   "text": "engineering: combat power: shields and weapons up, life support and engines trimmed",
+   "report": true
+  },
+  {
+   "t": 151.27,
+   "text": "flight: alpha squadron airborne, 8 Falcons on CAP",
+   "report": true
+  },
+  {
+   "t": 168.54,
+   "text": "sensors: civilian traffic is clearing the area as the hostile contacts close — 2 vessels diverting to the berths of the Arsenal and Keeper Station, 0 running dark, 0 holding at the Gate",
+   "report": false
+  },
+  {
+   "t": 251.37,
+   "text": "flight: bravo squadron airborne, 7 Hammers on STRIKE",
+   "report": true
+  },
+  {
+   "t": 321.53,
+   "text": "sensors: firm tracks — Acheron (T-40) at 85 km, bearing 055; Styx (T-41) at 86 km, bearing 054; Cocytus (T-42) at 86 km, bearing 056; Phlegethon (T-43) at 88 km, bearing 053",
+   "report": true
+  },
+  {
+   "t": 321.53,
+   "text": "sensors: T-40 identified: Acheron; T-41 identified: Styx; T-42 identified: Cocytus; T-43 identified: Phlegethon",
+   "report": true
+  },
+  {
+   "t": 321.63,
+   "text": "comms: Keeper Station — the Janus Gate is closed to civilian traffic while hostile contacts are about the ring (1 vessel holding in the lane queue; everything else is told to clear the Gate lane)",
+   "report": true
+  },
+  {
+   "t": 335.48,
+   "text": "transmission: T-40 — the commander of the Mandate force, aboard the Acheron, hails the Aquila",
+   "report": true
+  },
+  {
+   "t": 335.62,
+   "text": "flight: bravo squadron torpedo run on Lethe (T-11): 6 torpedoes away, bombers returning",
+   "report": true
+  },
+  {
+   "t": 336.48,
+   "text": "tactical: Lethe (T-11) has gone dark — the reactor scrammed: no power, drifting, no longer a threat",
+   "report": true
+  },
+  {
+   "t": 339.01,
+   "text": "tactical: Lethe (T-11) — the mid section is gutted, the hull is breaking up",
+   "report": true
+  },
+  {
+   "t": 341.42,
+   "text": "tactical: Lethe (T-11) — the bow section is gutted, the hull is breaking up",
+   "report": true
+  },
+  {
+   "t": 341.42,
+   "text": "tactical: Lethe (T-11) — the stern section is gutted, the hull is breaking up",
+   "report": true
+  },
+  {
+   "t": 341.43,
+   "text": "tactical: Lethe (T-11, Kharon Mandate frigate, Lethe class) destroyed: her reactor breached",
+   "report": true
+  },
+  {
+   "t": 341.43,
+   "text": "flight: Hammer: 3.3 km from the stern section of Lethe (W-11S) — the hull is open to space at the torn end. Her rooms as they were when she went (all of her; this piece is about 30% of her): 265 gutted, 265 open to space or without air, 0 burning, 265 without power; 30 pressure bulkheads were shut",
+   "report": false
+  },
+  {
+   "t": 341.43,
+   "text": "flight: Hammer: 3.4 km from the middle section of Lethe (W-11M) — the hull is open to space at the torn ends. Her rooms as they were when she went (all of her; this piece is about 36% of her): 265 gutted, 265 open to space or without air, 0 burning, 265 without power; 30 pressure bulkheads were shut",
+   "report": false
+  },
+  {
+   "t": 341.43,
+   "text": "flight: Hammer: 3.4 km from the bow section of Lethe (W-11B) — the hull is open to space at the torn end. Her rooms as they were when she went (all of her; this piece is about 34% of her): 265 gutted, 265 open to space or without air, 0 burning, 265 without power; 30 pressure bulkheads were shut",
+   "report": false
+  },
+  {
+   "t": 341.48,
+   "text": "helm: keep on bow ended (T-11 is no longer on the plot): back to hold",
+   "report": true
+  },
+  {
+   "t": 341.48,
+   "text": "flight: alpha's target T-11 is gone: alpha back on combat air patrol",
+   "report": true
+  },
+  {
+   "t": 341.48,
+   "text": "flight: bravo's target T-11 is gone: bravo back on combat air patrol",
+   "report": true
+  },
+  {
+   "t": 343.08,
+   "text": "flight: bravo squadron torpedo run on Lethe (T-11): 4 torpedoes away, bombers returning",
+   "report": true
+  },
+  {
+   "t": 350.42,
+   "text": "sensors: focus ended (T-11 is gone): back to passive",
+   "report": true
+  },
+  {
+   "t": 354.55,
+   "text": "flight: Hammer: 0.8 km from the stern section of Lethe (W-11S) — no life signs. Of the 62 her class carries, 26 lie dead where they fell before she went and 36 more were lost with her (about 19 of them in this piece); 0 got away in 0 lifepods",
+   "report": false
+  },
+  {
+   "t": 395.98,
+   "text": "flight: alpha squadron recovered, 8 of 8 Falcons aboard, rearming (60 s)",
+   "report": true
+  },
+  {
+   "t": 418.47,
+   "text": "sensors: friendly contacts at 85 km, bearing 060 — the 7th Fleet: Battle Group Constance: 4 ships",
+   "report": true
+  },
+  {
+   "t": 420.74,
+   "text": "sensors: friendly contacts at 85 km, bearing 061 — the 7th Fleet: 7th Fleet Main Body: 8 ships",
+   "report": true
+  },
+  {
+   "t": 424.85,
+   "text": "sensors: civilian traffic is clearing the area as the hostile contacts close — 11 vessels diverting to the berths of the Arsenal and Keeper Station, 0 running dark, 0 holding at the Gate",
+   "report": false
+  },
+  {
+   "t": 435.49,
+   "text": "sensors: jamming — a strobe from Acheron (T-40) on bearing 067: it floods our radar along that bearing (its range is hidden and our tracks there fade, the fleet's too). Missiles can home on the jamming; the railguns need a range: a cross-fix (a fleet ship or a flight group well off our line), a recon flight's eyes, an active ping burning through for a moment, or burn-through inside 12 km",
+   "report": true
+  },
+  {
+   "t": 438.66,
+   "text": "flight: bravo squadron recovered, 7 of 7 Hammers aboard, rearming (120 s)",
+   "report": true
+  },
+  {
+   "t": 439.16,
+   "text": "sensors: Acheron (T-40) has launched strike fighters — 4 Harpies inbound on the Aquila",
+   "report": true
+  },
+  {
+   "t": 453.6,
+   "text": "flight: w36-0 squadron engaged a Harpy at 6.9 km",
+   "report": false
+  },
+  {
+   "t": 453.97,
+   "text": "flight: w37-0 squadron engaged a Harpy at 8.2 km",
+   "report": false
+  },
+  {
+   "t": 454.37,
+   "text": "flight: w32-0 squadron engaged a Harpy at 4.0 km",
+   "report": false
+  },
+  {
+   "t": 455.31,
+   "text": "flight: the ASN Valiant's bombers are airborne, 5 on strike",
+   "report": false
+  },
+  {
+   "t": 456.0,
+   "text": "flight: alpha squadron rearmed, 8 Falcons ready on the flight deck",
+   "report": false
+  },
+  {
+   "t": 460.69,
+   "text": "flight: the ASN Bulwark's bombers are airborne, 5 on strike",
+   "report": false
+  },
+  {
+   "t": 462.15,
+   "text": "tactical: 1 Harpy splashed, 3 of the enemy strike fighters left",
+   "report": true
+  },
+  {
+   "t": 468.45,
+   "text": "flight: the ASN Constance's fighters are airborne, 8 on cap",
+   "report": false
+  },
+  {
+   "t": 474.15,
+   "text": "tactical: 3 Harpies splashed, 0 of the enemy strike fighters left",
+   "report": true
+  },
+  {
+   "t": 474.52,
+   "text": "flight: the ASN Bulwark's fighters are airborne, 14 on cap",
+   "report": false
+  },
+  {
+   "t": 478.98,
+   "text": "flight: the ASN Valiant's fighters are airborne, 14 on cap",
+   "report": false
+  },
+  {
+   "t": 484.83,
+   "text": "tactical: no hostile ship left fighting in the engagement zone — the engagement is over",
+   "report": true
+  },
+  {
+   "t": 484.84,
+   "text": "director: engagement over — victory: the surviving enemy ships broke off and withdrew; Aquila hull 100%, 96 missiles; our fleet: ASN Praetorian in action, ASN Vigilant in action, ASN Constance in action, ASN Steadfast in action, ASN Valour in action, ASN Kestrel in action, ASN Valiant in action, ASN Bulwark in action, ASN Vigilance in action, ASN Fortitude in action, ASN Prudence in action, ASN Temperance in action, ASN Clemency in action, ASN Verity in action; Mandate ships destroyed so far: 5",
+   "report": false
+  },
+  {
+   "t": 487.73,
+   "text": "flight: w36-1 squadron torpedo run on Acheron (T-40): 8 torpedoes away, bombers returning",
+   "report": true
+  },
+  {
+   "t": 489.75,
+   "text": "sensors: the Mandate has found us — a firm track (our signature reaches about 28 km)",
+   "report": true
+  },
+  {
+   "t": 492.81,
+   "text": "flight: w37-1 squadron torpedo run on Acheron (T-40): 6 torpedoes away, bombers returning",
+   "report": true
+  },
+  {
+   "t": 494.61,
+   "text": "flight: w36-1 squadron torpedo run on Acheron (T-40): 2 torpedoes away, bombers returning",
+   "report": true
+  },
+  {
+   "t": 499.52,
+   "text": "flight: w37-1 squadron torpedo run on Acheron (T-40): 4 torpedoes away, bombers returning",
+   "report": true
+  },
+  {
+   "t": 516.71,
+   "text": "flight: w36-1 squadron recovered, 5 of 5 Hammers aboard, rearming (120 s)",
+   "report": false
+  },
+  {
+   "t": 522.74,
+   "text": "flight: w37-1 squadron recovered, 5 of 5 Hammers aboard, rearming (120 s)",
+   "report": false
+  },
+  {
+   "t": 538.17,
+   "text": "comms: distress call from the Ceres ore barge Deep Vein (CERES MINING GUILD) — 4 hostile warships 16 km off her and closing; she is running for the berths of Aurelia Arsenal. She is at bearing 190, mark +17, 15 km from us",
+   "report": true
+  },
+  {
+   "t": 558.7,
+   "text": "flight: bravo squadron rearmed, 7 Hammers ready on the flight deck",
+   "report": false
+  },
+  {
+   "t": 564.31,
+   "text": "engineering: radiators extended",
+   "report": false
+  },
+  {
+   "t": 564.31,
+   "text": "engineering: heat 67%: radiators extended (they show on the enemy's sensors)",
+   "report": true
+  },
+  {
+   "t": 573.7,
+   "text": "engineering: the ship is running hot, 70 % and rising — weapons cadence and shield regeneration start to drop (radiators extended, 3 coolant vents)",
+   "report": true
+  },
+  {
+   "t": 588.26,
+   "text": "tactical: Phlegethon (T-43) — the stern section is gutted",
+   "report": true
+  },
+  {
+   "t": 588.29,
+   "text": "tactical: Phlegethon (T-43) — the mid section is gutted, the hull is breaking up",
+   "report": true
+  },
+  {
+   "t": 588.34,
+   "text": "tactical: Phlegethon (T-43) has gone dark — the reactor scrammed: no power, drifting, no longer a threat",
+   "report": true
+  },
+  {
+   "t": 589.36,
+   "text": "tactical: engaging Cocytus (was T-43)",
+   "report": true
+  },
+  {
+   "t": 602.59,
+   "text": "sensors: firm tracks — T-56 at 85 km, bearing 049; T-57 at 87 km, bearing 049",
+   "report": true
+  },
+  {
+   "t": 610.64,
+   "text": "sensors: firm tracks — T-58 at 83 km, bearing 055; T-59 at 83 km, bearing 054; T-60 at 83 km, bearing 053; T-61 at 83 km, bearing 051",
+   "report": true
+  },
+  {
+   "t": 611.68,
+   "text": "tactical: Phlegethon (T-43) — the bow section is gutted, the hull is breaking up",
+   "report": true
+  },
+  {
+   "t": 611.7,
+   "text": "tactical: Phlegethon (T-43, Kharon Mandate destroyer, Styx class) destroyed: her reactor breached",
+   "report": true
+  },
+  {
+   "t": 611.75,
+   "text": "helm: keep on bow ended (T-43 is no longer on the plot): back to hold",
+   "report": true
+  },
+  {
+   "t": 611.88,
+   "text": "sensors: 3.8 km from the stern section of Phlegethon (W-43S) — the hull is open to space at the torn end. Her rooms as they were when she went (all of her; this piece is about 30% of her): 385 gutted, 388 open to space or without air, 0 burning, 385 without power; 38 pressure bulkheads were shut",
+   "report": false
+  },
+  {
+   "t": 611.88,
+   "text": "sensors: 3.9 km from the middle section of Phlegethon (W-43M) — the hull is open to space at the torn ends. Her rooms as they were when she went (all of her; this piece is about 36% of her): 385 gutted, 388 open to space or without air, 0 burning, 385 without power; 38 pressure bulkheads were shut",
+   "report": false
+  },
+  {
+   "t": 611.88,
+   "text": "sensors: 4.0 km from the bow section of Phlegethon (W-43B) — the hull is open to space at the torn end. Her rooms as they were when she went (all of her; this piece is about 34% of her): 385 gutted, 388 open to space or without air, 0 burning, 385 without power; 38 pressure bulkheads were shut",
+   "report": false
+  },
+  {
+   "t": 619.64,
+   "text": "tactical: Cocytus (T-42) — the bow section is gutted",
+   "report": true
+  },
+  {
+   "t": 619.72,
+   "text": "tactical: Cocytus (T-42) — the mid section is gutted, the hull is breaking up",
+   "report": true
+  },
+  {
+   "t": 619.76,
+   "text": "tactical: Cocytus (T-42, Kharon Mandate destroyer, Styx class) destroyed: her reactor breached",
+   "report": true
+  },
+  {
+   "t": 620.11,
+   "text": "flight: Falcon: 2.3 km from the bow section of Cocytus (W-42B) — the hull is open to space at the torn end. Her rooms as they were when she went (all of her; this piece is about 34% of her): 200 gutted, 198 open to space or without air, 6 burning, 200 without power",
+   "report": false
+  },
+  {
+   "t": 620.11,
+   "text": "flight: Falcon: 2.4 km from the middle section of Cocytus (W-42M) — the hull is open to space at the torn ends. Her rooms as they were when she went (all of her; this piece is about 36% of her): 200 gutted, 198 open to space or without air, 6 burning, 200 without power",
+   "report": false
+  },
+  {
+   "t": 620.11,
+   "text": "flight: Falcon: 2.5 km from the stern section of Cocytus (W-42S) — the hull is open to space at the torn end. Her rooms as they were when she went (all of her; this piece is about 30% of her): 200 gutted, 198 open to space or without air, 6 burning, 200 without power",
+   "report": false
+  },
+  {
+   "t": 620.77,
+   "text": "tactical: engaging Styx (was T-42)",
+   "report": true
+  },
+  {
+   "t": 621.52,
+   "text": "sensors: T-56 classified: Kharon Mandate cruiser, Acheron class",
+   "report": true
+  },
+  {
+   "t": 624.81,
+   "text": "tactical: Styx (T-41) has gone dark — the crew has abandoned her: no power, drifting, no longer a threat",
+   "report": true
+  },
+  {
+   "t": 625.57,
+   "text": "tactical: Styx (T-41) — the stern section is gutted",
+   "report": true
+  },
+  {
+   "t": 625.58,
+   "text": "tactical: Styx (T-41) — the mid section is gutted, the hull is breaking up",
+   "report": true
+  },
+  {
+   "t": 625.58,
+   "text": "tactical: Styx (T-41) — the bow section is gutted, the hull is breaking up",
+   "report": true
+  },
+  {
+   "t": 625.58,
+   "text": "tactical: Styx (T-41, Kharon Mandate destroyer, Styx class) destroyed: her reactor breached",
+   "report": true
+  },
+  {
+   "t": 625.79,
+   "text": "sensors: T-57 classified: Kharon Mandate destroyer, Styx class",
+   "report": true
+  },
+  {
+   "t": 626.66,
+   "text": "sensors: firm tracks — T-62 at 83 km, bearing 045; T-63 at 85 km, bearing 044",
+   "report": true
+  },
+  {
+   "t": 630.15,
+   "text": "sensors: T-60 classified: Kharon Mandate destroyer, Styx class",
+   "report": true
+  },
+  {
+   "t": 630.28,
+   "text": "sensors: T-61 classified: Kharon Mandate destroyer, Styx class",
+   "report": true
+  },
+  {
+   "t": 631.69,
+   "text": "sensors: T-59 classified: Kharon Mandate destroyer, Styx class",
+   "report": true
+  },
+  {
+   "t": 632.15,
+   "text": "sensors: a close look at the stern section of Phlegethon (W-43S, ex T-43, Kharon Mandate destroyer, Styx class), lost 20 s ago when her reactor breached: no power, no transponder, no life signs; tumbling at about 6.1 deg/s, the hull charred by the blast, the torn ends still glowing; some 117 pieces of wreckage spread over 2.5 km — bearing 047, mark +19, 4 km",
+   "report": false
+  },
+  {
+   "t": 632.53,
+   "text": "sensors: T-58 classified: Kharon Mandate destroyer, Styx class",
+   "report": true
+  },
+  {
+   "t": 636.74,
+   "text": "flight: w36-1 squadron rearmed, 5 Hammers ready on the flight deck",
+   "report": false
+  },
+  {
+   "t": 639.96,
+   "text": "sensors: a close look at the bow section of Cocytus (W-42B, ex T-42, Kharon Mandate destroyer, Styx class), lost 20 s ago when her reactor breached: no power, no transponder, no life signs; tumbling at about 2.3 deg/s, the hull charred by the blast, the torn ends still glowing; 2 lifepods got away; some 117 pieces of wreckage spread over 2.4 km — bearing 029, mark +4, 7 km",
+   "report": false
+  },
+  {
+   "t": 642.75,
+   "text": "flight: w37-1 squadron rearmed, 5 Hammers ready on the flight deck",
+   "report": false
+  },
+  {
+   "t": 645.65,
+   "text": "sensors: a Kharon Mandate cruiser, Acheron class (T-56) has launched strike fighters — 4 Harpies inbound on the Aquila",
+   "report": true
+  },
+  {
+   "t": 652.22,
+   "text": "sensors: a Kharon Mandate cruiser, Acheron class (T-56) has launched strike fighters — 8 Harpies inbound on the Aquila",
+   "report": true
+  },
+  {
+   "t": 654.57,
+   "text": "sensors: T-62 classified: Kharon Mandate frigate, Lethe class",
+   "report": true
+  },
+  {
+   "t": 656.29,
+   "text": "sensors: T-63 classified: Kharon Mandate frigate, Lethe class",
+   "report": true
+  },
+  {
+   "t": 685.36,
+   "text": "sensors: civilian traffic is clearing the area as the hostile contacts close — 12 vessels diverting to the berths of the Arsenal and Keeper Station, 0 running dark, 0 holding at the Gate",
+   "report": false
+  },
+  {
+   "t": 685.87,
+   "text": "engineering: heat back down to 60 %, systems nominal",
+   "report": false
+  },
+  {
+   "t": 691.0,
+   "text": "sensors: distress beacons — 2 Mandate lifepods of Cocytus (T-42) (10 survivors, air for 2 h 05 min at the least), the nearest bearing 034, mark +16, 13 km",
+   "report": false
+  },
+  {
+   "t": 694.03,
+   "text": "sensors: lost the track on Acheron (T-40) — a bearing at most now",
+   "report": true
+  },
+  {
+   "t": 717.21,
+   "text": "tactical: rockets inbound from the Harpy strike fighters (1 so far), point defense tracking",
+   "report": true
+  },
+  {
+   "t": 718.27,
+   "text": "tactical: decoys away: 3 missiles closing",
+   "report": true
+  },
+  {
+   "t": 718.34,
+   "text": "sensors: the bearing on T-40 has faded — its emissions stopped (it went quiet, or it was never there)",
+   "report": true
+  },
+  {
+   "t": 719.11,
+   "text": "tactical: point defense splashed an incoming missile",
+   "report": false
+  },
+  {
+   "t": 719.11,
+   "text": "tactical: point defense splashed an incoming missile",
+   "report": false
+  },
+  {
+   "t": 720.15,
+   "text": "tactical: point defense splashed an incoming missile",
+   "report": false
+  },
+  {
+   "t": 721.15,
+   "text": "tactical: the decoys drew off 1 missile",
+   "report": true
+  },
+  {
+   "t": 721.19,
+   "text": "tactical: point defense splashed an incoming missile",
+   "report": false
+  },
+  {
+   "t": 722.91,
+   "text": "shields took a hit, holding at 99%",
+   "report": true
+  },
+  {
+   "t": 723.08,
+   "text": "flight: w37-0 squadron engaged a Harpy at 7.5 km",
+   "report": false
+  },
+  {
+   "t": 723.32,
+   "text": "comms: distress call from the Concord Line passenger shuttle Evening Star II (CONCORD LINE) — 12 hostile strike craft 16 km off her and closing; she is running for the berths of Aurelia Arsenal. She is at bearing 317, mark +16, 18 km from us",
+   "report": true
+  },
+  {
+   "t": 725.97,
+   "text": "flight: w36-0 squadron engaged a Harpy at 10.1 km",
+   "report": false
+  },
+  {
+   "t": 726.24,
+   "text": "sensors: T-62 identified: Moros",
+   "report": true
+  },
+  {
+   "t": 727.17,
+   "text": "tactical: the decoys drew off 3 missiles",
+   "report": true
+  },
+  {
+   "t": 728.44,
+   "text": "sensors: T-63 identified: Keres",
+   "report": true
+  },
+  {
+   "t": 728.95,
+   "text": "shields took a hit, holding at 100%",
+   "report": true
+  },
+  {
+   "t": 730.84,
+   "text": "tactical: point defense splashed an incoming missile",
+   "report": false
+  },
+  {
+   "t": 731.01,
+   "text": "tactical: 1 Harpy splashed, 7 of the enemy strike fighters left",
+   "report": true
+  },
+  {
+   "t": 732.84,
+   "text": "tactical: point defense splashed an incoming missile",
+   "report": false
+  },
+  {
+   "t": 732.84,
+   "text": "tactical: point defense splashed an incoming missile",
+   "report": false
+  },
+  {
+   "t": 733.17,
+   "text": "tactical: the decoys drew off 6 missiles",
+   "report": true
+  },
+  {
+   "t": 734.38,
+   "text": "tactical: point defense splashed an incoming missile",
+   "report": false
+  },
+  {
+   "t": 734.97,
+   "text": "shields took a hit, holding at 107%",
+   "report": true
+  },
+  {
+   "t": 735.31,
+   "text": "flight: w94-1 squadron torpedo run on ASN Aquila (AQUILA): 8 torpedoes away, bombers returning",
+   "report": true
+  },
+  {
+   "t": 737.93,
+   "text": "sensors: Acheron (T-40) has left sensor range",
+   "report": true
+  },
+  {
+   "t": 738.53,
+   "text": "tactical: point defense splashed an incoming missile",
+   "report": false
+  },
+  {
+   "t": 739.2,
+   "text": "tactical: the decoys drew off 1 missile",
+   "report": true
+  },
+  {
+   "t": 740.58,
+   "text": "tactical: 1 Harpy splashed, 3 of the enemy strike fighters left",
+   "report": true
+  },
+  {
+   "t": 740.98,
+   "text": "damage report: we've been hit — a hull breach in deck 9 section B (Flight Deck); shields 100%, hull 98%",
+   "report": true
+  },
+  {
+   "t": 743.04,
+   "text": "tactical: 5 Harpies splashed, 2 of the enemy strike fighters left",
+   "report": true
+  },
+  {
+   "t": 746.9,
+   "text": "tactical: engaging Talon 2 (was HARPY-1)",
+   "report": true
+  },
+  {
+   "t": 746.95,
+   "text": "transmission: T-56 — the Nyx (Kharon Mandate cruiser, Acheron class) now leads what is left of the strike group, because the Acheron jumped out of the system; it hails the Aquila",
+   "report": true
+  },
+  {
+   "t": 752.59,
+   "text": "tactical: 3 Harpies splashed, 0 of the enemy strike fighters left",
+   "report": true
+  },
+  {
+   "t": 755.07,
+   "text": "tactical: 2 Harpies splashed, 0 of the enemy strike fighters left",
+   "report": true
+  },
+  {
+   "t": 763.26,
+   "text": "tactical: Moros (T-62) — the bow section is gutted",
+   "report": true
+  },
+  {
+   "t": 777.34,
+   "text": "tactical: Moros (T-62) — the mid section is gutted, the hull is breaking up",
+   "report": true
+  },
+  {
+   "t": 777.38,
+   "text": "tactical: Moros (T-62) has gone dark — the reactor scrammed: no power, drifting, no longer a threat",
+   "report": true
+  },
+  {
+   "t": 777.58,
+   "text": "tactical: engaging Keres (was T-62)",
+   "report": true
+  },
+  {
+   "t": 779.38,
+   "text": "tactical: Moros (T-62) — the stern section is gutted, the hull is breaking up",
+   "report": true
+  },
+  {
+   "t": 779.38,
+   "text": "tactical: Moros (T-62, Kharon Mandate frigate, Lethe class) destroyed: her reactor breached",
+   "report": true
+  },
+  {
+   "t": 779.42,
+   "text": "flight: bravo's target T-62 is gone: bravo back on combat air patrol",
+   "report": true
+  },
+  {
+   "t": 779.42,
+   "text": "flight: alpha's target T-62 is gone: alpha back on combat air patrol",
+   "report": true
+  },
+  {
+   "t": 787.54,
+   "text": "flight: bravo squadron airborne, 5 Hammers on CAP",
+   "report": true
+  },
+  {
+   "t": 789.17,
+   "text": "flight: Hammer: 3.9 km from the stern section of Moros (W-62S) — the hull is open to space at the torn end. Her rooms as they were when she went (all of her; this piece is about 30% of her): 265 gutted, 265 open to space or without air, 0 burning, 265 without power; 10 pressure bulkheads were shut",
+   "report": false
+  },
+  {
+   "t": 789.57,
+   "text": "flight: alpha squadron airborne, 6 Falcons on CAP",
+   "report": true
+  },
+  {
+   "t": 790.5,
+   "text": "tactical: Keres (T-63) — the stern section is gutted, the hull is breaking up",
+   "report": true
+  },
+  {
+   "t": 790.54,
+   "text": "tactical: Keres (T-63) — the mid section is gutted, the hull is breaking up",
+   "report": true
+  },
+  {
+   "t": 790.57,
+   "text": "tactical: Keres (T-63, Kharon Mandate frigate, Lethe class) destroyed: her reactor breached",
+   "report": true
+  },
+  {
+   "t": 790.6,
+   "text": "tactical: no hostile ship left fighting in the engagement zone — the engagement is over",
+   "report": true
+  },
+  {
+   "t": 790.61,
+   "text": "director: engagement over — victory: the surviving enemy ships broke off and withdrew; Aquila hull 98%, 60 missiles; our fleet: ASN Praetorian in action, ASN Vigilant in action, ASN Constance in action, ASN Steadfast in action, ASN Valour in action, ASN Kestrel in action, ASN Valiant in action, ASN Bulwark in action, ASN Vigilance in action, ASN Fortitude in action, ASN Prudence in action, ASN Temperance in action, ASN Clemency in action, ASN Verity in action; Mandate ships destroyed so far: 22",
+   "report": false
+  },
+  {
+   "t": 790.67,
+   "text": "flight: Hammer: 3.5 km from the stern section of Keres (W-63S) — the hull is open to space at the torn end. Her rooms as they were when she went (all of her; this piece is about 30% of her): 246 gutted, 246 open to space or without air, 0 burning, 246 without power",
+   "report": true
+  },
+  {
+   "t": 790.67,
+   "text": "flight: Hammer: 3.6 km from the middle section of Keres (W-63M) — the hull is open to space at the torn ends. Her rooms as they were when she went (all of her; this piece is about 36% of her): 246 gutted, 246 open to space or without air, 0 burning, 246 without power",
+   "report": true
+  },
+  {
+   "t": 790.67,
+   "text": "flight: Hammer: 3.6 km from the bow section of Keres (W-63B) — the hull is open to space at the torn end. Her rooms as they were when she went (all of her; this piece is about 34% of her): 246 gutted, 246 open to space or without air, 0 burning, 246 without power",
+   "report": true
+  },
+  {
+   "t": 791.17,
+   "text": "flight: Hammer: 3.8 km from the middle section of Moros (W-62M) — the hull is open to space at the torn ends. Her rooms as they were when she went (all of her; this piece is about 36% of her): 265 gutted, 265 open to space or without air, 0 burning, 265 without power; 10 pressure bulkheads were shut",
+   "report": true
+  },
+  {
+   "t": 791.44,
+   "text": "tactical: engaging T-56 (Acheron class) (was T-63)",
+   "report": true
+  },
+  {
+   "t": 792.67,
+   "text": "flight: Hammer: 4.0 km from the bow section of Moros (W-62B) — the hull is open to space at the torn end. Her rooms as they were when she went (all of her; this piece is about 34% of her): 265 gutted, 265 open to space or without air, 0 burning, 265 without power; 10 pressure bulkheads were shut",
+   "report": true
+  },
+  {
+   "t": 797.26,
+   "text": "flight: Hammer: 0.7 km from the stern section of Keres (W-63S) — no life signs. Of the 62 her class carries, 27 lie dead where they fell before she went and 32 more were lost with her (about 18 of them in this piece); 3 got away in 1 lifepod",
+   "report": true
+  },
+  {
+   "t": 799.79,
+   "text": "sensors: a close look at the stern section of Moros (W-62S, ex T-62, Kharon Mandate frigate, Lethe class), lost 20 s ago when her reactor breached: no power, no transponder, no life signs; tumbling at about 5.4 deg/s, the hull charred by the blast, the torn ends still glowing; some 70 pieces of wreckage spread over 2.4 km — bearing 064, mark +70, 2 km",
+   "report": true
+  },
+  {
+   "t": 800.29,
+   "text": "flight: Hammer: 0.8 km from the bow section of Keres (W-63B) — no life signs. Of the 62 her class carries, 27 lie dead where they fell before she went and 32 more were lost with her (about 20 of them in this piece); 3 got away in 1 lifepod",
+   "report": true
+  },
+  {
+   "t": 802.69,
+   "text": "tactical: engaging T-58 (Styx class) (was T-56)",
+   "report": true
+  },
+  {
+   "t": 811.04,
+   "text": "sensors: a close look at the bow section of Keres (W-63B, ex T-63, Kharon Mandate frigate, Lethe class), lost 20 s ago when her reactor breached: no power, no transponder, no life signs; tumbling at about 6.0 deg/s, the hull charred by the blast, the torn ends still glowing; 1 lifepod got away; some 70 pieces of wreckage spread over 2.4 km — bearing 208, mark +27, 3 km",
+   "report": true
+  },
+  {
+   "t": 825.87,
+   "text": "damage control: the hull breach at deck 9 section B (Flight Deck) is sealed (team 1 free again)",
+   "report": true
+  },
+  {
+   "t": 827.05,
+   "text": "sensors: distress beacons — 1 Mandate lifepod of Keres (T-63) (3 survivors, air for 2 h 47 min at the least), the nearest bearing 223, mark +12, 12 km",
+   "report": true
+  },
+  {
+   "t": 833.42,
+   "text": "flight: drones squadron airborne, 12 Wasps on STRIKE",
+   "report": true
+  },
+  {
+   "t": 842.68,
+   "text": "damage report: fixed fire suppression has discharged in deck 9 section B (Flight Deck)",
+   "report": false
+  },
+  {
+   "t": 847.79,
+   "text": "sensors: lost the track on a Kharon Mandate destroyer, Styx class (T-60) — a bearing at most now",
+   "report": true
+  },
+  {
+   "t": 847.83,
+   "text": "sensors: lost the track on a Kharon Mandate destroyer, Styx class (T-59), a Kharon Mandate destroyer, Styx class (T-61) — a bearing at most now",
+   "report": true
+  },
+  {
+   "t": 848.77,
+   "text": "sensors: lost the track on a Kharon Mandate destroyer, Styx class (T-57) — a bearing at most now",
+   "report": true
+  },
+  {
+   "t": 851.66,
+   "text": "damage control: the fire at deck 9 section B (Flight Deck) is out (team 2 free again)",
+   "report": true
+  },
+  {
+   "t": 867.07,
+   "text": "sensors: T-58 identified: Tartarus",
+   "report": true
+  },
+  {
+   "t": 872.01,
+   "text": "engineering: radiators retracted",
+   "report": false
+  },
+  {
+   "t": 878.51,
+   "text": "sensors: firm track — a Kharon Mandate destroyer, Styx class (T-61) at 50 km, bearing 092",
+   "report": true
+  },
+  {
+   "t": 879.1,
+   "text": "sensors: firm track — a Kharon Mandate destroyer, Styx class (T-60) at 49 km, bearing 087",
+   "report": true
+  },
+  {
+   "t": 882.76,
+   "text": "sensors: firm track — a Kharon Mandate destroyer, Styx class (T-59) at 49 km, bearing 084",
+   "report": true
+  },
+  {
+   "t": 887.81,
+   "text": "flight: bravo squadron torpedo run on Tartarus (T-58): 14 torpedoes away, bombers returning",
+   "report": true
+  },
+  {
+   "t": 920.38,
+   "text": "sensors: lost the track on a Kharon Mandate destroyer, Styx class (T-60) — a bearing at most now",
+   "report": true
+  },
+  {
+   "t": 920.75,
+   "text": "sensors: lost the track on a Kharon Mandate destroyer, Styx class (T-59) — a bearing at most now",
+   "report": true
+  },
+  {
+   "t": 928.7,
+   "text": "flight: bravo squadron recovered, 7 of 7 Hammers aboard, rearming (120 s)",
+   "report": true
+  },
+  {
+   "t": 931.93,
+   "text": "sensors: lost the track on a Kharon Mandate cruiser, Acheron class (T-56), Asphodel (T-57), a Kharon Mandate destroyer, Styx class (T-61) — a bearing at most now",
+   "report": true
+  },
+  {
+   "t": 985.68,
+   "text": "sensors: lost the track on Tartarus (T-58) — a bearing at most now",
+   "report": true
+  },
+  {
+   "t": 986.35,
+   "text": "tactical: engaging Nyx (was T-58)",
+   "report": true
+  },
+  {
+   "t": 990.3,
+   "text": "sensors: lost the track on Nyx (T-56), Asphodel (T-57), a Kharon Mandate destroyer, Styx class (T-59), a Kharon Mandate destroyer, Styx class (T-60), a Kharon Mandate destroyer, Styx class (T-61) — a bearing at most now",
+   "report": true
+  },
+  {
+   "t": 993.17,
+   "text": "sensors: a Kharon Mandate destroyer, Styx class (T-61) has left sensor range",
+   "report": true
+  },
+  {
+   "t": 997.58,
+   "text": "sensors: a Kharon Mandate destroyer, Styx class (T-60) has left sensor range",
+   "report": true
+  },
+  {
+   "t": 1002.01,
+   "text": "sensors: a Kharon Mandate destroyer, Styx class (T-59) has left sensor range",
+   "report": true
+  },
+  {
+   "t": 1024.11,
+   "text": "flight: drones squadron recovered, 12 of 12 Wasps aboard, rearming (60 s)",
+   "report": true
+  },
+  {
+   "t": 1024.99,
+   "text": "flight: alpha squadron recovered, 8 of 8 Falcons aboard, rearming (60 s)",
+   "report": true
+  },
+  {
+   "t": 1038.86,
+   "text": "sensors: lost the track on Nyx (T-56), Asphodel (T-57), Tartarus (T-58) — a bearing at most now",
+   "report": true
+  },
+  {
+   "t": 1040.15,
+   "text": "sensors: Asphodel (T-57) has left sensor range",
+   "report": true
+  },
+  {
+   "t": 1044.49,
+   "text": "sensors: Nyx (T-56) has left sensor range",
+   "report": true
+  },
+  {
+   "t": 1054.8,
+   "text": "flight: bravo squadron rearmed, 7 Hammers ready on the flight deck",
+   "report": false
+  },
+  {
+   "t": 1067.36,
+   "text": "sensors: Tartarus (T-58) has left sensor range",
+   "report": true
+  },
+  {
+   "t": 1067.66,
+   "text": "sensors: focus ended (T-58 is gone): back to passive",
+   "report": true
+  },
+  {
+   "t": 1078.3,
+   "text": "arms: Private Ravi Zaman is bringing the rifle and the sidearm from the Marine Armory to the Captain (about 68 s)",
+   "report": false
+  },
+  {
+   "t": 1080.76,
+   "text": "sensors: civilian traffic is resuming its routes",
+   "report": false
+  },
+  {
+   "t": 1084.11,
+   "text": "flight: drones squadron rearmed, 12 Wasps ready on the flight deck",
+   "report": false
+  },
+  {
+   "t": 1085.01,
+   "text": "flight: alpha squadron rearmed, 8 Falcons ready on the flight deck",
+   "report": false
+  },
+  {
+   "t": 1106.29,
+   "text": "engineering: fight's over: power back to balanced",
+   "report": true
+  },
+  {
+   "t": 1127.53,
+   "text": "sensors: friendly contacts at 70 km, bearing 044 — the 7th Fleet: Aurelia Reserve: 1 ships",
+   "report": true
+  },
+  {
+   "t": 1146.0,
+   "text": "arms: Private Ravi Zaman has put the rifle and the sidearm in the Captain's hands",
+   "report": false
+  },
+  {
+   "t": 1388.59,
+   "text": "director: beat complete — calm",
+   "report": false
+  },
+  {
+   "t": 1406.42,
+   "text": "sensors: new contact T-65 at bearing 332, 38 km — ASN Resolve — the 7th Fleet picket ship that was on Thule Watch: no power, no transponder, tumbling slowly",
+   "report": true
+  },
+  {
+   "t": 1797.63,
+   "text": "helm: turn complete, steady on course 167 mark -5",
+   "report": true
+  },
+  {
+   "t": 1941.66,
+   "text": "transporter: X1 done: the Captain is at Deck 9 · Section B · Flight Deck, a clean arrival, lock quality 100% at worst, 8.0 s cycle",
+   "report": true
+  },
+  {
+   "t": 2090.17,
+   "text": "the Captain went into the Captain's quarters (Deck 1, behind the bridge)",
+   "report": false
+  },
+  {
+   "t": 2094.15,
+   "text": "transporter: X2 done: the Captain is at Deck 1 · Section A · Captain's Quarters, a clean arrival, lock quality 100% at worst, 8.0 s cycle",
+   "report": true
+  },
+  {
+   "t": 2096.88,
+   "text": "the Captain left the Captain's quarters",
+   "report": false
+  },
+  {
+   "t": 2187.35,
+   "text": "sensors: friendly contacts at 70 km, bearing 163 — the 7th Fleet: Aurelia Reserve: 1 ships",
+   "report": true
+  },
+  {
+   "t": 2331.45,
+   "text": "the Captain came down to Main Engineering to see Chief Okonkwo and the reactor watch",
+   "report": false
+  },
+  {
+   "t": 2420.26,
+   "text": "the Captain went into the Captain's quarters (Deck 1, behind the bridge)",
+   "report": false
+  },
+  {
+   "t": 2424.16,
+   "text": "transporter: X3 done: the Captain is at Deck 1 · Section A · Captain's Quarters, a clean arrival, lock quality 100% at worst, 8.0 s cycle",
+   "report": true
+  },
+  {
+   "t": 2434.25,
+   "text": "the Captain left the Captain's quarters",
+   "report": false
+  }
+ ],
+ "recorded": {
+  "spoken": [
+   {
+    "t": 61.6,
+    "speaker": "xo",
+    "text": "Capitano, siamo in rotta verso l'orbita alta di New Ravenna, in pattuglia con il picket della 7th Fleet: Praetorian a quattro virgola tre chilometri, Vigilant a due virgola otto."
+   },
+   {
+    "t": 72.3,
+    "speaker": "xo",
+    "text": "Il sistema è calmo, otto contatti tutti tracciati; l'unico che non mi piace è T-11, a trentuno chilometri, deriva a motore freddo e non identificato."
+   },
+   {
+    "t": 130.27,
+    "speaker": "xo",
+    "text": "È il cantiere orbitale di Aurelia, Capitano: infrastruttura ASTRA, sessantuno chilometri a bearing zero-zero-sette, dove ci hanno costruito e ci riparano."
+   },
+   {
+    "t": 139.72,
+    "speaker": "xo",
+    "text": "Nessuna arma, scudi a zero, equipaggio civile: se qualcuno arriva in forze, è il primo bersaglio del sistema e noi siamo l'unica scorta qui."
+   },
+   {
+    "t": 148.47,
+    "speaker": "sensors",
+    "text": "T-11 è una fregata Lethe del Mandate, in accelerazione su Brightwater: cinquantatré chilometri, non ci ha ancora visti."
+   },
+   {
+    "t": 156.07,
+    "speaker": "xo",
+    "text": "Capitano, la Lethe va sui civili: propongo di portarci in rotta d'intercetto con la prua su di lei, standoff dieci chilometri."
+   },
+   {
+    "t": 189.86,
+    "speaker": "sensors",
+    "text": "T-11 tiene la prua su Brightwater, quarantanove virgola otto chilometri: la tengo in traccia focalizzata."
+   },
+   {
+    "t": 196.79,
+    "speaker": "helm",
+    "text": "Prua sulla Lethe, tengo dieci chilometri, tutta forza: la porto in portata dei railgun."
+   },
+   {
+    "t": 201.76,
+    "speaker": "sensors",
+    "text": "T-11 ora è a quarantanove virgola cinque, bearing due-uno-cinque: la tengo in traccia focalizzata."
+   },
+   {
+    "t": 213.36,
+    "speaker": "flight",
+    "text": "Capitano, i droni sono a bordo, dodici in hangar: ho lanciato solo Alpha, otto Falcon, in CAP."
+   },
+   {
+    "t": 219.47,
+    "speaker": "xo",
+    "text": "Il lancio l'ho lasciato fare io, Capitano: la Lethe corre su Brightwater e la CAP è coperta mentre ci portiamo su di lei."
+   },
+   {
+    "t": 227.1,
+    "speaker": "helm",
+    "text": "La Lethe ha virato e ci sta aprendo: cinquantasette chilometri, la inseguo e chiudo."
+   },
+   {
+    "t": 239.67,
+    "speaker": "flight",
+    "text": "Alpha e Bravo in caccia sulla Lethe: Alpha è già in volo, Bravo lanciato adesso, sette Hammer."
+   },
+   {
+    "t": 245.77,
+    "speaker": "tactical",
+    "text": "Capitano, la Lethe è a sessantuno chilometri e i Falcon arrivano prima di noi: se la colpiscono, il Mandate saprà che ci siamo."
+   },
+   {
+    "t": 252.64,
+    "speaker": "sensors",
+    "text": "La Lethe ci sta allargando: sessantatré chilometri e in aumento, tiene la prua su Brightwater."
+   },
+   {
+    "t": 264.14,
+    "speaker": "helm",
+    "text": "Già tutta forza sulla Lethe, Capitano: quattrocentottanta metri al secondo, sto virando su due-tre-sei, tengo dieci chilometri."
+   },
+   {
+    "t": 271.58,
+    "speaker": "xo",
+    "text": "Capitano, la Lethe è ferma a sessantaquattro chilometri: non la prendiamo, e tra un minuto il Gate ci mette tre navi alle spalle."
+   },
+   {
+    "t": 279.32,
+    "speaker": "comms",
+    "text": "Capitano, il Gate ha già ciclato: tre navi del Mandate sono in Aurelia, un Acheron e due Styx, a cinquantacinque chilometri da noi. E la Lethe è ferma a sessantatré chilomet"
+   },
+   {
+    "t": 288.93,
+    "speaker": "xo",
+    "text": "Capitano, la Lethe è ferma a sessantadue chilometri e le tre navi del Gate sono a cinquantacinque: se la inseguiamo, quelle ci arrivano addosso."
+   },
+   {
+    "t": 297.84,
+    "speaker": "sensors",
+    "text": "La Lethe ha virato su due-cinque-zero e ci sta chiudendo: cinquantanove chilometri, la traccia tiene."
+   },
+   {
+    "t": 310.81,
+    "speaker": "sensors",
+    "text": "Capitano, l'unico contatto ostile tracciato è la Lethe, a cinquantacinque virgola cinque chilometri su bearing due-cinque-quattro."
+   },
+   {
+    "t": 317.27,
+    "speaker": "sensors",
+    "text": "Le tre navi del Gate sono ancora in transito, non sono in Aurelia: le vedremo quando usciranno, tra un minuto circa."
+   },
+   {
+    "t": 324.07,
+    "speaker": "ops",
+    "text": "Capitano, sullo schermo ho la Lethe a cinquanta chilometri; ci metto anche il Gate e la zona d'uscita, se vuole."
+   },
+   {
+    "t": 330.84,
+    "speaker": "castellan",
+    "text": "Aquila, Praetorian: quattro contatti oltre il Gate — un incrociatore Acheron e tre caccia Styx, più la Lethe a 49 chilometri. Il picket resta in schermo su di voi; quando arrivano li prendiamo a 4,5 chilometri, fuori portata laser."
+   },
+   {
+    "t": 342.85,
+    "speaker": "bravo_lead",
+    "text": "Bravo Lead: sei siluri in acqua sulla Lethe, i camion rientrano."
+   },
+   {
+    "t": 343.79,
+    "speaker": "xo",
+    "text": "Capitano, la Lethe è distrutta e l'Acheron con tre Styx è a ottantacinque chilometri: l'Archon ci offre la resa, e la scelta è sua."
+   },
+   {
+    "t": 355.15,
+    "speaker": "flight",
+    "text": "Alpha e Bravo richiamati: rientrano tutti, otto Falcon e sette Hammer, appontaggio in corso."
+   },
+   {
+    "t": 360.37,
+    "speaker": "helm",
+    "text": "Prua sull'Acheron, rotta zero-cinque-se"
+   },
+   {
+    "t": 363.13,
+    "speaker": "xo",
+    "text": "Capitano, la Lethe è distrutta e l'Acheron con tre Styx è a ottantasei chilometri: l'Archon ci offre la resa, e la scelta è sua."
+   },
+   {
+    "t": 371.35,
+    "speaker": "cmdr_t40",
+    "text": "Capitano, qui parla l'Archon Varek Solm, del Kharon Mandate. Ho quattro vascelli in avvicinamento alla vostra ultima posizione nota: vi troverò, e la distanza la scelgo io. Vi offro una scelta, e la offro una volta sola: spegnete i motori, abbassate gli scudi, e le vostre vite sono salve."
+   },
+   {
+    "t": 388.41,
+    "speaker": "tactical",
+    "text": "Quattro Mandate in gruppo a settantasei chilometri, fuori portata: tengo il fuoco di ritorno e gli scudi verso di loro."
+   },
+   {
+    "t": 402.41,
+    "speaker": "comms",
+    "text": "Canale aperto con l'Acheron, Capitano: parla pure, l'Archon Solm ascolta."
+   },
+   {
+    "t": 418.1,
+    "speaker": "cmdr_t40",
+    "text": "Capitano, siete un bersaglio solo, e il mio gruppo vi sta già cercando. Non vi chiedo di arrendervi a un nemico che vi odia: vi chiedo di non morire per un silenzio. Spegnete i motori e gli scudi, e risponderò della vostra ciurma come della mia."
+   },
+   {
+    "t": 431.36,
+    "speaker": "xo",
+    "text": "Capitano, Solm ha risposto: non si ritira e non spegne i motori, tiene il Gate. I suoi quattro ci stanno cercando, a cinquantasette chilometri e in avvicinamento."
+   },
+   {
+    "t": 441.26,
+    "speaker": "cmdr_t40",
+    "text": "Capitano, non chiedo permesso per restare, e non me ne vado da un cancello che ho il dovere di tenere. Ho visto cosa significa essere abbandonati da chi doveva proteggere: non accadrà di nuovo, non sotto il mio comando. Ritiratevi, o spegnete i motori — la terza via la sceglierete voi, ma non sarà lunga."
+   },
+   {
+    "t": 459.16,
+    "speaker": "ally_t48",
+    "text": "Aquila, Valiant: il Main Body è in tiro sul gruppo del Gate, 3,2 km, fuoco su T-40. Il picket ci copre il davanti; noi chiudiamo dietro di loro."
+   },
+   {
+    "t": 467.9,
+    "speaker": "deck_chief",
+    "text": "Deck: Bravo sette su sette a bordo, riarmo in novanta secondi."
+   },
+   {
+    "t": 471.96,
+    "speaker": "tactical",
+    "text": "Capitano, tre Harpy ancora in volo su di noi, la più vicina a otto chilometri: punto difesa automatico, missili pronti."
+   },
+   {
+    "t": 479.24,
+    "speaker": "alpha_lead",
+    "text": "Alpha Lead: un Harpy abbattuto, ne restano tre."
+   },
+   {
+    "t": 482.25,
+    "speaker": "xo",
+    "text": "Allarme rosso, Capitano: posti di combattimento, tutti ai propri posti."
+   },
+   {
+    "t": 486.49,
+    "speaker": "tactical",
+    "text": "Quattro Mandate a trentatré chilometri, l'Acheron jamma ancora: railgun senza soluzione finché non ho un cross-fix o un ping."
+   },
+   {
+    "t": 494.29,
+    "speaker": "xo",
+    "text": "Capitano, l'azione è finita: i Mandate si ritirano, l'Acheron a trentadue chilometri con sei falle e dodici incendi a bordo."
+   },
+   {
+    "t": 501.09,
+    "speaker": "tactical",
+    "text": "Nessun ostile resta in combattimento, Capitano: quattro in ritirata, il Phlegethon a ventitré chilometri è il più vicino."
+   },
+   {
+    "t": 508.85,
+    "speaker": "xo",
+    "text": "Capitano, l'azione è finita: i Mandate si ritirano, l'Acheron a ventidue chilometri con sei falle e dieci incendi a bordo."
+   },
+   {
+    "t": 515.75,
+    "speaker": "tactical",
+    "text": "Fuoco a volontà, Capitano: ostili in portata entro dieci chilometri, il Phlegethon è a quattordici virgola nove."
+   },
+   {
+    "t": 521.67,
+    "speaker": "helm",
+    "text": "Prua sul Phlegethon, tengo dieci chilometri, tutta forza: la porto io in portata."
+   },
+   {
+    "t": 526.26,
+    "speaker": "xo",
+    "text": "Capitano, i Mandate si ritirano: quattro in fuga, il Phlegethon è il più vicino a dieci virgola cinque chilometri."
+   },
+   {
+    "t": 533.86,
+    "speaker": "xo",
+    "text": "Capitano, i Mandate si ritirano: quattro in fuga, il Phlegethon a nove virgola cinque chilometri è il più vicino, e l'Ammiraglio Rourke dice di tenere il Gate e non inseguire."
+   },
+   {
+    "t": 539.53,
+    "speaker": "helm",
+    "text": "Prua sul Phlegethon, tengo quattro chilometri, tutta forza: la porto io in portata dei laser."
+   },
+   {
+    "t": 545.12,
+    "speaker": "xo",
+    "text": "Capitano, il Phlegethon è a nove e mezzo, ma l'ammiraglio Rourke ordina di tenere il Gate e non inseguire chi si ritira: la Deep Vein chiede aiuto a quindici chilometri, quattro ostili addosso."
+   },
+   {
+    "t": 557.28,
+    "speaker": "admiral",
+    "text": "Capitano, buon lavoro. Il grosso della Flotta e il gruppo di Constance sono già in rotta per Aurelia: tenete il Gate, non inseguite chi si è ritirato. Se il contatto a Thule si muove verso di noi, lo vedrete arrivare prima voi di me."
+   },
+   {
+    "t": 569.06,
+    "speaker": "admiral",
+    "text": "Aquila, qui Rourke. Il campo è nostro: il gruppo d'attacco di Solm si è rotto e si è ritirato, cinque vascelli mandatari distrutti, e il Gate di Aurelia è ancora aperto. Non è stato gratis — abbiamo perduto il Vigilant e il Praetorian ha due fasci di carena aperti, ma i cantieri di Port Aurelius lavoreranno tutta la notte e i morti avranno i loro nomi. Avete tenuto la linea quando era più facile cedere, e questo lo ricorderanno. Nessuno vi ha abbandonati."
+   },
+   {
+    "t": 595.99,
+    "speaker": "comms",
+    "text": "Capitano, la Deep Vein è a ventiquattro chilometri, in fuga verso l'Arsenal: i quattro ostili che la inseguono sono ancora con lei."
+   },
+   {
+    "t": 603.0,
+    "speaker": "xo",
+    "text": "Capitano, Rourke ordina di tenere il Gate e non inseguire chi si ritira: la Cocytus è a un virgola otto, la Deep Vein a ventisei chilometri con quattro ostili addosso."
+   },
+   {
+    "t": 606.57,
+    "speaker": "comms",
+    "text": "Capitano, il Gate di Thule sta ciclando: circa diciotto navi in arrivo tra poco più di un minuto."
+   },
+   {
+    "t": 611.95,
+    "speaker": "xo",
+    "text": "Capitano, il Phlegethon è morto a tre virgola nove chilometri, senza energia: la Cocytus è a due e si ritira, e la Deep Vein resta a ventiquattro con quattro ostili addosso."
+   },
+   {
+    "t": 612.8,
+    "speaker": "xo",
+    "text": "Capitano, il Phlegethon è distrutto a tre virgola otto chilometri: la Cocytus si ritira a due, e la Deep Vein resta a ventiquattro con quattro ostili addosso."
+   },
+   {
+    "t": 623.0,
+    "speaker": "xo",
+    "text": "Capitano, la Cocytus è distrutta a tre virgola quattro chilometri: la Styx si ritira a ventiquattro per cento di scafo, e la Deep Vein resta a ventiquattro con quattro ostili addosso."
+   },
+   {
+    "t": 634.59,
+    "speaker": "xo",
+    "text": "Capitano, la Styx è distrutta a otto virgola otto chilometri, la Cocytus a tre virgola quattro: nessun bersaglio in tiro, e diciotto navi mandate arrivano dal Gate di Thule."
+   },
+   {
+    "t": 645.11,
+    "speaker": "xo",
+    "text": "Capitano, il Gate di Thule sta ciclando: circa diciotto navi in arrivo, e i sei contatti nuovi a quaranta gradi sono la loro avanguardia. Rourke ordina di tenere il Gate e non inseguire chi si ritira."
+   },
+   {
+    "t": 656.9,
+    "speaker": "admiral",
+    "text": "Capitano, avviso: il Gate di Thule sta ciclando, circa diciotto navi in arrivo tra poco più di un minuto. Il grosso e Constance sono a due minuti e mezzo: tenete duro al Gate, non vi fate prendere in mezzo. Se il peso è troppo, ripiegate sulle difese del mondo e noi vi copriamo l'ingresso."
+   },
+   {
+    "t": 679.67,
+    "speaker": "castellan",
+    "text": "Aquila, Praetorian: la forza di Thule è entrata dal Gate, sei cont"
+   },
+   {
+    "t": 683.76,
+    "speaker": "ally_t48",
+    "text": "Aquila, Valiant: Main Body a otto chilometri da voi, otto scafi intatti, in linea davanti al Gate. Nemici ancora a cinquantotto chilometri: se il peso arriva, dite e vi facciamo schermo."
+   },
+   {
+    "t": 694.11,
+    "speaker": "tactical",
+    "text": "Capitano, dodici Harpy in volo, la più vicina a trentadue chilometri: punto difesa automatico, missili pronti, e il Valiant ci fa schermo."
+   },
+   {
+    "t": 701.74,
+    "speaker": "tactical",
+    "text": "Capitano, dodici Harpy in volo, la più vicina a ventiquattro chilometri: punto difesa automatico, missili pronti, i Falcon della Valiant li coprono."
+   },
+   {
+    "t": 711.05,
+    "speaker": "sensors",
+    "text": "Capitano, la Vanguard T-56 è a cinquantuno chilometri con otto scafi, l'Acheron resta solo un rilevamento a duecentootto senza distanza."
+   },
+   {
+    "t": 719.51,
+    "speaker": "sensors",
+    "text": "Capitano, la T-40 non è più sul quadro: nessuna traccia da focalizzare, resta un rilevamento a duecentootto."
+   },
+   {
+    "t": 726.37,
+    "speaker": "tactical",
+    "text": "Capitano, scudi a prua verso la minaccia, razzi in arrivo, punto difesa in traccia: il gruppo mandate tiene a quarantasette chilometri."
+   },
+   {
+    "t": 733.58,
+    "speaker": "comms",
+    "text": "Capitano, l'Evening Star II chiede aiuto: dodici caccia ostili a sedici chilometri, corre verso l'Arsenale."
+   },
+   {
+    "t": 737.56,
+    "speaker": "tactical",
+    "text": "Capitano, otto siluri in arrivo dai bombardieri: scudi a prua al centosette per cento, punto difesa in traccia."
+   },
+   {
+    "t": 744.09,
+    "speaker": "xo",
+    "text": "Capitano, falle a deck nove sezione B, ponte di volo: squadra uno in arrivo, scafo al novantotto per cento."
+   },
+   {
+    "t": 750.87,
+    "speaker": "comms",
+    "text": "Capitano, l'Evening Star II chiede aiuto: dodici caccia ostili a sedici chilometri, corre verso l'Arsenale, a trecentodiciassette da noi."
+   },
+   {
+    "t": 759.29,
+    "speaker": "helm",
+    "text": "Prua sul gruppo mandate, tengo dieci chilometri, tutta forza: la Nyx è a trentanove virgola sette."
+   },
+   {
+    "t": 770.46,
+    "speaker": "tactical",
+    "text": "Fuoco su tutti gli ostili, Capitano: la Moros a quattordici virgola sei è la prima, poi la Keres, i nuovi compresi."
+   },
+   {
+    "t": 776.53,
+    "speaker": "flight",
+    "text": "Alpha e Bravo lanciati, Capitano: otto Falcon e sette Hammer sulla Moros, dodici virgola tre chilometri."
+   },
+   {
+    "t": 783.35,
+    "speaker": "tactical",
+    "text": "Capitano, la Moros è distrutta a dieci chilometri: ora batto la Keres, a dieci virgola sei, in ritirata."
+   },
+   {
+    "t": 790.67,
+    "speaker": "comms",
+    "text": "Capitano, l'Evening Star II chiede aiuto: dodici caccia ostili a sedici chilometri, corre verso l'Arsenale, a trecentodiciassette da noi."
+   },
+   {
+    "t": 794.59,
+    "speaker": "tactical",
+    "text": "Capitano, la Keres è distrutta: nessun ostile resta in combattimento, i sei superstiti si ritirano a trentuno chilometri."
+   },
+   {
+    "t": 804.81,
+    "speaker": "helm",
+    "text": "Prua sul gruppo mandate, tengo dieci chilometri, tutta forza: la Nyx è a trentadue virgola due."
+   },
+   {
+    "t": 812.33,
+    "speaker": "flight",
+    "text": "Dodici Wasp, otto Falcon e sette Hammer lanciati sulla Tartarus, Capitano: trentuno chilometri, la portano in portata."
+   },
+   {
+    "t": 819.05,
+    "speaker": "tactical",
+    "text": "Fuoco a volontà già in corso su tutti gli ostili, Capitano: la Tartarus a trenta chilometri, railgun assegnati, aprono da soli a dieci."
+   },
+   {
+    "t": 828.08,
+    "speaker": "tactical",
+    "text": "Capitano, la Keres è distrutta: nessun ostile resta in combattimento, i sei superstiti si ritirano a trentaquattro chilometri, fuori dai railgun. Capitano, li inseguiamo a tutta"
+   },
+   {
+    "t": 839.1,
+    "speaker": "xo",
+    "text": "Capitano, i sei superstiti sono a trentacinque chilometri e si allontanano: li inseguiamo o teniamo la posizione? L'Ammiraglio dice di restare al Gate."
+   },
+   {
+    "t": 848.21,
+    "speaker": "flight",
+    "text": "Capitano, Alpha, Bravo e i droni sono in volo sulla Tartarus, ventisette chilometri: i siluri arrivano a venticinque, ci siamo quasi."
+   },
+   {
+    "t": 857.29,
+    "speaker": "ops",
+    "text": "Capitano, falla a deck nove sezione B sigillata e incendio spento: tutte e quattro le squadre di nuovo libere."
+   },
+   {
+    "t": 864.87,
+    "speaker": "admiral",
+    "text": "Capitano, bel lavoro: il nemico si è ritirato e non abbiamo perso nessuna nave. Restate al Gate con il grosso e Constance; il Gate di Thule sta ciclando di nuovo, una nave sola in arrivo. Non inseguite: se è un'esca, la prossima ondata è nostra da ricevere qui."
+   },
+   {
+    "t": 880.23,
+    "speaker": "sensors",
+    "text": "Capitano, la Tartarus è a ventisette e si allontana a trecentoquindici; i quattro Styx restano solo rilevamenti, senza distanza."
+   },
+   {
+    "t": 887.64,
+    "speaker": "sensors",
+    "text": "Capitano, traccia focalizzata sul T-57 a prua, rilevamento zero quattro nove: cerco la distanza prima di qualunque fuoco."
+   },
+   {
+    "t": 895.8,
+    "speaker": "bravo_lead",
+    "text": "Bravo Lead: quattordici siluri in acqua sulla Tartarus, i camion rientrano."
+   },
+   {
+    "t": 900.86,
+    "speaker": "tactical",
+    "text": "Capitano, la Tartarus si apre a tribordo e resta fuori portata: propongo di ingaggiare l'Asphodel a prua, quarantatré chilometri."
+   },
+   {
+    "t": 916.64,
+    "speaker": "helm",
+    "text": "Rientro in formazione col Main Body, in coda al Valiant a tre chilometri: rotta due-tre-cinque, tutta forza."
+   },
+   {
+    "t": 926.72,
+    "speaker": "flight",
+    "text": "Richiamo Alpha, Bravo e i droni, Capitano: otto Falcon, tre Hammer e dodici Wasp rientrano, la Tartarus a trentotto chilometri."
+   },
+   {
+    "t": 935.42,
+    "speaker": "deck_chief",
+    "text": "Deck: Bravo a bordo, sette Hammer su sette. Riarmo in due minuti."
+   },
+   {
+    "t": 939.86,
+    "speaker": "sensors",
+    "text": "Capitano, cinque contatti sono solo rilevamenti: traccia focalizzata sul T-56 a prua, cerco la distanza."
+   },
+   {
+    "t": 951.0,
+    "speaker": "sensors",
+    "text": "Capitano, il T-56 è la Nyx, cinquantaquattro chilometri a prua: tutti i contatti hanno ora la distanza, nessun decoy."
+   },
+   {
+    "t": 959.16,
+    "speaker": "comms",
+    "text": "Capitano, dalla rete di flotta: Thule è dichiarata perduta, in mano al Mandate."
+   },
+   {
+    "t": 968.73,
+    "speaker": "admiral",
+    "text": "Capitano, Thule è caduta: il Mandate l'ha rivendicata, ma era un guscio senza cantiere e non ci muoviamo per riprenderla. Il grosso nemico, diciotto navi, è ancora a Thule; la punta da otto è in casa nostra. Restate al Gate con il grosso e Constance: non inseguite F-M3, non regalate loro il distacco."
+   },
+   {
+    "t": 986.69,
+    "speaker": "sensors",
+    "text": "Capitano, la Tartarus è di nuovo solo un rilevamento a uno-cinque-zero: gli altri cinque si ritirano oltre settanta chilometri."
+   },
+   {
+    "t": 994.14,
+    "speaker": "sensors",
+    "text": "Capitano, sei contatti tornati a soli rilevamenti: focalizzo l'Asfodelo sul zero-cinque-sei."
+   },
+   {
+    "t": 999.68,
+    "speaker": "sensors",
+    "text": "Capitano, T-60 e T-61 sono usciti dal raggio dei sensori: restano la Nyx a settantasette, l'Asfodelo a ottanta e la Tartarus a sessantacinque."
+   },
+   {
+    "t": 1009.01,
+    "speaker": "xo",
+    "text": "Alarme verde, Capitano: si rientra dai posti di combattimento, ma i sei ostili in ritirata restano in traccia."
+   },
+   {
+    "t": 1015.51,
+    "speaker": "sensors",
+    "text": "Capitano, T-59, T-60 e T-61 sono fuori portata: restano la Nyx a ottantasette, l'Asfodelo a novanta e la Tartarus a settantaquattro."
+   },
+   {
+    "t": 1025.17,
+    "speaker": "tactical",
+    "text": "Capitano, i tre ostili sono di nuovo a portata: la Tartarus a settantasette, la Nyx e l'Asfodelo a novanta."
+   },
+   {
+    "t": 1031.36,
+    "speaker": "deck_chief",
+    "text": "Deck: Alpha a bordo, otto Falcon su otto. Riarmo in un minuto. Deck: droni a bordo, dodici Wasp su dodici. Riarmo in un minuto."
+   },
+   {
+    "t": 1040.42,
+    "speaker": "sensors",
+    "text": "Capitano, i tre ostili sono di nuovo solo rilevamenti: la Tartarus a uno-quarantatré, la Nyx e l'Asfodelo a zero-cinque-nove."
+   },
+   {
+    "t": 1050.46,
+    "speaker": "xo",
+    "text": "Capitano, lei non porta nulla: il fucile AR-181 e la pistola M27S sono nella rastrelliera dell'armeria dei marine, deck otto, e una M27S è nell'armadietto del suo Ready Room, deck uno. L'armaiolo Zaman può portarle quello che vuole."
+   },
+   {
+    "t": 1067.03,
+    "speaker": "sensors",
+    "text": "Capitano, se la vuole addosso dica quale: fucile, pistola o entrambi, e l'armaiolo Zaman gliela porta dove si trova."
+   },
+   {
+    "t": 1079.3,
+    "speaker": "xo",
+    "text": "Capitano, l'armaiolo Zaman sale dall'armeria dei marine con fucile e pistola: sessantotto secondi, glieli mette in mano dove si trova."
+   },
+   {
+    "t": 1088.81,
+    "speaker": "deck_chief",
+    "text": "Deck: Alpha e droni riarmati, otto Falcon e dodici Wasp pronti sul ponte."
+   },
+   {
+    "t": 1100.39,
+    "speaker": "comms",
+    "text": "Capitano, la rete di flotta è aperta: dica pure, l'ammiraglio Rourke è in ascolto."
+   },
+   {
+    "t": 1102.83,
+    "speaker": "comms",
+    "text": "Capitano, la rete di flotta è aperta e l'ammiraglio Rourke è in ascolto: dica pure."
+   },
+   {
+    "t": 1108.12,
+    "speaker": "engineering",
+    "text": "Capitano, a fine scontro sono tornato al profilo bilanciato: reattore al settantotto per cento, calore sedici, radiatori rientrati."
+   },
+   {
+    "t": 1129.6,
+    "speaker": "comms",
+    "text": "Capitano, il suo messaggio è passato all'ammiraglio Rourke sulla rete di flotta: chiede il permesso di andare a Thule con tutto il grosso e affrontarli."
+   },
+   {
+    "t": 1186.05,
+    "speaker": "comms",
+    "text": "Capitano, la rete di flotta è aperta e l'ammiraglio Rourke è in ascolto: il suo messaggio è già passato, attendiamo la sua risposta."
+   },
+   {
+    "t": 1200.86,
+    "speaker": "comms",
+    "text": "Capitano, il vice ammiraglio Rourke comanda la Settima Flotta da lontano, non da una nave qui: sulla rete risponde lui, e il gruppo più vicino è il Main Body del Valiant, a cinque virgola otto chilometri."
+   },
+   {
+    "t": 1217.17,
+    "speaker": "comms",
+    "text": "Capitano, canale aperto col Valiant: il capitano Sorensen è in linea."
+   },
+   {
+    "t": 1221.46,
+    "speaker": "ally_t48",
+    "text": "Valiant a Aquila: canale aperto, Capitano. Niente sui sensori, i miei otto in formazione di schermo su di voi. Dite."
+   },
+   {
+    "t": 1246.97,
+    "speaker": "xo",
+    "text": "Capitano, il canale col Valiant è aperto: Sorensen ascolta. Ma le ricordo che a Thule il Mandate tiene diciotto navi contro le nostre dodici, e che l'ordine di lasciare Aurelia non è mio né suo: è dell'ammiraglio Rourke."
+   },
+   {
+    "t": 1260.12,
+    "speaker": "ally_t48",
+    "text": "Valiant a Aquila: supporto pieno confermato, otto schermi serrati a 4.5 km su di voi. Nessun contatto sui sensori; al primo bersaglio mi sposto in attacco."
+   },
+   {
+    "t": 1268.92,
+    "speaker": "comms",
+    "text": "Capitano, dalla rete di flotta: dal Meridian è passato il primo convoglio di grano per Aurelia, undici navi sotto scorta, e chiedono che il picchetto non spari su chi arriva col trasponder acceso."
+   },
+   {
+    "t": 1277.23,
+    "speaker": "ally_t64",
+    "text": "Probity a Aquila: ero a 45 km, chiudo a tutta forza per entrare nella schermata a 4.5 km. Nessun contatto sui miei sensori."
+   },
+   {
+    "t": 1314.7,
+    "speaker": "ops",
+    "text": "Capitano, schermo principale sulla sezione di prua del Keres, tredici virgola sette chilometri, ingrandita al massimo."
+   },
+   {
+    "t": 1339.17,
+    "speaker": "xo",
+    "text": "Capitano, i marine stanno bene: settantasei pronti a partire, nessun ferito, e i due Kestrel sono liberi nel ponte di lancio, deck otto. L'armaiolo Zaman le ha già messo in mano fucile e pistola."
+   },
+   {
+    "t": 1353.12,
+    "speaker": "admiral",
+    "text": "Capitano, aggiornamento: a Thule il nemico si sta radunando — il grosso da diciotto è ancora lì e negli ultimi minuti sono entrate altre cinque navi in tre gruppi. Non è una ritirata, è un accumulo: la prossima spinta sarà ancora su di voi. Restate al Gate con il grosso e Constance, non inseguite nulla verso Thule."
+   },
+   {
+    "t": 1392.3,
+    "speaker": "xo",
+    "text": "Capitano, il canale col Valiant è aperto, non con Rourke: se vuole che l'ammiraglio senta questo, Martin deve passarlo sulla rete di flotta. E le ricordo che a Thule sono diciotto contro le nostre dodici, con altri cinque scafi entrati in tre gruppi."
+   },
+   {
+    "t": 1407.15,
+    "speaker": "comms",
+    "text": "Capitano, messaggio passato sulla rete di flotta all'ammiraglio Rourke: la sua richiesta di guidare tutto il grosso su Thule per la resa dei conti."
+   },
+   {
+    "t": 1414.04,
+    "speaker": "admiral",
+    "text": "Capitano, risposta breve: no. Non vi mando a Thule. Il Gate è la nostra forza — chi passa per primo si forma sotto il fuoco, e diciotto navi a Thule non valgono il rischio di perdere il Gate di Aurelia. Se vogliono Aurelia, vengono qui, e qui li aspettiamo con voi al centro. Tenete la posizione; se il Gate di Thule canta, lo saprete per primo."
+   },
+   {
+    "t": 1434.41,
+    "speaker": "sensors",
+    "text": "Capitano, la Resolve è ancora là: zero-tre-tre-quattro, trentacinque chilometri, senza energia e alla deriva. È il picchetto che tenevamo a Thule Watch, e nessuno sa da quanto tempo sia morta."
+   },
+   {
+    "t": 1440.03,
+    "speaker": "comms",
+    "text": "Capitano, dalla rete di flotta: il Gate di Thule sta ciclando, circa quattro navi stanno passando, arrivo in settantuno secondi."
+   },
+   {
+    "t": 1446.15,
+    "speaker": "sensors",
+    "text": "Capitano, la Resolve è ancora là: zero-tre-tre-sei, trentaquattro chilometri, senza energia e alla deriva. Era il nostro picchetto a Thule Watch, e nessuno sa da quanto tempo sia morta."
+   },
+   {
+    "t": 1479.32,
+    "speaker": "tactical",
+    "text": "Capitano, ora no: l'unico scafo ostile a schermo è la Tartarus, a settantasette chilometri, e i Kestrel non arrivano oltre qualche chilometro. L'unica nave ferma e vicina è la Resolve, ma è nostra e senza energia: non si abborda un relitto amico."
+   },
+   {
+    "t": 1493.36,
+    "speaker": "admiral",
+    "text": "Capitano, aggiornamento: a Thule continuano a entrare navi — altre quattro tra poco più di un minuto, e il grosso resta a diciotto. È un accumulo, non una ritirata. Restate al Gate con il grosso e Constance: se si muovono, il primo che passa lo prendiamo sotto il fuoco di Keeper Station."
+   },
+   {
+    "t": 1527.25,
+    "speaker": "comms",
+    "text": "Capitano, richiesta passata sulla rete: solo l'Aquila oltre il Gate di Thule, in avanscoperta coperta, senza aprire il fuoco."
+   },
+   {
+    "t": 1532.23,
+    "speaker": "admiral",
+    "text": "Capitano, no. L'Aquila non passa il Gate da sola: diciotto navi di là aspettano solo che qualcuno si offra, e se vi prendono perdiamo il Gate e voi. Il Gate è la nostra forza — chi passa per primo si forma sotto il fuoco. Restate al Gate con il grosso e Constance: se vogliono Aurelia, che vengano loro."
+   },
+   {
+    "t": 1548.07,
+    "speaker": "admiral",
+    "text": "Capitano, no — e questa è la seconda volta che ve lo dico, quindi ascoltatemi bene: l'Aquila non passa il Gate da sola, né scoperta né coperta. Diciotto navi di là non aspettano altro che qualcuno si offra: se vi prendono, perdiamo voi e il Gate di Aurelia in un colpo. Il Gate è la nostra forza — chi passa per primo si forma sotto il fuoco. Restate al Gate con il grosso e Constance; se vogliono Aurelia, che siano loro a passare."
+   },
+   {
+    "t": 1626.75,
+    "speaker": "ops",
+    "text": "Capitano, schermo principale tornato alla visualizzazione normale: inquadratura automatica sulla rotta, nessun bersaglio fisso."
+   },
+   {
+    "t": 1679.11,
+    "speaker": "xo",
+    "text": "Capitano, l'ordine dell'ammiraglio è di restare al Gate, e questo lo porta di là: lo eseguo, ma lo metto a verbale come suo. Vuole che Martin lo annunci sulla rete di flotta prima che il Gate canti?"
+   },
+   {
+    "t": 1690.56,
+    "speaker": "sensors",
+    "text": "Capitano, l'ordine dell'ammiraglio è di restare al Gate, e questo lo porta di là: lo eseguo, ma resta scritto come suo. Vuole che Martin lo annunci sulla rete di flotta prima che il Gate canti?"
+   },
+   {
+    "t": 1709.65,
+    "speaker": "comms",
+    "text": "Capitano, annuncio passato sulla rete di flotta a tutte le navi: l'Aquila passa il Gate di Thule in avanscoperta coperta, senza aprire il fuoco, e torna con i dati."
+   },
+   {
+    "t": 1717.44,
+    "speaker": "ally_t44",
+    "text": "Aquila, Constance: schermo confermato a 4.5 km, resto su questo lato del Gate. Se torni con diciotto navi alle calcagna, siamo già fra te e loro."
+   },
+   {
+    "t": 1726.87,
+    "speaker": "admiral",
+    "text": "Capitano, prendo atto: la decisione è vostra, e la rispetto. Io non vi copro oltre il Gate — il grosso, Constance e il picket restano qui a ricevere chi passa, e se diciotto vi vengono dietro non li inseguo a Thule: li aspetto al Gate. Tornate con i dati, e tornate presto."
+   },
+   {
+    "t": 1744.91,
+    "speaker": "xo",
+    "text": "Capitano, allarme rosso su tutta la nave: posti di combattimento, compartimenti stagni chiusi, duecentosei uomini in postazione. La nave è sua."
+   },
+   {
+    "t": 1753.87,
+    "speaker": "helm",
+    "text": "Capitano, rotta uno-sei-sette sul Janus Gate, sessanta virgola cinque chilometri, tutta forza: ci arrivo in circa quattro minuti. Il passaggio lo comando io solo al suo ordine."
+   },
+   {
+    "t": 1776.61,
+    "speaker": "xo",
+    "text": "Capitano, le armi: quattro torri binate di railgun, gittata dieci chilometri, una salva ogni sette secondi; dodici batterie laser a quattro chilometri; due lanciatori VLS con sessanta missili, otto per salva, venticinque chilometri; due tubi lanciasiluri; ventiquattro postazioni di difesa ravvicinata in automatico; sei decoy a bordo, due per lancio. Scudi su, cento per cento, sei settori. A bordo: quattrocentoventi di equipaggio, sessanta piloti, ottanta marine, e lei al comando. Alpha otto Falcon, Bravo sette Hammer, dodici droni Wasp, tutti a bordo pronti. Due Kestrel liberi con settantasei marine pronti a partire. Scafo novantotto per cento, calore quattro, reattore settantotto, nessun ferito, nessun danno."
+   },
+   {
+    "t": 1844.28,
+    "speaker": "xo",
+    "text": "Capitano, ho girato la domanda alla Ostrander sulla sua richiesta: i marine sono settantasei, pronti, e i due Kestrel liberi. Ma un arrembaggio si fa coi Kestrel, non col teletrasporto: la Ostrander le dirà lei cosa può passare."
+   },
+   {
+    "t": 1857.39,
+    "speaker": "xfer_chief",
+    "text": "Capitano, sempre sul registro: \"marines\" non esiste come reparto, mi serve un nome o un numero. E nessuna nave della schermata ha nostri fanti a bordo: non ho un interno dove metterli."
+   },
+   {
+    "t": 1873.45,
+    "speaker": "xo",
+    "text": "Capitano, ho passato l'ordine alla Ostrander: lei, dalla plancia al ponte dei Kestrel, deck otto. La conferma è sua."
+   },
+   {
+    "t": 1880.91,
+    "speaker": "ally_t44",
+    "text": "Aquila, Constance: non posso seguirvi oltre il Gate. Resto sul lato Aurelia a 4.5 km con i miei quattro scafi, armi libere: rientrate sulla mia linea e vi copro."
+   },
+   {
+    "t": 1899.24,
+    "speaker": "xo",
+    "text": "Capitano, la Ostrander ha già il suo ordine: lei dalla plancia al ponte dei Kestrel, deck otto. La conferma è sua, non mia."
+   },
+   {
+    "t": 1912.61,
+    "speaker": "xo",
+    "text": "Capitano, ordine ripassato alla Ostrander: lei dalla plancia al ponte dei Kestrel, deck otto. La conferma è sua."
+   },
+   {
+    "t": 1930.99,
+    "speaker": "xo",
+    "text": "Capitano, ordine passato alla Ostrander: lei dalla plancia al ponte dei Kestrel, deck otto. La conferma è sua."
+   },
+   {
+    "t": 1938.08,
+    "speaker": "xfer_chief",
+    "text": "Capitano, \"Deck 8 hangar\" non esiste nel registro: la mia lista ha \"Flight Deck\", che è il ponte nove. Se il deck otto è quello che intende, me lo confermi e lo cerco per nome."
+   },
+   {
+    "t": 1947.26,
+    "speaker": "xfer_chief",
+    "text": "Capitano, è sul Flight Deck, ponte nove, sezione B: arrivo pulito, otto secondi. Se il ponte otto è un altro locale, me lo dica per nome."
+   },
+   {
+    "t": 1964.06,
+    "speaker": "npc205",
+    "text": "Sul registro non lo so, Capitano. Noi alloggiamo con i reparti"
+   },
+   {
+    "t": 1974.04,
+    "speaker": "xo",
+    "text": "Capitano, ordine alla Ostrander: lei dal ponte di volo all'armeria dei marine, deck otto. La conferma è sua."
+   },
+   {
+    "t": 1980.75,
+    "speaker": "xfer_chief",
+    "text": "Capitano, \"Marine Armory\" non esiste nel registro: l'armeria della nave è \"the armory\", e non è raggiungibile dal fascio, è schermata contro il modello. Se intende la sua armeria, me lo confermi e le dico cosa si può fare."
+   },
+   {
+    "t": 1996.4,
+    "speaker": "npc216",
+    "text": "Capitano, per ora siamo a posto: Alpha e Bravo sono in coperta, pronti. Ma se devono rientrare i gruppi ancora fuori, io posso far liberare le corsie adesso."
+   },
+   {
+    "t": 2004.91,
+    "speaker": "npc208",
+    "text": "Capitano, i nostri Falcon possono restare in volo di pattugliamento ancora un po', ma i piloti sono stanchi. Se vuole, rientriamo e teniamo due in allarme."
+   },
+   {
+    "t": 2011.2,
+    "speaker": "npc160",
+    "text": "Capitano, sugli Hammers in coperta il carico è pronto e i motori sono"
+   },
+   {
+    "t": 2025.2,
+    "speaker": "xo",
+    "text": "Capitano, lei è già sul ponte di volo, deck nove, sezione B: da lì i Kestrel del ponte otto si raggiungono a piedi, per la scaletta di poppa, due minuti. Il fascio non arriva al ponte otto, è schermato: se vuole, la Ostrander la porta al ponte nove e da lì scende lei."
+   },
+   {
+    "t": 2041.7,
+    "speaker": "admiral",
+    "text": "Capitano, i Kestrel sono vostri: andateci con le vostre lance, è una manovra della vostra nave e non serve il permesso di Fleet. Io non ho altro da aggiungere — il Gate resta tenuto dal grosso, Constance e il picket."
+   },
+   {
+    "t": 2079.15,
+    "speaker": "xo",
+    "text": "Capitano, non ho capito \"i miei orologi\": se intende i suoi piloti, sono sul ponte di volo dove lei è già; se intende altro, me lo dica per nome e passo l'ordine alla Ostrander."
+   },
+   {
+    "t": 2084.31,
+    "speaker": "xo",
+    "text": "Capitano, ordine alla Ostrander: lei dal ponte di volo ai suoi alloggi, deck uno. La conferma è sua."
+   },
+   {
+    "t": 2090.99,
+    "speaker": "xfer_chief",
+    "text": "Capitano, dai suoi alloggi: preso dal Flight Deck, ponte nove, serratura in un secondo e mezzo, qualità cento. Otto secondi di ciclo, è già in partenza."
+   },
+   {
+    "t": 2100.12,
+    "speaker": "xfer_chief",
+    "text": "Capitano, è nei suoi alloggi: arrivo pulito, qualità cento, otto secondi di ciclo. I pad sono liberi."
+   },
+   {
+    "t": 2156.75,
+    "speaker": "npc510",
+    "text": "Presente, Capitano. Sezione B al completo, pronti a muoverci."
+   },
+   {
+    "t": 2179.83,
+    "speaker": "npc485",
+    "text": "Armi pronte e contate, Capitano: fucili e munizioni in ordine, nessun guasto. Qui siamo in sei, tutti al loro posto."
+   },
+   {
+    "t": 2190.32,
+    "speaker": "npc524",
+    "text": "Kestrel? Non sono di noi, Capitano: qui in armeria non ne abbiamo. Provi dal ponte di volo, forse è roba dei piloti."
+   },
+   {
+    "t": 2196.86,
+    "speaker": "admiral",
+    "text": "Capitano, i Kestrel sono nel vostro hangar di poppa, alloggiamento di poppa, ponte C: le vostre lance li raggiungono in due minuti. Nessun'altra nave di Fleet li ha — sono vostri. Il Gate resta tenuto dal grosso e da Constance."
+   },
+   {
+    "t": 2209.91,
+    "speaker": "ally_t66",
+    "text": "Aquila, Intrepid: Reserve in schermata su di voi a 4.5 km, lato Aurelia, sezione T-66 in linea con Probity. Nessun contatto ostile."
+   },
+   {
+    "t": 2220.24,
+    "speaker": "ally_t66",
+    "text": "Aquila, Intrepid: Reserve in schermata su di voi a 4.5 km, lato Aurelia, sezione T-66 in linea con Probity. Nessun contatto ostile."
+   },
+   {
+    "t": 2254.71,
+    "speaker": "ally_t66",
+    "text": "Aquila, Aurelia Reserve: T-66 in command, closing from 21 km to take station on T-64's screen line at 4.5 km. Plot is clear; we cover you."
+   },
+   {
+    "t": 2265.98,
+    "speaker": "ally_t64",
+    "text": "Aquila, Aurelia Reserve: T-66 in comando. Porto la mia sezione sulla linea di schermo di T-64; plot pulito, ti copriamo."
+   },
+   {
+    "t": 2274.62,
+    "speaker": "ally_t66",
+    "text": "Aquila, Aurelia Reserve: T-66 in comando. Chiudo da 5.5 a 4.5 km sulla linea di schermo; plot pulito, ti copriamo."
+   },
+   {
+    "t": 2284.85,
+    "speaker": "ally_t64",
+    "text": "Aquila, Aurelia Reserve: T-66 in comando. Chiudo dai 5.5 km a 4.5 km sulla linea di schermo; plot pulito, ti copriamo."
+   },
+   {
+    "t": 2295.46,
+    "speaker": "ally_t64",
+    "text": "Aquila, Aurelia Reserve: T-66 in comando, chiudo dai 5.5 km sulla linea di schermo a 4.5 km. Plot pulito, ti copriamo."
+   },
+   {
+    "t": 2305.87,
+    "speaker": "ally_t66",
+    "text": "Aquila, Aurelia Reserve: T-66 in comando, schermo confermato a 4.5 km. Plot pulito, chiudo dai 15 km sulla tua linea con la Probity; nessun contatto."
+   },
+   {
+    "t": 2315.28,
+    "speaker": "ally_t66",
+    "text": "Aquila, Aurelia Reserve: T-66 in comando, schermo confermato a 4.5 km. Plot pulito, chiudo dai 15 km sulla tua linea con la Probity; nessun contatto."
+   },
+   {
+    "t": 2324.09,
+    "speaker": "comms",
+    "text": "Capitano, è il Dalca dell'Intrepid: si sta portando sulla linea di schermo a quattro virgola cinque chilometri e ripete il suo rapporto a ogni chilometro, come gli hanno ordinato. Non è un guasto, è la sua procedura."
+   },
+   {
+    "t": 2339.76,
+    "speaker": "chief",
+    "text": "Capitano, lei è già nei suoi alloggi: la Ostrander l'ha portata lì otto minuti fa, e il fascio non ripete un viaggio che è già fatto. Se vuole tornare in plancia, quello sì lo faccio fare subito."
+   },
+   {
+    "t": 2350.53,
+    "speaker": "ally_t66",
+    "text": "Aquila, Aurelia Reserve: T-66 in comando, schermo confermato a 4.5 km. Plot pulito, chiudo dai 53 km sulla tua linea con la Probity; nessun contatto."
+   },
+   {
+    "t": 2358.06,
+    "speaker": "xo",
+    "text": "Capitano, lei è già nei suoi alloggi, deck uno, sezione A: la Ostrander l'ha portata lì otto minuti fa, arrivo pulito. Non c'è nulla da teletrasportare: se vuole tornare in plancia, quello lo faccio fare subito."
+   },
+   {
+    "t": 2364.53,
+    "speaker": "xo",
+    "text": "Capitano, il locatore la dà nella spina, deck otto, sezione F: è già al ponte dei marine, dove stanno i Kestrel. Da lì l'armeria è a poppa, trenta passi."
+   },
+   {
+    "t": 2374.94,
+    "speaker": "ally_t66",
+    "text": "Aquila, Aurelia Reserve: T-66 in comando, schermo confermato a 4.5 km. Plot pulito, chiudo dai 68 km sulla tua linea con la Probity; nessun contatto."
+   },
+   {
+    "t": 2384.04,
+    "speaker": "ally_t64",
+    "text": "Aquila, Aurelia Reserve: T-66 in comando, schermo confermato a 4.5 km. Plot pulito; chiudo dai 72 km sulla tua linea con la Probity."
+   },
+   {
+    "t": 2394.99,
+    "speaker": "castellan",
+    "text": "Aquila, Praetorian: il picket è a 104 km da voi, uno schermo a quella distanza non è uno schermo. Chiudo a 4.5 km sulla vostra scia e tengo l'arco verso il Gate."
+   },
+   {
+    "t": 2405.68,
+    "speaker": "xo",
+    "text": "Capitano, lei è già nei suoi alloggi, deck uno sezione A: la Ostrander l'ha portata lì otto minuti fa, arrivo pulito. Il locatore la dà nella spina, deck otto sezione E, dai marine: se vuole gli alloggi, la porto io con la sua parola."
+   },
+   {
+    "t": 2414.38,
+    "speaker": "xo",
+    "text": "Capitano, ordine alla Ostrander: lei dal deck otto, sezione E, ai suoi alloggi, deck uno. La conferma è sua."
+   },
+   {
+    "t": 2421.81,
+    "speaker": "xfer_chief",
+    "text": "Capitano, preso dal passaggio di tribordo, deck otto sezione E: serratura in un secondo e mezzo, qualità cento, ciclo di otto secondi. È in arrivo nei suoi alloggi."
+   },
+   {
+    "t": 2433.25,
+    "speaker": "castellan",
+    "text": "Aquila, Praetorian: siamo a 110 km da voi, a quella distanza lo schermo non è uno schermo. Chiudo con il Vigilant sulla vostra scia e porto l'arco verso il Gate."
+   },
+   {
+    "t": 2442.39,
+    "speaker": "xo",
+    "text": "Capitano, sono Serra, comandante in seconda: lei è nel corridoio uno-a di tribordo, deck uno, e la nave è mia finché non torna in plancia. Vuole che la riporti al suo posto?"
+   },
+   {
+    "t": 2456.54,
+    "speaker": "xo",
+    "text": "Capitano, ben tornato. Nave in rotta uno-sei-sette verso il Gate, tutta forza, quattrocentottanta metri al secondo, allarme rosso, scafo novantotto, calore trentuno, nessun contatto ostile sul plot. Il Main Body, Constance e il picket si sono messi in schermo sulla nostra scia a quattro virgola cinque chilometri. L'unica cosa che conta: il Gate di Thule è a duecentosettanta chilometri, e di là diciotto navi."
+   },
+   {
+    "t": 2484.42,
+    "speaker": "helm",
+    "text": "Capitano, rotta tre-quattro-cinque, marca più sei, sul Janus Gate, tutta forza: duecentottantuno virgola due chilometri, ci arrivo in circa dieci minuti. Il passaggio lo comando io solo al suo ordine."
+   },
+   {
+    "t": 2497.48,
+    "speaker": "ally_t64",
+    "text": "Aquila, Intrepid: ho la Reserve. Nessun contatto; l'Intrepid rientra in schermo a 4.5 km in linea con la Probity."
+   },
+   {
+    "t": 2515.38,
+    "speaker": "helm",
+    "text": "Capitano, la colpa è mia: la prima rotta che le ho dato, uno-sei-sette, era sbagliata, e in dieci minuti ci ha portati a duecentottanta chilometri dal Gate. Ora sto già virando su tre-quattro-cinque, marca più sei: il Gate è a duecentonovantaquattro virgola cinque, ci arrivo in circa dieci minuti a tutta forza."
+   },
+   {
+    "t": 2533.01,
+    "speaker": "ally_t66",
+    "text": "Aquila, Intrepid: ho la Reserve. Nessun contatto; l'Intrepid rientra in schermo a 4.5 km in linea con la Probity."
+   },
+   {
+    "t": 2542.65,
+    "speaker": "ally_t66",
+    "text": "Aquila, Intrepid: ho la Reserve. Nessun contatto; l'Intrepid rientra in schermo a 4.5 km in linea con la Probity."
+   },
+   {
+    "t": 2550.8,
+    "speaker": "ally_t66",
+    "text": "Aquila, Intrepid: ho la Reserve. Nessun contatto; l'Intrepid rientra in schermo a 4.5 km in linea con la Probity."
+   }
+  ],
+  "dropped": [
+   {
+    "t": 296.35,
+    "id": 24,
+    "speaker": "castellan",
+    "prio": "normal",
+    "reason": "rethought",
+    "text": "Aquila, Praetorian: chiudo su di voi e vi metto il picket attorno. Se "
+   },
+   {
+    "t": 369.25,
+    "id": 33,
+    "speaker": "bravo_lead",
+    "prio": "normal",
+    "reason": "rethought",
+    "text": "Bravo Lead: sei siluri in acqua sulla Lethe, i camion rientrano."
+   },
+   {
+    "t": 386.15,
+    "id": 35,
+    "speaker": "bravo_lead",
+    "prio": "normal",
+    "reason": "rethought",
+    "text": "Bravo Lead: quattro siluri in acqua sulla Lethe, i camion rientrano."
+   },
+   {
+    "t": 455.99,
+    "id": 39,
+    "speaker": "deck_chief",
+    "prio": "normal",
+    "reason": "rethought",
+    "text": "Deck: Alpha a bordo, otto su otto. Riarmo in sessanta secondi."
+   },
+   {
+    "t": 456.68,
+    "id": 44,
+    "speaker": "ally_t44",
+    "prio": "normal",
+    "reason": "rethought",
+    "text": "Aquila, Constance: siamo a ottantadue chilometri, in avvicinamento per"
+   },
+   {
+    "t": 477.99,
+    "id": 48,
+    "speaker": "deck_chief",
+    "prio": "normal",
+    "reason": "rethought",
+    "text": "Deck: Alpha riarmato, otto Falcon pronti sul ponte."
+   },
+   {
+    "t": 555.41,
+    "id": 50,
+    "speaker": "alpha_lead",
+    "prio": "normal",
+    "reason": "rethought",
+    "text": "Alpha Lead: un Harpy abbattuto, ne restano tre."
+   },
+   {
+    "t": 555.91,
+    "id": 55,
+    "speaker": "alpha_lead",
+    "prio": "normal",
+    "reason": "rethought",
+    "text": "Alpha Lead: tre Harpy abbattuti, zero rimasti. Cielo nostro, Capitano."
+   },
+   {
+    "t": 556.82,
+    "id": 57,
+    "speaker": "castellan",
+    "prio": "normal",
+    "reason": "rethought",
+    "text": "Aquila, Praetorian: vi siete allontanata di sette chilometri; il picke"
+   },
+   {
+    "t": 570.24,
+    "id": 61,
+    "speaker": "ally_t48",
+    "prio": "normal",
+    "reason": "rethought",
+    "text": "Aquila, Valiant: i Mandate si ritirano fuori tiro; il Main Body annull"
+   },
+   {
+    "t": 581.07,
+    "id": 67,
+    "speaker": "deck_chief",
+    "prio": "normal",
+    "reason": "synth_timeout",
+    "text": "Deck: Bravo riarmato, sette Hammer pronti sul ponte. Al tuo ordine, Ca"
+   },
+   {
+    "t": 671.61,
+    "id": 77,
+    "speaker": "ally_t44",
+    "prio": "normal",
+    "reason": "rethought",
+    "text": "Aquila, Constance: i sei contatti nuovi a quaranta gradi sono l'avangu"
+   },
+   {
+    "t": 709.04,
+    "id": 82,
+    "speaker": "ally_t48",
+    "prio": "normal",
+    "reason": "rethought",
+    "text": "Aquila, Valiant: vi facciamo schermo, otto scafi in arrivo su di voi; "
+   },
+   {
+    "t": 862.68,
+    "id": 87,
+    "speaker": "alpha_lead",
+    "prio": "normal",
+    "reason": "rethought",
+    "text": "Alpha Lead: uno abbattuto, ne restano sette. Alpha tiene la pattuglia."
+   },
+   {
+    "t": 863.35,
+    "id": 91,
+    "speaker": "alpha_lead",
+    "prio": "normal",
+    "reason": "rethought",
+    "text": "Alpha Lead: cinque abbattuti, ne restano due. Alpha tiene la pattuglia"
+   },
+   {
+    "t": 863.85,
+    "id": 94,
+    "speaker": "alpha_lead",
+    "prio": "normal",
+    "reason": "rethought",
+    "text": "Alpha Lead: tre abbattuti, zero caccia nemici rimasti. Cielo pulito so"
+   },
+   {
+    "t": 864.71,
+    "id": 103,
+    "speaker": "ally_t44",
+    "prio": "normal",
+    "reason": "rethought",
+    "text": "Aquila, Constance: siamo a ventitré chilometri, ancora in avvicinament"
+   },
+   {
+    "t": 879.02,
+    "id": 108,
+    "speaker": "cag",
+    "prio": "normal",
+    "reason": "rethought",
+    "text": "CAG: Capitano, Alpha, Bravo e i droni sono in volo sulla Tartarus, tre"
+   },
+   {
+    "t": 1028.95,
+    "id": 127,
+    "speaker": "deck_chief",
+    "prio": "normal",
+    "reason": "merged_into_126",
+    "text": "Deck: droni a bordo, dodici Wasp su dodici. Riarmo in un minuto."
+   },
+   {
+    "t": 1073.64,
+    "id": 131,
+    "speaker": "deck_chief",
+    "prio": "normal",
+    "reason": "rethought",
+    "text": "Deck: Bravo riarmato, sette Hammer pronti sul ponte."
+   },
+   {
+    "t": 1320.81,
+    "id": 146,
+    "speaker": "ally_t44",
+    "prio": "normal",
+    "reason": "rethought",
+    "text": "Constance a Aquila: quattro scafi intatti, lascio il picket e prendo p"
+   },
+   {
+    "t": 1703.02,
+    "id": 164,
+    "speaker": "helm",
+    "prio": "answer",
+    "reason": "rethink_timeout",
+    "text": "Capitano, rotta per il Gate di Thule, zero-sette-cinque, cinquantasei "
+   },
+   {
+    "t": 1724.37,
+    "id": 167,
+    "speaker": "castellan",
+    "prio": "answer",
+    "reason": "rethought",
+    "text": "Aquila, Praetorian: la schermata vi resta addosso attraverso il Gate, "
+   },
+   {
+    "t": 1725.37,
+    "id": 168,
+    "speaker": "ally_t48",
+    "prio": "answer",
+    "reason": "rethought",
+    "text": "Valiant a Aquila: la mia schermata resta sul lato Aurelia del Gate, ot"
+   },
+   {
+    "t": 1799.13,
+    "id": 173,
+    "speaker": "castellan",
+    "prio": "normal",
+    "reason": "synth_timeout",
+    "text": "Aquila, Praetorian: non vi seguo attraverso il Gate. Resto di qua con "
+   },
+   {
+    "t": 2038.92,
+    "id": 190,
+    "speaker": "castellan",
+    "prio": "answer",
+    "reason": "rethought",
+    "text": "Aquila, Praetorian: il Kestrel è di qua dal Gate, a 37 km da voi sul l"
+   },
+   {
+    "t": 2039.78,
+    "id": 191,
+    "speaker": "ally_t48",
+    "prio": "answer",
+    "reason": "rethought",
+    "text": "Valiant al Capitano: il Gate di Thule è in mano al Mandate, non possia"
+   },
+   {
+    "t": 2040.66,
+    "id": 192,
+    "speaker": "ally_t44",
+    "prio": "answer",
+    "reason": "rethought",
+    "text": "Aquila, Constance: il Kestrel è a 37 km da voi, rilevamento 344°, sul "
+   },
+   {
+    "t": 2041.71,
+    "id": 193,
+    "speaker": "ally_t64",
+    "prio": "answer",
+    "reason": "rethought",
+    "text": "Aquila, Probity: i Kestrel sono a 37 km da voi, rilevamento 344°, sul "
+   },
+   {
+    "t": 2208.65,
+    "id": 204,
+    "speaker": "castellan",
+    "prio": "answer",
+    "reason": "rethought",
+    "text": "Aquila, Praetorian: i Kestrel sono a 62 km da voi, rilevamento 346°, s"
+   },
+   {
+    "t": 2209.63,
+    "id": 205,
+    "speaker": "ally_t48",
+    "prio": "answer",
+    "reason": "rethought",
+    "text": "Capitano, Valiant: i Kestrel sono nostri — T-47, a 62 km da voi per ri"
+   },
+   {
+    "t": 2210.27,
+    "id": 206,
+    "speaker": "ally_t44",
+    "prio": "answer",
+    "reason": "rethought",
+    "text": "Aquila, Constance: i Kestrel sono a 62 km da voi, rilevamento 346°, su"
+   },
+   {
+    "t": 2216.61,
+    "id": 207,
+    "speaker": "ally_t66",
+    "prio": "answer",
+    "reason": "rethought",
+    "text": "Aquila, Intrepid: i Kestrel sono in linea con il picket, 62 km da voi "
+   },
+   {
+    "t": 2217.93,
+    "id": 201,
+    "speaker": "ally_t64",
+    "prio": "normal",
+    "reason": "rethought",
+    "text": "Aquila, Intrepid: assumo il comando della Reserve; la mia sezione rien"
+   },
+   {
+    "t": 2218.97,
+    "id": 208,
+    "speaker": "ally_t66",
+    "prio": "normal",
+    "reason": "rethought",
+    "text": "Aquila, Intrepid: assumo il comando della Reserve. La mia sezione si p"
+   },
+   {
+    "t": 2220.58,
+    "id": 209,
+    "speaker": "ally_t66",
+    "prio": "normal",
+    "reason": "rethought",
+    "text": "Aquila, Intrepid: Reserve in schermata su di voi a 4.5 km, lato Aureli"
+   },
+   {
+    "t": 2291.43,
+    "id": 216,
+    "speaker": "ally_t64",
+    "prio": "normal",
+    "reason": "rethought",
+    "text": "Aquila, Aurelia Reserve: T-66 in comando. Chiudo dai 5.5 km sulla line"
+   },
+   {
+    "t": 2294.73,
+    "id": 217,
+    "speaker": "ally_t64",
+    "prio": "normal",
+    "reason": "rethought",
+    "text": "Aquila, Aurelia Reserve: T-66 in comando, Probity e Intrepid sulla tua"
+   },
+   {
+    "t": 2302.29,
+    "id": 219,
+    "speaker": "ally_t66",
+    "prio": "normal",
+    "reason": "rethought",
+    "text": "Aquila, Aurelia Reserve: T-66 in comando, ordine di schermo confermato"
+   },
+   {
+    "t": 2315.7,
+    "id": 221,
+    "speaker": "ally_t66",
+    "prio": "normal",
+    "reason": "rethought",
+    "text": "Aquila, Aurelia Reserve: T-66 in comando, schermo confermato a 4.5 km."
+   },
+   {
+    "t": 2333.47,
+    "id": 224,
+    "speaker": "ally_t66",
+    "prio": "normal",
+    "reason": "rethought",
+    "text": "Aquila, Aurelia Reserve: T-66 in comando, schermo confermato a 4.5 km."
+   },
+   {
+    "t": 2350.31,
+    "id": 223,
+    "speaker": "ally_t66",
+    "prio": "normal",
+    "reason": "rethought",
+    "text": "Aquila, Aurelia Reserve: T-66 in comando, schermo confermato a 4.5 km."
+   },
+   {
+    "t": 2351.03,
+    "id": 225,
+    "speaker": "ally_t66",
+    "prio": "normal",
+    "reason": "rethought",
+    "text": "Aquila, Aurelia Reserve: T-66 in comando, schermo confermato a 4.5 km."
+   },
+   {
+    "t": 2372.58,
+    "id": 228,
+    "speaker": "ally_t66",
+    "prio": "normal",
+    "reason": "rethought",
+    "text": "Aquila, Aurelia Reserve: T-66 in comando, schermo confermato a 4.5 km."
+   },
+   {
+    "t": 2373.55,
+    "id": 230,
+    "speaker": "ally_t66",
+    "prio": "normal",
+    "reason": "rethought",
+    "text": "Aquila, Aurelia Reserve: T-66 in comando, schermo confermato a 4.5 km."
+   },
+   {
+    "t": 2374.15,
+    "id": 231,
+    "speaker": "ally_t66",
+    "prio": "normal",
+    "reason": "rethought",
+    "text": "Aquila, Aurelia Reserve: T-66 in comando, schermo confermato a 4.5 km."
+   },
+   {
+    "t": 2393.85,
+    "id": 236,
+    "speaker": "ally_t66",
+    "prio": "normal",
+    "reason": "rethought",
+    "text": "Aquila, Aurelia Reserve: T-66 in comando, schermo sull'Aquila conferma"
+   },
+   {
+    "t": 2394.73,
+    "id": 237,
+    "speaker": "ally_t64",
+    "prio": "normal",
+    "reason": "rethought",
+    "text": "Aquila, Aurelia Reserve: T-66 in comando, schermo sull'Aquila conferma"
+   },
+   {
+    "t": 2453.5,
+    "id": 247,
+    "speaker": "castellan",
+    "prio": "normal",
+    "reason": "rethought",
+    "text": "Aquila, Praetorian: siamo a 110 km da voi, a quella distanza lo scherm"
+   },
+   {
+    "t": 2468.52,
+    "id": 242,
+    "speaker": "ally_t44",
+    "prio": "normal",
+    "reason": "synth_timeout",
+    "text": "Aquila, Constance: nessun contatto qui. Chiudo da 93 km e mi metto in "
+   },
+   {
+    "t": 2496.4,
+    "id": 240,
+    "speaker": "ally_t66",
+    "prio": "normal",
+    "reason": "rethought",
+    "text": "Aquila, Intrepid: nessun contatto sul plot. La Reserve chiude da 92 km"
+   },
+   {
+    "t": 2496.82,
+    "id": 256,
+    "speaker": "ally_t66",
+    "prio": "normal",
+    "reason": "merged_into_255",
+    "text": "Aquila, Intrepid: ho la Reserve. Nessun contatto; l'Intrepid rientra i"
+   },
+   {
+    "t": 2497.36,
+    "id": 243,
+    "speaker": "ally_t48",
+    "prio": "normal",
+    "reason": "rethought",
+    "text": "Aquila, Valiant: nessun contatto sul plot. Il Main Body chiude da 100 "
+   },
+   {
+    "t": 2498.38,
+    "id": 246,
+    "speaker": "ally_t66",
+    "prio": "normal",
+    "reason": "rethought",
+    "text": "Aquila, Intrepid: Reserve in schermo a 4.5 km sulla vostra scia, in li"
+   },
+   {
+    "t": 2503.77,
+    "id": 250,
+    "speaker": "ally_t66",
+    "prio": "normal",
+    "reason": "rethought",
+    "text": "Aquila, Intrepid: ho la Reserve. Nessun contatto; l'Intrepid rientra i"
+   },
+   {
+    "t": 2504.5,
+    "id": 251,
+    "speaker": "ally_t64",
+    "prio": "normal",
+    "reason": "rethought",
+    "text": "Aquila, Intrepid: ho la Reserve. Nessun contatto; l'Intrepid rientra i"
+   },
+   {
+    "t": 2505.42,
+    "id": 253,
+    "speaker": "ally_t66",
+    "prio": "normal",
+    "reason": "rethought",
+    "text": "Aquila, Intrepid: ho la Reserve. Nessun contatto; l'Intrepid rientra i"
+   },
+   {
+    "t": 2521.91,
+    "id": 259,
+    "speaker": "ally_t66",
+    "prio": "normal",
+    "reason": "merged_into_258",
+    "text": "Aquila, Intrepid: ho la Reserve. Nessun contatto; l'Intrepid rientra i"
+   },
+   {
+    "t": 2539.26,
+    "id": 258,
+    "speaker": "ally_t66",
+    "prio": "normal",
+    "reason": "rethought",
+    "text": "Aquila, Intrepid: ho la Reserve. Nessun contatto; l'Intrepid rientra i"
+   },
+   {
+    "t": 2545.23,
+    "id": 263,
+    "speaker": "ally_t66",
+    "prio": "normal",
+    "reason": "merged_into_262",
+    "text": "Aquila, Intrepid: ho la Reserve. Nessun contatto; l'Intrepid rientra i"
+   },
+   {
+    "t": 2549.84,
+    "id": 265,
+    "speaker": "ally_t66",
+    "prio": "normal",
+    "reason": "merged_into_264",
+    "text": "Aquila, Intrepid: ho la Reserve. Nessun contatto; l'Intrepid rientra i"
+   },
+   {
+    "t": 2553.71,
+    "id": 267,
+    "speaker": "ally_t66",
+    "prio": "normal",
+    "reason": "merged_into_266",
+    "text": "Aquila, Probity: ho la Reserve. Nessun contatto; l'Intrepid rientra in"
+   },
+   {
+    "t": 2557.72,
+    "id": 269,
+    "speaker": "ally_t66",
+    "prio": "normal",
+    "reason": "merged_into_268",
+    "text": "Aquila, Probity: ho la Reserve. Nessun contatto; l'Intrepid rientra in"
+   },
+   {
+    "t": 2560.42,
+    "id": 262,
+    "speaker": "ally_t66",
+    "prio": "normal",
+    "reason": "no_listener",
+    "text": "Aquila, Intrepid: ho la Reserve. Nessun contatto;"
+   },
+   {
+    "t": 2560.42,
+    "id": 264,
+    "speaker": "ally_t66",
+    "prio": "normal",
+    "reason": "no_listener",
+    "text": "Aquila, Intrepid: ho la Reserve. Nessun contatto; l'Intrepid rientra i"
+   },
+   {
+    "t": 2560.42,
+    "id": 266,
+    "speaker": "ally_t66",
+    "prio": "normal",
+    "reason": "no_listener",
+    "text": "Aquila, Intrepid: ho la Reserve. Nessun contatto; l'Intrepid rientra i"
+   },
+   {
+    "t": 2560.42,
+    "id": 268,
+    "speaker": "ally_t66",
+    "prio": "normal",
+    "reason": "no_listener",
+    "text": "Aquila, Intrepid: ho la Reserve. Nessun contatto; l'Intrepid rientra i"
+   }
+  ],
+  "rethought": [
+   {
+    "t": 201.22,
+    "id": 12,
+    "speaker": "sensors",
+    "waited_s": 11
+   },
+   {
+    "t": 278.62,
+    "id": 20,
+    "speaker": "comms",
+    "waited_s": 17
+   },
+   {
+    "t": 288.76,
+    "id": 21,
+    "speaker": "xo",
+    "waited_s": 27
+   },
+   {
+    "t": 323.25,
+    "id": 28,
+    "speaker": "ops",
+    "waited_s": 11
+   },
+   {
+    "t": 362.4,
+    "id": 34,
+    "speaker": "xo",
+    "waited_s": 20
+   },
+   {
+    "t": 430.21,
+    "id": 42,
+    "speaker": "xo",
+    "waited_s": 10
+   },
+   {
+    "t": 457.72,
+    "id": 45,
+    "speaker": "ally_t48",
+    "waited_s": 26
+   },
+   {
+    "t": 466.33,
+    "id": 46,
+    "speaker": "deck_chief",
+    "waited_s": 24
+   },
+   {
+    "t": 470.52,
+    "id": 47,
+    "speaker": "tactical",
+    "waited_s": 31
+   },
+   {
+    "t": 499.95,
+    "id": 54,
+    "speaker": "tactical",
+    "waited_s": 12
+   },
+   {
+    "t": 507.48,
+    "id": 56,
+    "speaker": "xo",
+    "waited_s": 14
+   },
+   {
+    "t": 525.26,
+    "id": 62,
+    "speaker": "xo",
+    "waited_s": 17
+   },
+   {
+    "t": 531.76,
+    "id": 58,
+    "speaker": "xo",
+    "waited_s": 36
+   },
+   {
+    "t": 544.08,
+    "id": 59,
+    "speaker": "xo",
+    "waited_s": 44
+   },
+   {
+    "t": 594.42,
+    "id": 68,
+    "speaker": "comms",
+    "waited_s": 55
+   },
+   {
+    "t": 602.86,
+    "id": 69,
+    "speaker": "xo",
+    "waited_s": 64
+   },
+   {
+    "t": 611.19,
+    "id": 70,
+    "speaker": "xo",
+    "waited_s": 21
+   },
+   {
+    "t": 620.6,
+    "id": 73,
+    "speaker": "xo",
+    "waited_s": 9
+   },
+   {
+    "t": 634.34,
+    "id": 76,
+    "speaker": "xo",
+    "waited_s": 8
+   },
+   {
+    "t": 643.6,
+    "id": 73,
+    "speaker": "xo",
+    "waited_s": 22
+   },
+   {
+    "t": 679.61,
+    "id": 78,
+    "speaker": "castellan",
+    "waited_s": 45
+   },
+   {
+    "t": 682.51,
+    "id": 79,
+    "speaker": "ally_t48",
+    "waited_s": 46
+   },
+   {
+    "t": 693.28,
+    "id": 80,
+    "speaker": "tactical",
+    "waited_s": 47
+   },
+   {
+    "t": 700.75,
+    "id": 81,
+    "speaker": "tactical",
+    "waited_s": 44
+   },
+   {
+    "t": 710.87,
+    "id": 83,
+    "speaker": "sensors",
+    "waited_s": 16
+   },
+   {
+    "t": 726.15,
+    "id": 85,
+    "speaker": "tactical",
+    "waited_s": 8
+   },
+   {
+    "t": 749.33,
+    "id": 89,
+    "speaker": "comms",
+    "waited_s": 16
+   },
+   {
+    "t": 827.05,
+    "id": 99,
+    "speaker": "tactical",
+    "waited_s": 33
+   },
+   {
+    "t": 837.94,
+    "id": 100,
+    "speaker": "xo",
+    "waited_s": 37
+   },
+   {
+    "t": 847.19,
+    "id": 105,
+    "speaker": "flight",
+    "waited_s": 35
+   },
+   {
+    "t": 854.98,
+    "id": 107,
+    "speaker": "ops",
+    "waited_s": 28
+   },
+   {
+    "t": 879.71,
+    "id": 109,
+    "speaker": "sensors",
+    "waited_s": 27
+   },
+   {
+    "t": 1014.89,
+    "id": 123,
+    "speaker": "sensors",
+    "waited_s": 16
+   },
+   {
+    "t": 1063.66,
+    "id": 129,
+    "speaker": "sensors",
+    "waited_s": 24
+   },
+   {
+    "t": 1434.32,
+    "id": 153,
+    "speaker": "sensors",
+    "waited_s": 27
+   },
+   {
+    "t": 1445.92,
+    "id": 155,
+    "speaker": "sensors",
+    "waited_s": 11
+   },
+   {
+    "t": 1688.73,
+    "id": 163,
+    "speaker": "sensors",
+    "waited_s": 8
+   },
+   {
+    "t": 1855.97,
+    "id": 175,
+    "speaker": "xfer_chief",
+    "waited_s": 10
+   },
+   {
+    "t": 2265.75,
+    "id": 213,
+    "speaker": "ally_t64",
+    "waited_s": 8
+   },
+   {
+    "t": 2272.29,
+    "id": 214,
+    "speaker": "ally_t66",
+    "waited_s": 12
+   },
+   {
+    "t": 2280.79,
+    "id": 215,
+    "speaker": "ally_t64",
+    "waited_s": 10
+   },
+   {
+    "t": 2431.38,
+    "id": 239,
+    "speaker": "castellan",
+    "waited_s": 43
+   },
+   {
+    "t": 2532.77,
+    "id": 255,
+    "speaker": "ally_t66",
+    "waited_s": 37
+   },
+   {
+    "t": 2558.09,
+    "id": 262,
+    "speaker": "ally_t66",
+    "waited_s": 14
+   }
+  ]
+ },
+ "unpaired_pulses": 5
+}

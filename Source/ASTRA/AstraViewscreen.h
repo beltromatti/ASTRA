@@ -46,6 +46,8 @@ public:
 
 	/** What is on screen now, for the crew and the datapad ("auto: tactical's target T-23 Cocytus, zoom x38"). */
 	FString Describe() const;
+	/** The contact the screen is showing, when it shows one (the Captain's command wheel takes it as the target he is looking at). */
+	FString SubjectId() const { return Shot == EShot::Contact ? ShotId : FString(); }
 	/** The image as it is on the screen now, at full resolution, to a PNG (testing: astra.viewscreen.dump). */
 	bool Dump(const FString& Path) const;
 	/** Testing: log every visible component in the camera's field of view, nearest first (astra.viewscreen.what). */
@@ -62,12 +64,17 @@ private:
 	UPROPERTY() TObjectPtr<UFont> Title;
 
 	// the shot: what the camera frames, where it is, how wide
-	enum class EShot : uint8 { Forward, Contact, Group, Point, Ship, Swarm, Off };
+	enum class EShot : uint8 { Forward, Contact, Group, Point, Ship, Swarm, Broadside, Off };
+	/** The shots that see the Aquila's own hull from outside (the camera's world has it in only for these). */
+	bool ShowsOwnHull(EShot S) const { return S == EShot::Ship || S == EShot::Broadside; }
 	EShot Shot = EShot::Forward;
 	FString ShotId;                    // the contact (Contact)
 	FString ShotName;                  // how the caption calls it
 	TArray<FString> GroupIds;          // the contacts to frame together (Group)
 	double SwarmShotAt = -100.0;       // the last time a salvo coming in had the screen (Swarm: the missiles at the Aquila, framed as they come)
+	double BroadsideShotAt = -100.0;   // the last time the Aquila's own fire had the screen (Broadside: her hull from outside, her rounds going away to the target)
+	double BroadsideSince = -1.0;      // the broadside shot the camera's side was chosen for
+	FVector BroadsideSide = FVector::RightVector;
 	FVector ShotPoint = FVector::ZeroVector;   // system frame (Point: where a ship died)
 	FString ShotWhy;                   // "TARGET", "FIRING ON US", "DESTROYED", "ORDERED", …
 	int32 ShotPri = 0;                 // the director's priority of the shot on screen
@@ -109,6 +116,7 @@ private:
 	float SmoothDt = 0.f;                 // the frame time, smoothed (the feed gives way when frames run long)
 	double NextShowListAt = 0.0;       // when the list of what the camera may see is rebuilt
 	double NextSizeAt = 0.0;           // when the feed's width is next weighed against the pixels the screen covers on the Captain's view
+	double SlowFor = 0.0, GoodFor = 0.0;   // seconds the frame has been running long / holding its pace (the feed's width changes on these, not on a glance)
 	/** The camera sees only space (the sky, the Aquila's hull, ships, weapons, wrecks): the bridge, the decks inside and
 	 *  the planet's surface zone never enter its scene (half the render thread's work of a capture was theirs). */
 	void RebuildShowList();

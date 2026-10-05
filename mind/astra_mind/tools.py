@@ -21,7 +21,8 @@ MESS = [f"mess{i}" for i in range(1, 13)] + ["mess_cook"]   # the Mess Hall's pl
 SPEAK = _fn("speak", "Someone aboard speaks aloud: an officer, a wounded crewman in the Medbay, someone off duty in "
                      "the Mess Hall, or the ship's computer (`computer`: only in a lift, where it answers the Captain's travel orders) "
                      "(one call per line, in speaking order). Short and specific: one sentence, and an "
-                     "acknowledgement always says WHAT was set or answered (never a bare 'aye').", {
+                     "acknowledgement always says WHAT was set or answered (never a bare 'aye') and nothing around it: no ranges, no enemy positions, "
+                     "no advice (that is the XO's picture).", {
     "speaker": {"type": "string", "enum": list(CREW) + PATIENTS + MESS + ["computer"]},
     "text": {"type": "string", "description": "The spoken line, in the Captain's language: usually one short sentence "
                                               "(6-16 words); two only when the second carries something needed; more only "
@@ -36,8 +37,8 @@ SHIP_TOOLS: list[dict[str, Any]] = [
     _fn("intercept", "Helm: continuous intercept of a contact — the course follows it; at the standoff range the ship "
                      "turns broadside (all turrets bear) and holds that range. A set_course cancels it.", {
         "contact_id": {"type": "string"},
-        "standoff_km": {"type": "number", "minimum": 1, "maximum": 30,
-                        "description": "range to hold: railguns reach 10 km, lasers 4 km"}}, ["contact_id", "standoff_km"]),
+        "standoff_km": {"type": "number", "minimum": 1, "maximum": 45,
+                        "description": "range to hold: the Aquila's band is 18-30 km (her railguns reach 45 km, a Styx's 28, lasers 6.5-9); 15-20 to cut off a ship that runs"}}, ["contact_id", "standoff_km"]),
     _fn("transit_gate", "Helm: take the Aquila through the system's Janus Gate to another star system. The helm flies at "
                         "full ahead to the gate's approach lane (see janus_gate in the state for where it is), then the "
                         "gate's field takes the ship and draws her through the ring: once in the lane there is no turning "
@@ -61,7 +62,7 @@ SHIP_TOOLS: list[dict[str, Any]] = [
         "percent": {"type": "number", "minimum": 0, "maximum": 150}}, ["system", "percent"]),
     _fn("set_target", "Tactical: designate the current target (a contact id from the state).", {
         "contact_id": {"type": "string"}}, ["contact_id"]),
-    _fn("fire_weapons", "Tactical: engage a contact with a weapon group (it needs a track: never a bearing-only contact — except missiles at a jammer). Railguns (range 10 km) and lasers (4 km) fire "
+    _fn("fire_weapons", "Tactical: engage a contact with a weapon group (it needs a track: never a bearing-only contact — except missiles at a jammer). Railguns (range 45 km; the farther, the fewer rounds strike) and lasers (6.5-9 km) fire "
                         "`salvo` volleys at their cadence (railguns one volley every 7 s; 12 = sustained fire, about 1.5 "
                         "minutes); if the target is still beyond range they stay assigned and open fire by themselves "
                         "once it closes. Missiles (25 km) launch `salvo` missiles at once (max 8; the VLS then cycles 14 s); at a "
@@ -244,8 +245,27 @@ GROUP_ORDER = _fn("group_order", "XO: the Captain's DIRECT ORDER to one of our b
     "formation": {"type": "string", "enum": ["line", "wedge", "column", "screen"]}},
     ["group", "order"])
 
-ALL_TOOLS = [SPEAK, STANDING] + SHIP_TOOLS
+# The officers' silent tool and the Captain's speaker for the radio nets (both the mind's own: nothing goes to the ship, docs/protocollo_voce.md §5ter, astra_mind/nets.py)
+CONSOLE_LOG = _fn("console_log", "Write ONE line on a console's log, silently: nobody hears it. It shows on that console and on the Captain's datapad (the log page), where he reads "
+                                 "it whenever he wants. It is for what is routine or already on the boards and changes nothing the Captain must do now: a range that moved, a "
+                                 "rearm complete, a fire put out, a repair team's progress, an ally's new position or heading, net traffic you will not relay, what you set on your "
+                                 "own console on your own initiative. Not for what he must hear (that is `speak`: a danger, a decision, an answer, a loss) and not for an order he "
+                                 "gave (the board shows it). Telegraphic and in English, it is the ship's record, about 100 characters at most; `notice` only for the few lines "
+                                 "worth a glance. Call it in the same turn as, or instead of, `speak`.", {
+    "station": {"type": "string", "enum": ["xo", "helm", "ops", "tactical", "comms", "sensors", "engineering", "flight"], "description": "the console whose log it is: your own"},
+    "text": {"type": "string", "description": "the line, e.g. \"T-11 range 49.5 km, opening\", \"Alpha rearmed, 8 ready\", \"Praetorian holding the screen at 4.5 km\""},
+    "kind": {"type": "string", "enum": ["routine", "notice"], "description": "routine (the default) or notice (worth a glance)"}}, ["station", "text"])
+
+NET_SPEAKER = _fn("net_speaker", "Put a radio net on the bridge's speaker, or take it off. Only when the Captain asks (\"put the flight net on the speaker\", \"voglio sentire la "
+                                "flotta\", \"togli la rete di volo\"): the net's voices are then heard as they speak, nobody relays them, until he says to take it off. With the net "
+                                "off the speaker, the officer who has the watch on it (Comms the fleet net, Flight Control the flight net, the XO the marines) tells him what he "
+                                "must know and the rest is on the logs. The flight net is his own radio while he is in a cockpit or on the flight deck.", {
+    "net": {"type": "string", "enum": ["fleet", "flight", "marines"]},
+    "on": {"type": "boolean", "description": "true: on the speaker; false: off it"}}, ["net", "on"])
+
+ALL_TOOLS = [SPEAK, STANDING, CONSOLE_LOG, NET_SPEAKER] + SHIP_TOOLS
 SHIP_TOOL_NAMES = {t["function"]["name"] for t in SHIP_TOOLS} | {"group_order", "lift_go"}
+SILENT_TOOLS = {"console_log"}               # tools that are no action to read back to the Captain: a turn that only wrote the log needs no "what was done"
 
 
 def lift_tool(lift: Any) -> dict[str, Any]:
@@ -290,7 +310,7 @@ _OWNER = {"set_course": "helm", "set_throttle": "helm", "intercept": "helm", "tr
           "launch_decoys": "tactical", "holo_display": "sensors", "end_transmission": "comms", "cease_fire": "tactical",
           "fleet_request": "comms", "set_radiators": "engineering", "vent_heat": "engineering",
           "dismiss_visitor": "captain", "abandon_ship": "xo", "group_order": "xo", "crew_locate": "ops", "transporter": "ops", "lift_go": "computer", "eagle_recover": "flight",
-          "issue_weapon": "xo", "board_ship": "xo"}
+          "issue_weapon": "xo", "board_ship": "xo", "net_speaker": "comms", "console_log": "xo"}
 LEGACY_INITIATIVE = {"dispatch_damage_control", "set_shields", "set_point_defense", "set_radiators", "launch_decoys"}
 
 
@@ -341,7 +361,7 @@ def _tools_for_build(state: dict[str, Any] | None) -> ToolSet:
     hidden: set[str] = set()
     for s in avail:
         hidden |= SUPERSEDED.get(s, set())
-    tools: list[dict[str, Any]] = [SPEAK, STANDING, station_model.tool_schema(avail)]
+    tools: list[dict[str, Any]] = [SPEAK, STANDING, CONSOLE_LOG, NET_SPEAKER, station_model.tool_schema(avail)]
     if has_groups(state):
         tools.append(GROUP_ORDER)
     for t in SHIP_TOOLS:

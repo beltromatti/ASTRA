@@ -596,7 +596,7 @@ class AstraTests(Fixture):
         self.assertIn("hull 88% (100% at your last look", user)
         self.assertIn("shields 82% (100% then)", user)
         self.assertIn("Hostile ships nearest the Aquila: T-21 acheron 2.4 km (hull 90%); T-22 styx 3.3 km (hull 100%); T-23 styx 9.0 km", user)
-        self.assertIn("inside laser reach (4 km) of her: T-21, T-22", user)
+        self.assertIn(f"inside laser reach ({war_minds.LASER_KM:g} km) of her: T-21, T-22", user)
         await self.feed(self.aquila_at(2.5, 86, 80, near), 30)                            # the next look compares with this one: 2 points, nothing
         self.assertEqual(len(self.llm.calls), n + 1)
         await self.feed(self.aquila_at(2.5, 86, 45, near), 5)                             # 35 points of shield: wakes
@@ -806,6 +806,83 @@ class AstraTests(Fixture):
         self.assertIsNone(await self.minds.rethink("castellan", "x", 30.0, "Aquila, the", "it"))
 
 
+class SuccessionTests(Fixture):
+    """5 October: the pool of six captains wrapped (two ships of one name), a group's leader flapped between them every two seconds and the captain «took command from himself»
+    226 times, a call to the model each. A fleet of a dozen ships has a dozen captains, and a succession is told once."""
+
+    sides = ("astra",)
+
+    async def test_a_dozen_ships_have_a_dozen_captains(self) -> None:
+        names = [self.minds.persona_of("astra", f"T-{n}", "frigate").name for n in range(40, 52)]
+        self.assertEqual(len(set(names)), 12, names)
+        self.assertEqual(len({self.minds.persona_of("astra", f"T-{n}", "frigate").name for n in range(40, 52)}), 12, "asked again: the same captains")
+
+    async def test_a_leader_that_flaps_between_two_ships_is_one_succession_not_one_every_two_seconds(self) -> None:
+        self.llm.policy = null_policy
+
+        def state(lead: str) -> dict[str, Any]:
+            return astra_state([group("Aurelia Reserve", 1, [member("T-01", "praetorian"), member("T-02", "vigilant")], leader=lead)], ENEMIES(), None,
+                               contacts=[{"id": "T-01", "name": "ASN Praetorian", "status": "friendly", "range_km": 4.5, "bearing_deg": 25, "hull_pct": 100},
+                                         {"id": "T-02", "name": "ASN Vigilant", "status": "friendly", "range_km": 5.5, "bearing_deg": 30, "hull_pct": 100}])
+        await self.feed(state("T-01"))
+        await self.feed(state("T-01"), 9)
+        told = lambda: [p for p in self.minds.pulses if any("taken command" in w for w in p["why"])]  # noqa: E731
+        n0 = len(told())
+        for lead in ("T-02", "T-01", "T-02", "T-01", "T-02"):
+            await self.feed(state(lead), 3)
+        self.assertEqual(len(told()) - n0, 1, "one succession in all that flapping")
+        await self.feed(state("T-01"), 100)                                                # (long after: another real change is told again)
+        await self.feed(state("T-02"), 4)
+        self.assertEqual(len(told()) - n0, 2)
+
+    async def test_two_ships_of_one_captain_pass_the_command_between_them_unnoticed(self) -> None:
+        self.llm.policy = null_policy
+        mind_ships = [("T-61", "frigate"), ("T-62", "frigate")]
+        p1 = self.minds.persona_of("astra", *mind_ships[0])
+        self.minds.allies["T-62"] = self.minds.register_ally("T-62", dict(name=p1.name, rank=p1.rank, ship="the frigate T-62", voice=p1.voice))      # (one name on two ships)
+
+        def state(lead: str) -> dict[str, Any]:
+            return astra_state([group("Aurelia Reserve", 1, [member("T-61", "frigate"), member("T-62", "frigate")], leader=lead)], ENEMIES(), None, contacts=[])
+        await self.feed(state("T-61"))
+        await self.feed(state("T-61"), 9)
+        for lead in ("T-62", "T-61", "T-62"):
+            await self.feed(state(lead), 3)
+        self.assertEqual([p for p in self.minds.pulses if any("taken command" in w for w in p["why"])], [])
+
+
+class FanOutTests(Fixture):
+    """5 October: every sentence of the Captain's that went out on the fleet net woke every allied captain and the admiral (six calls to the model, nearly always for «no change»).
+    The router now says whom the words are for, and only they are woken."""
+
+    sides = ("astra",)
+
+    def fleet(self) -> dict[str, Any]:
+        groups = [group("7th Fleet picket", 1, [member("T-01", "praetorian")], leader="T-01"), group("Screen", 2, [member("T-02", "vigilant")], leader="T-02"),
+                  group("Reserve", 3, [member("T-44", "constance")], leader="T-44"), group("Rear", 4, [member("T-45", "steadfast")], leader="T-45")]
+        return astra_state(groups, ENEMIES(), None, contacts=[{"id": i, "name": f"ASN {n}", "status": "friendly", "range_km": 5.0, "bearing_deg": 20, "hull_pct": 100}
+                                                              for i, n in (("T-01", "Praetorian"), ("T-02", "Vigilant"), ("T-44", "Constance"), ("T-45", "Steadfast"))])
+
+    async def test_words_for_one_ship_wake_one_captain_and_words_for_the_fleet_wake_them_all(self) -> None:
+        self.llm.policy = null_policy
+        st = self.fleet()
+        await self.feed(st)
+        await self.feed(st, 9)
+        n0 = len(self.llm.calls)
+        self.assertEqual(self.minds.captain_to_fleet("Castellan, rapporto.", "it", to="castellan"), 1)
+        await self.feed(st, 1)
+        one = len(self.llm.calls) - n0
+        n1 = len(self.llm.calls)
+        self.assertEqual(self.minds.captain_to_fleet("Tutta la flotta, rapporto.", "it"), 4)
+        await self.feed(st, 1)
+        everyone = len(self.llm.calls) - n1
+        self.assertEqual((one, everyone), (1, 4))
+        n2 = len(self.llm.calls)
+        self.assertEqual(self.minds.captain_to_fleet("Vigilant, qui l'Aquila.", "it", to="vigilant"), 1, "a ship's name finds her captain")
+        self.assertEqual(self.minds.captain_to_fleet("Nobody by that name.", "it", to="the ghost"), 0, "and a name nobody has finds nobody")
+        await self.feed(st, 1)
+        self.assertEqual(len(self.llm.calls) - n2, 1)
+
+
 class ChainOfCommandTests(Fixture):
     sides = ("astra",)
 
@@ -880,10 +957,10 @@ class RenderTests(unittest.TestCase):
 
     def test_the_doctrine_quotes_the_measured_ranges_and_teaches_the_formation_lever_only_when_switched_on(self) -> None:
         plain, line = war_minds.doctrine(), war_minds.doctrine(True)
-        self.assertIn(f"does best at {war_minds.SMALL_GROUP_KM:g} km", plain)
+        self.assertIn("10-24 km out", plain)                                              # the physics of BATTAGLIA-3 (the old sweet spots were for 10 km rails)
+        self.assertIn("seven in ten at 15-30 km", plain)
         self.assertNotIn("LINE ABREAST", plain)
         self.assertIn("LINE ABREAST", line)
-        self.assertIn(f"closing to about {war_minds.LINE_KM:g} km", line)
         for text in (plain, line):
             self.assertIn("The first look at a fight is a partial picture", text)         # the rest of the doctrine is the same
             self.assertIn("Concentrate fire", text)

@@ -26,11 +26,12 @@ ZOOM_WORDS = ("close", "wide", "max")             # (a zoom is a factor on the n
 
 UNTIL_WORDS = ("done", "target_lost", "order")           # and "time:<seconds>"
 DELEGATIONS = ("manual", "advise", "auto")
+DELEGABLE = ("helm", "tactical", "sensors", "ops", "engineering", "comms", "flight")       # the consoles whose officer has a delegation (the XO's own has none)
 SQUADRONS = ("alpha", "bravo", "drones")
 WEAPON_GROUPS = ("railguns", "lasers", "missiles", "torpedoes")
 SECTORS = ("forward", "aft", "port", "starboard", "dorsal", "ventral")
 POWER_PROFILES = ("balanced", "combat", "evasive", "silent", "shields", "weapons", "engines")
-DATAPAD_PAGES = ("overview", "contact", "damage", "fleet", "orders")
+DATAPAD_PAGES = ("overview", "contact", "damage", "fleet", "orders", "log")
 POWER_SYSTEMS = ("shields", "weapons", "engines", "sensors", "life_support", "flight_deck")
 
 
@@ -103,14 +104,14 @@ def _build() -> dict[str, Station]:
           "speed_pct 0", (P("heading_deg", NUM, "true bearing in the system plane, 0-359.99", lo=0, hi=359.99),
                           P("mark_deg", NUM, "pitch, -90..90", lo=-90, hi=90), _speed()), "order", "captain"),
         m("helm", "course", "intercept", "close on a contact and hold the standoff range, broadside inside it; the course follows the target",
-          (_target(), P("standoff_km", NUM, "range to hold: railguns reach 10 km, lasers 4 km", lo=0.5, hi=40, default=6), _speed()),
+          (_target(), P("standoff_km", NUM, "range to hold: the Aquila's band is 18-30 km (her railguns reach 45 km, a Styx's 28, lasers 6.5-9); 15-20 to cut off a ship that runs", lo=0.5, hi=45, default=22), _speed()),
           "target_lost", "engaged"),
         m("helm", "course", "keep_on_bow", "keep the bow on the target: the Captain sees it through the window; with target `action` the bow "
           "follows the fight from one target to the next by itself, and waits when there is none. It turns the ship; with standoff_km the "
           "console also holds that range by itself (closes, slows in time, matches the target's run, stops if it closes inside); "
           "otherwise her speed stays as it is unless speed_pct is given in the same order (pointing at an enemy at cruise speed "
           "closes on it and runs past)",
-          (_action_target(), _speed(), P("standoff_km", NUM, "range to hold: railguns reach 10 km, lasers 4 km", lo=0.5, hi=40)),
+          (_action_target(), _speed(), P("standoff_km", NUM, "range to hold: the Aquila's band is 18-30 km (her railguns reach 45 km, a Styx's 28, lasers 6.5-9)", lo=0.5, hi=45)),
           "target_lost"),
         m("helm", "course", "follow", "shadow a ship at a distance and on a side of it",
           (_target(), P("distance_km", NUM, "distance to keep", lo=0.3, hi=40, default=2),
@@ -198,7 +199,7 @@ def _build() -> dict[str, Station]:
           "systems and guns too for our own ships, by datalink)",
           (_target(required=False, desc="optional: a contact id (T-21) to show that ship; empty for the Aquila"),), "order", native="ship"),
         m("ops", "datapad", "datapad_push", "put a page on the Captain's datapad (Tab shows it)",
-          (P("page", STR, "overview | contact (a dossier: give focus) | damage | fleet | orders", required=True, enum=DATAPAD_PAGES),
+          (P("page", STR, "overview | contact (a dossier: give focus) | damage | fleet | orders | log (what the officers wrote on their consoles' logs and the nets said that the Captain did not hear)", required=True, enum=DATAPAD_PAGES),
            P("focus", STR, "a contact id, for the page 'contact'")), "order", native="push"),
         m("ops", "damage_control", "dc_auto", "the damage-control teams go where the worst is: breaches, fires, then what a fight needs",
           (), "order", native="auto"),
@@ -241,8 +242,8 @@ def _build() -> dict[str, Station]:
     xo = [
         m("xo", "delegation", "delegation", "how far an officer may act on their own: manual = only on orders, advise = proposes and "
           "waits for a go, auto = acts within orders and standing orders and informs",
-          (P("station", STR, "helm | tactical | sensors | ops | engineering | comms | flight", required=True,
-             enum=("helm", "tactical", "sensors", "ops", "engineering", "comms", "flight")),
+          (P("station", STR, "helm | tactical | sensors | ops | engineering | comms | flight, or all (every console at once: «fate da soli», «everyone on their own»)", required=True,
+             enum=("helm", "tactical", "sensors", "ops", "engineering", "comms", "flight", "all")),
            P("level", STR, "manual | advise | auto", enum=DELEGATIONS, required=True)), "order"),
     ]
     out: dict[str, Station] = {}
@@ -387,6 +388,13 @@ def normalize(args: dict[str, Any], available: dict[str, Iterable[str] | None] |
     Numbers are coerced and clamped to the mode's range; unknown parameters are dropped; a missing required one is an error."""
     st_id = str(args.get("station", "")).strip().lower()
     mode = str(args.get("mode", "")).strip().lower().replace("-", "_").replace(" ", "_")
+    if mode == "delegation" and st_id in STATIONS:
+        # «flight delegation manual»: the model names the console the level is for instead of the XO, whose mode it is, or calls the level `delegation` (the words «nessuno lancia
+        # senza il mio ordine» changed nothing: the call was refused)
+        params = args.get("params") if isinstance(args.get("params"), dict) else {}
+        level = params.get("level") or params.get("delegation")
+        args = {**args, "station": "xo", "params": {**params, "station": params.get("station") or (st_id if st_id != "xo" else ""), **({"level": level} if level else {})}}
+        st_id = "xo"
     st = STATIONS.get(st_id)
     if st is None:
         return None, f"no such station '{st_id}' (stations: {', '.join(STATIONS)})"

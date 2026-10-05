@@ -1,0 +1,8 @@
+{
+  "_doc": "BATTAGLIA-3: the Aquila (held at rest at the origin, bow to +x, her stations on their defaults: the bench scripts the Captain with --at) against one Kharon Mandate destroyer that comes in from 50 km, bow first, the way an AI ship does. The measure of a duel: how long the fire goes on, at what ranges, who wins. tools/war.py batch --scenario duel_aq_styx --at 'see CAPTAIN_ENGAGE in tools/war.py' --fight",
+  "aquila": {"at_km": [0, 0, 0], "heading": 0, "speed": 0},
+  "mandate": [
+    {"name": "Duelist", "formation": "line", "at_km": [50, 0, 0], "heading": 180, "spacing_km": 1.5, "objective_km": [0, 0, 0],
+     "ships": [{"class": "styx", "n": 1, "name": "Cocytus"}]}
+  ]
+}

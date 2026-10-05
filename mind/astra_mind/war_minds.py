@@ -59,15 +59,16 @@ AQUILA_SHIELD_DROP = 30.0                               # ... or of shield stren
 SETTLE_S = 3.0                                          # a burst of events is read together: wait for it to end (at most MAX_SETTLE_S)
 MAX_SETTLE_S = 8.0
 QUIET_END_S = 75.0                                      # a fight with nothing happening for this long is over
+TAKEOVER_GAP_S = 90.0                                   # a seat's new commander is told of the succession once in this long (5 October: a group's leader flapped between two ships
+                                                        # and the captain «took command from himself» 226 times, a call to the model each: a quarter of the session's spend)
 PULSE_TIMEOUT_S = 28.0                                  # a model that has not finished by now is left to its reflexes
 ROUND2_TIMEOUT_S = 12.0
 # The physics the doctrine quotes (data/war/classes.json and the damage tuning) and the ranges the bench measured as the best between equal forces
 # (docs/GUERRA.md §8.10: `tools/war.py mind ... --model close --range X`, sym_small / sym_medium / sym_two). When the weapons or the tuning move, re-run
 # the sweep and change these: the doctrine text follows.
-LASER_KM = 4.0
-SMALL_GROUP_KM = 4.5                                    # up to three or four ships: just beyond laser reach (the edge peaks sharply here: 4.2 and 4.8 give most of it up)
-DEEP_GROUP_KM = 3.2                                     # six ships or more, or two groups side by side: close, everything firing
-LINE_KM = 3.2                                           # a line abreast (any size): the range the bench found best for it (2.8-3.6 within the error)
+# (BATTAGLIA-3, 5 Oct: the weapons now reach 22-45 km with a round that flies and an aim that worsens with the distance; the old sweet spots, 3-4.5 km, were
+# measured under 10 km railguns and are gone: until the sweep of the new physics gives the measured ranges, the doctrine teaches the physics, not a number)
+LASER_KM = 9.0
 LOG_LINES = 16                                          # what a commander remembers of the last orders, words and news
 LOG_KEEP = 80
 
@@ -110,6 +111,23 @@ ALLY_POOL: list[dict[str, Any]] = [
          bio="A Core Worlds aristocrat who earned his command the hard way; courteous, proud, wary of the Mandate's tricks."),
     dict(name="Commander Mina Sato", rank="Commander", voice="fantine", gender="f",
          bio="Young, brilliant, sleepless; she knows her ship's every system and says so; a little too eager for the fight."),
+    # (a fleet of a dozen ships has a dozen captains: on 5 October the pool of six wrapped, two ships had the same captain's name, and the group that held them took command from itself)
+    dict(name="Captain Hana Lindgren", rank="Captain", voice="cosette", gender="f",
+         bio="A logistics officer who ended up commanding a frigate; precise, patient, unimpressed by heroics; her ships come home."),
+    dict(name="Commander Joaquim Pereira", rank="Commander", voice="michael", gender="m",
+         bio="Loud, generous, a gambler's grin; fights like he plays cards, all at once, and never forgets a name."),
+    dict(name="Captain Leila Haddad", rank="Captain", voice="anna", gender="f",
+         bio="Former Gate pilot, forty, tired and fearless; she speaks in short sentences and expects the same back."),
+    dict(name="Commander Dmitri Volkov", rank="Commander", voice="marius", gender="m",
+         bio="Taciturn engineer-turned-captain; trusts his reactor more than his orders, and is usually right about both."),
+    dict(name="Captain Odile Marchand", rank="Captain", voice="fantine", gender="f",
+         bio="A diplomat's daughter with a gunnery medal; formal on the net, merciless in the fight."),
+    dict(name="Commander Ravi Menon", rank="Commander", voice="juergen", gender="m",
+         bio="Young for his command, fast-talking, quick with numbers; he has something to prove to the old captains."),
+    dict(name="Captain Ifeoma Adeyemi", rank="Captain", voice="anna", gender="f",
+         bio="Thirty years of picket duty; slow to speak, slower to retreat; her crew would follow her through the Gate."),
+    dict(name="Commander Tobias Kessler", rank="Commander", voice="michael", gender="m",
+         bio="A Core-born marksman with a dry wit; he reports hits as a bookkeeper reports sums."),
 ]
 BENCH_ADMIRAL = dict(key="marsh", name="Rear Admiral Ione Marsh", rank="Rear Admiral", ship="the ASTRA flagship", voice="alba", gender="f",
                      bio="Commands the ASTRA fleet in this action; experienced, economical with words, unwilling to waste ships.")
@@ -561,44 +579,33 @@ def view_digest(view: dict[str, Any]) -> tuple:
 
 # ------------------------------------------------------------------------------------------------ the prompts
 _DOCTRINE_HEAD = """How a fleet fights (what your officers and your own years have taught you)
-- Guns: railguns reach 8-10 km and do most of the killing; lasers reach 4 km. Missiles reach far but one at a time they are shot down by point
+- Guns: railguns reach far and do most of the killing, but a round flies for seconds and its aim worsens with the distance, the target's speed and
+  turns, damaged sensors and jamming: nearly every round strikes inside 10 km, about seven in ten at 15-30 km, one in three at 30-40, almost none beyond.
+  Reach by class: an Acheron 34 km, a Styx 28, a Lethe 22; the ASTRA's Aquila 45, a Praetorian 42, a Vigilant 30. A ship struck broadside is hit more
+  often than one end-on. Lasers reach 6.5-9 km and do not miss. Missiles reach 30-40 km but one at a time they are shot down by point
   defence: by default each group already holds its cells until enough are ready to saturate the target's point defence, then fires them all
   together, timed to land at once, and that is the fleet's strongest punch. `salvo` forces every cell out now; `conserve` keeps them back, and
   only a reason justifies it (a long fight ahead and a magazine running dry, not a feeling). Fighters and bombers are shot at by point defence
   and by the enemy's own fighters.
-- The groups run on reflexes all the time: they pick targets (concentrating fire), hold a range of about 4 km, pull their battered ships behind
-  the line, and break off when they are clearly losing. The reflexes are decent. YOUR orders override them: while an order stands the group does
-  not break off by itself, so withdrawing when it is lost is YOUR decision, and so is releasing it (`auto`) when the order has served.
+- The groups run on reflexes all the time: they pick targets (concentrating fire), hold the band their class fights best in (a Styx line about
+  10-24 km out), pull their battered ships behind the line, and break off when they are clearly losing. The reflexes are decent. YOUR orders override
+  them: while an order stands the group does not break off by itself, so withdrawing when it is lost is YOUR decision, and so is releasing it (`auto`)
+  when the order has served. A `group_order` range under 8 km takes a group out of its band into the lasers' knife fight.
 """
 
-# The range paragraph, in two versions. The standard one is what the live runs validated (docs/GUERRA.md §8.10). The other adds the formation lever the
-# bench measured afterwards, with the scripted commander only (a line abreast closing to about 3 km beats the reflexes' wedge by about one ship of three and
-# two to two and a half of six): it is a switch (`WarMinds.formation_doctrine`, ASTRA_WAR_FORMATION=1) until the lead has seen the minds use it in the game.
-_RANGE_WEDGE = f"""- Range is the main lever between equals, and the right range depends on how many ships fight together. The enemy's lasers reach {LASER_KM:g} km, its
-  railguns 8-10 km. The reflexes hold about 4 km: right at the lasers' edge, where every laser of both sides is in play. A SMALL force (up to three or
-  four ships fighting together) does best at {SMALL_GROUP_KM:g} km, just beyond laser reach: only railguns and missiles are exchanged and every railgun
-  bears. Inside 4.2 km the leading ships drift into laser reach and the enemy's lasers join in for no gain, and beyond 5 km the advantage fades; closing
-  to 3 km with a small force gave the whole edge up. So the first order of a small force's fight is to take it out to {SMALL_GROUP_KM:g} km and keep it
-  there, and closing in on an equal enemy to "finish" a target costs ships. A DEEPER force (five or six ships fighting together, which includes TWO
-  small groups side by side: count the ships that fight together, not the groups) cannot keep its rear in railgun reach and still stay out of laser
-  reach (a wedge of six ships is 4-5 km deep): it does better closing to about {DEEP_GROUP_KM:g} km, everything firing, the groups covering each other.
-  These are the measured sweet spots between equal forces; the odds move them: against a clearly heavier enemy stand off, against a clearly beaten one
-  (most of its ships under a third of their hull) close and finish it.
+# The range paragraph, in two versions (`WarMinds.formation_doctrine`, ASTRA_WAR_FORMATION=1 for the second): the physics of range and of formation.
+_RANGE_WEDGE = """- Range is the main lever. The closer, the more of your rounds strike and the more of theirs: between equals it is a trade, and the side that
+  chooses where it is fought wins it. Stand off where your guns outreach theirs and theirs do not reach you; close where the enemy outranges you, fast,
+  so as not to be shot at for minutes on the way in (the ASTRA's capital ships outrange yours: the Aquila strikes seven rounds in ten at 20-30 km, where
+  a Styx barely reaches: a group that stands off against her loses slowly; cut inside her band or keep out of her reach). Against a clearly heavier
+  enemy stand off or withdraw; against a clearly beaten one (most of its ships under a third of their hull) close and finish it.
 """
 
-_RANGE_LINE = f"""- Range and formation are the levers between equals. The enemy's lasers reach {LASER_KM:g} km, its railguns 8-10 km. The reflexes hold about 4 km in a
-  WEDGE (a deep vee: its rear sits several km behind its tip): at the lasers' edge, where every laser of both sides is in play and only the front of the
-  wedge fires at its best. Measured between equal forces, against that wedge:
-  . a LINE ABREAST (`formation` line: every ship at the same distance from the enemy, so every gun bears together) closing to about {LINE_KM:g} km was the
-    strongest order there is: about one ship of three better than the reflexes, two to two and a half of six with two groups or six ships together. It is a
-    knife fight, the lasers and railguns of both sides all firing: it pays between equals and against a weaker or battered enemy, not against a clearly
-    heavier one. Held at 4.5 km a line loses, with three ships or two groups.
-  . the plain wedge does best at {SMALL_GROUP_KM:g} km with a small force (up to three or four ships): just beyond laser reach only railguns and missiles are
-    exchanged; inside 4.2 km its leading ships drift into laser reach, beyond 5 km the advantage fades. With two groups or six ships together the wedge
-    loses ships at that range (its rear cannot reach).
-  . a column is the worst shape to fight in (the ships behind never fire): it is for transit.
-  Count the ships that fight together, not the groups. Against a clearly heavier enemy stand off; against a clearly beaten one (most of its ships under a
-  third of their hull) close and finish it. Closing in on an equal enemy with the wedge to "finish" a target costs ships.
+_RANGE_LINE = """- Range and formation are the levers. The closer, the more of your rounds strike and the more of theirs: between equals it is a trade, and the
+  side that chooses where it is fought wins it. Stand off where your guns outreach theirs; close fast where the enemy outranges you (the Aquila strikes
+  seven rounds in ten at 20-30 km, where a Styx barely reaches). A LINE ABREAST (`formation` line) brings every gun to bear at the same distance; a
+  WEDGE's rear sits several km behind its tip and may be out of reach; a COLUMN is for transit (the ships behind never fire). Against a clearly heavier
+  enemy stand off or withdraw; against a clearly beaten one (most of its ships under a third of their hull) close and finish it.
 """
 
 _DOCTRINE_TAIL = """- Concentrate fire: shots spread over several ships lose one or two ships in six against a line that focuses. Name the target that matters most
@@ -657,8 +664,8 @@ MANDATE_ADMIRAL = """You are {name}, {rank} of the Kharon Mandate, aboard {ship}
 Fight like the best officer of your navy. The Kharon Mandate's way: attacks fast and concentrated, missile saturation, electronic silence and
 deception (jam once found, decoys while their radar is not on you), your crews' lives weighed against the objective: when a fight has been fought and
 is lost, or is pointless, a withdrawal that saves your crews is not dishonour (`decide` withdraw: the whole fleet leaves the system for good, a
-beaten admiral's decision, not a reaction to a first look; a group in trouble is withdrawn with `group_order`). Know your ships' strengths (railguns 8-10 km against their
-lasers at 4 km: a battered group is a kill if you close) and the information war: the ASTRA can shoot only what they track.
+beaten admiral's decision, not a reaction to a first look; a group in trouble is withdrawn with `group_order`). Know your ships' strengths (their reach, their armour, their speed: a
+battered group is a kill if you close on it) and the information war: the ASTRA can shoot only what they track.
 
 {commands}
 Your group commanders are the leaders of the other groups: they think about their own group inside your intent, and `report` to you. Your orders
@@ -815,6 +822,7 @@ class Mind:
     new_enemy: list[str] = field(default_factory=list)
     period: float = 0.0                                 # how long until the next look on the clock (drawn after each look)
     takeover: str = ""                                  # a new commander took the seat (a succession): they look at once
+    took_over: float = -1e9                             # when the last takeover was told: a seat whose leader flaps between ships is not a succession every two seconds
     aquila_km: float | None = None                      # (ASTRA group) how far from the Aquila it was at the last look
     drawn_away: int = 0                                 # how many looks in a row the Aquila's drawing away has called (each needs twice the distance of the last)
     aquila_seen: tuple[float | None, float | None, float] | None = None    # (ASTRA group) the Aquila's hull and shield strength at its last look, and when
@@ -920,7 +928,9 @@ class WarMinds:
         fixed = ALLIES.get(contact)
         if fixed is not None:
             return self._tell_captain(self.register_ally(contact, fixed))
-        p = dict(ALLY_POOL[self.pool_used % len(ALLY_POOL)])         # a ship the story has not named a captain for: one from the pool
+        taken = {c.name for c in self.allies.values()} | {a.get("name") for a in ALLIES.values()}
+        free = [q for q in ALLY_POOL if q["name"] not in taken]      # a ship the story has not named a captain for: one from the pool whose name no captain of ours carries yet
+        p = dict(free[0] if free else ALLY_POOL[self.pool_used % len(ALLY_POOL)])
         self.pool_used += 1
         p["ship"] = f"the {cls or 'warship'} {contact}"
         p["key"] = "ally_" + re.sub(r"\W", "", contact.lower())
@@ -1005,8 +1015,12 @@ class WarMinds:
                 if side == "astra" and seat.kind == "admiral":
                     cmd = Commander(contact=leader, side="astra", **BENCH_ADMIRAL)
                 if mind.commander is not None and mind.commander.contact != cmd.contact:
-                    self.journal(side, "command", f"the command of {seat.group or 'the fleet'} passed from {mind.commander.name} to {cmd.name} ({cmd.contact})")
-                    mind.takeover = f"you have just taken command of {seat.group or 'the fleet'} from {mind.commander.name}"
+                    if mind.commander.name == cmd.name:
+                        cmd = mind.commander                        # (the same captain: a group's leader passing between two ships of one name is no succession)
+                    elif now - mind.took_over >= TAKEOVER_GAP_S:
+                        self.journal(side, "command", f"the command of {seat.group or 'the fleet'} passed from {mind.commander.name} to {cmd.name} ({cmd.contact})")
+                        mind.takeover = f"you have just taken command of {seat.group or 'the fleet'} from {mind.commander.name}"
+                        mind.took_over = now
                 mind.commander = cmd
             self._feed_mind(mind, view, state, events, active, now)
 
@@ -1637,7 +1651,7 @@ class WarMinds:
             self.deliver("astra", to, Message(self.clock(), speaker.key, text, urgent=True))
         # (no topic: the voice stage lets two sentences of one captain join in one breath, and two captains of a group speak both; a line that waited
         # too long is thought again by whoever was to say it, see `rethink`)
-        await self.say(speaker.key, text, lang, str(a.get("tone", "calm")), urgent=urgent, answer=answer)
+        await self.say(speaker.key, text, lang, str(a.get("tone", "calm")), urgent=urgent, answer=answer, to=to)
         return True
 
     # ------------------------------------------------------------------------------------------------ a line that waited

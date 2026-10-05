@@ -4,6 +4,9 @@
 #include "AstraBattleSubsystem.h"
 #include "AstraFleetInterior.h"
 #include "AstraWarClasses.h"
+#include "AstraShipSubsystem.h"
+#include "AstraDamageModel.h"
+#include "Engine/World.h"
 #include "Dom/JsonObject.h"
 #include "Dom/JsonValue.h"
 #include "HAL/PlatformTime.h"
@@ -249,6 +252,53 @@ TSharedRef<FJsonObject> UAstraBattleSubsystem::DebugState() const
 		J->SetNumberField(TEXT("track"), S.Track);
 		J->SetBoolField(TEXT("fleeing"), S.bFleeing);
 		J->SetBoolField(TEXT("hold_fire"), S.bHoldFire);
+		if (S.bPlayer)
+		{
+			// the Aquila's own layer (the bench reads her heat, her open incidents and her damage teams: the weight of the systems on a long fight)
+			if (const UAstraShipSubsystem* Ship = GetWorld() ? GetWorld()->GetSubsystem<UAstraShipSubsystem>() : nullptr)
+			{
+				TSharedRef<FJsonObject> Q = MakeShared<FJsonObject>();
+				int32 Busy = 0, Fires = 0, Breaches = 0;
+				for (const FAstraDamage& D : Ship->GetDamage())
+				{
+					Busy += D.Team >= 0 ? 1 : 0;
+					Fires += D.Kind.Contains(TEXT("fire")) ? 1 : 0;
+					Breaches += D.Kind.Contains(TEXT("breach")) ? 1 : 0;
+				}
+				Q->SetNumberField(TEXT("heat_pct"), FMath::RoundToDouble(Ship->GetHeatPct() * 10.0) / 10.0);
+				Q->SetNumberField(TEXT("heat_factor"), FMath::RoundToDouble(Ship->HeatFactor() * 100.0) / 100.0);
+				Q->SetNumberField(TEXT("incidents"), Ship->GetDamage().Num());
+				Q->SetNumberField(TEXT("fires"), Fires);
+				Q->SetNumberField(TEXT("breaches"), Breaches);
+				Q->SetNumberField(TEXT("teams_busy"), Busy);
+				Q->SetNumberField(TEXT("teams"), Ship->GetNumDamageTeams());
+				Q->SetNumberField(TEXT("throttle_pct"), FMath::RoundToDouble(Ship->GetThrottlePct()));
+				// where the heat came from since the start (points of the gauge), and what the inside of the ship has been through (the interior model's books)
+				TSharedRef<FJsonObject> Hi = MakeShared<FJsonObject>();
+				Hi->SetNumberField(TEXT("rail"), FMath::RoundToDouble(HeatBooks.Rail * 10.0) / 10.0);
+				Hi->SetNumberField(TEXT("laser"), FMath::RoundToDouble(HeatBooks.Laser * 10.0) / 10.0);
+				Hi->SetNumberField(TEXT("cells"), FMath::RoundToDouble(HeatBooks.Cells * 10.0) / 10.0);
+				Hi->SetNumberField(TEXT("soak"), FMath::RoundToDouble(HeatBooks.Soak * 10.0) / 10.0);
+				Hi->SetNumberField(TEXT("recharge"), FMath::RoundToDouble(HeatBooks.Recharge * 10.0) / 10.0);
+				Q->SetObjectField(TEXT("heat_in"), Hi);
+				const FAstraDamageModel::FBooks& Bk = Ship->GetInterior().Books();
+				TSharedRef<FJsonObject> Bo = MakeShared<FJsonObject>();
+				Bo->SetNumberField(TEXT("hits"), Bk.Hits);
+				Bo->SetNumberField(TEXT("hits_inside"), Bk.HitsInside);
+				Bo->SetNumberField(TEXT("holes"), Bk.Holes);
+				Bo->SetNumberField(TEXT("fires"), Bk.Fires);
+				Bo->SetNumberField(TEXT("conduits"), Bk.Conduits);
+				Bo->SetNumberField(TEXT("wrecks"), Bk.Wrecks);
+				Bo->SetNumberField(TEXT("suppressions"), Bk.Suppressions);
+				Bo->SetNumberField(TEXT("explosions"), Bk.Explosions);
+				Bo->SetNumberField(TEXT("killed"), Bk.Killed);
+				Bo->SetNumberField(TEXT("wounded"), Bk.Wounded);
+				Bo->SetNumberField(TEXT("burnt"), FMath::RoundToDouble(Bk.StructureBurnt));
+				Bo->SetNumberField(TEXT("max_incidents"), Bk.MaxIncidents);
+				Q->SetObjectField(TEXT("interior"), Bo);
+				J->SetObjectField(TEXT("ship_layer"), Q);
+			}
+		}
 		if (S.bCraft)
 		{
 			J->SetStringField(TEXT("mission"), S.Mission);

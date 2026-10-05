@@ -2355,6 +2355,7 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 		// the March (CAMPAGNA): the fleets and battles as our high command holds them, for the holo table's sector view
 		MarchFleets.Reset();
 		MarchBattles.Reset();
+		MarchAt = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
 		const TSharedPtr<FJsonObject>* March = nullptr;
 		if (Args->TryGetObjectField(TEXT("march"), March) && March && March->IsValid())
 		{
@@ -2374,6 +2375,7 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 					O->TryGetStringField(TEXT("name"), F.Name);
 					O->TryGetStringField(TEXT("system"), F.System);
 					O->TryGetStringField(TEXT("to"), F.To);
+					O->TryGetStringField(TEXT("next"), F.Next);
 					O->TryGetStringField(TEXT("state"), F.State);
 					double Eta = -1.0, N = 0.0, Age = 0.0;
 					if (O->TryGetNumberField(TEXT("eta_s"), Eta)) { F.EtaS = (float)Eta; }
@@ -3425,6 +3427,7 @@ void UAstraShipSubsystem::UpdateAlertVisuals(float DeltaTime)
 		FlickerTime -= DeltaTime;
 		LightLevel *= 0.35f + 0.65f * (FMath::FRand() > 0.45f ? 1.f : 0.f);
 	}
+	RailDrawGap = FMath::Max(0.f, RailDrawGap - DeltaTime);
 	if (RailDraw > 0.f)
 	{
 		// the rails charge: a quick sag (to about 60%) and a slower recovery over half a second
@@ -3927,8 +3930,17 @@ void UAstraShipSubsystem::FlushHitReport(bool bForce)
 			Where += FString::Printf(TEXT("; and %d more"), HitReport.People.Num() - Shown);
 		}
 	}
+	// it calls the crew when it is news: a breach, a room lost, a death, or the shields or the hull going down to the next of four steps (told again only after they have recovered
+	// and fallen anew); the words of the blows in between stay in the log and in the damage board, and the crew reads them at its next turn (5 Oct: 10 "shields took a hit, holding at
+	// 100%" and a dozen casualty and fire lines in 23 minutes each woke a turn)
+	const int32 ShBand = Sh <= 15 ? 3 : (Sh <= 40 ? 2 : (Sh <= 70 ? 1 : 0));
+	const int32 HuBand = Hu <= 25 ? 3 : (Hu <= 50 ? 2 : (Hu <= 75 ? 1 : 0));
+	const bool bFell = ShBand > ShieldBandTold || HuBand > HullBandTold;
+	ShieldBandTold = ShBand;
+	HullBandTold = HuBand;
+	const bool bNews = bFell || HitReport.bGrave || HitReport.Killed > 0;
 	Event(!Where.IsEmpty() ? FString::Printf(TEXT("damage report: we've been hit — %s; shields %d%%, hull %d%%"), *Where, Sh, Hu)
-	                       : FString::Printf(TEXT("shields took a hit, holding at %d%%"), Sh), true);
+	                       : FString::Printf(TEXT("shields took a hit, holding at %d%%"), Sh), bNews);
 	HitReport = FHitReport();
 }
 
@@ -4074,6 +4086,8 @@ void UAstraShipSubsystem::OnHullHit(const FAstraHullHit& Hit)
 	{
 		HitReport.People.Add(P);
 	}
+	HitReport.Killed += Res.Killed;
+	HitReport.bGrave |= Res.bBreach || Res.bWreck;
 	++HitReport.Hits;
 	FlushHitReport(false);
 }

@@ -68,7 +68,8 @@ struct FAstraSectorSystem
 struct FAstraMarchFleet
 {
 	FString Id, Side, Name, System, To;   // side: astra | mandate; To: the system it is bound for ("" when it stays)
-	float EtaS = -1.f;                    // seconds to its arrival (-1: not under way, or unknown)
+	FString Next;                         // under way: the system it comes out in next (EtaS is to there; To may lie hops beyond)
+	float EtaS = -1.f;                    // seconds to its arrival (-1: not under way, or unknown), as of GetMarchAt()
 	int32 Ships = 0;
 	bool bKnown = true;                   // our own fleet (false: an enemy track, as old as AgeS)
 	float AgeS = 0.f;
@@ -153,6 +154,8 @@ public:
 	const TArray<FAstraSectorSystem>& GetSector() const { return Sector; }
 	/** The March's fleets and battles for the holo table's sector view (empty without CAMPAGNA). */
 	const TArray<FAstraMarchFleet>& GetMarchFleets() const { return MarchFleets; }
+	/** When the March's picture came (world seconds): its fleets' EtaS count down from then. */
+	double GetMarchAt() const { return MarchAt; }
 	const TArray<FString>& GetMarchBattles() const { return MarchBattles; }
 	const TArray<FString>& GetSectorNews() const { return SectorNews; }
 	/** The Captain is in the Mess Hall (Deck 4). */
@@ -268,7 +271,7 @@ public:
 	const FString& GetHullNumber() const { return HullNumber; }
 	void SetHullNumber(const FString& N) { HullNumber = N; ApplyHullNumber(); }
 	/** A railgun volley: the capacitors' draw makes the ship's lights sag for a moment (the power is visible). */
-	void RailgunDraw() { RailDraw = 1.f; }
+	void RailgunDraw() { if (RailDrawGap <= 0.f) { RailDraw = 1.f; RailDrawGap = 2.5f; } }   // (at most one sag every 2.5 s: with the mounts firing one after another the lights would never be steady)
 	bool IsShipLost() const { return bShipLost; }
 	bool BoardLifepod(class AAstraLifepodHatch* Hatch, APlayerController* PC, bool bHauled = false);
 	/** The way from an officer's place to the Captain's quarters (world cm, deck level); OutWaitAt: the point at the
@@ -329,8 +332,9 @@ private:
 	float ThermalStress = 0.f;        // overheated conduits: a failure when it reaches 1
 	int32 ThermalSeq = 0;
 	float RadiatorStress = 0.f;       // blows on the radiator wings: one is torn when it reaches 1
-	struct FHitReport { TArray<FString> Lines; TArray<FString> People; int32 Hits = 0; double Since = -100.0; };
+	struct FHitReport { TArray<FString> Lines; TArray<FString> People; int32 Hits = 0, Killed = 0; bool bGrave = false; double Since = -100.0; };   // bGrave: a breach or a room gutted
 	FHitReport HitReport;             // what the last blows did, told in one report
+	int32 ShieldBandTold = 0, HullBandTold = 0;   // how far down (0 above 70 % / 75 %, 3 below 15 % / 25 %) the crew was last called on the shields and the hull: the next call is for the next step down
 	TMap<FName, TWeakObjectPtr<class AAstraDoor>> DoorActors;
 	FDelegateHandle DoorPlacedHandle;
 	TSet<int32> ExternalSeals;          // ABBORDAGGI: doors the fight has sealed (the damage model does not know them): they shut again when their deck streams in
@@ -419,6 +423,7 @@ private:
 	double LastRadiatorTear = -100.0;   // the last radiator wing torn by a hit (game time)   // the last console or fixture that shorted out on the bridge (game time)
 	float FlickerTime = 0.f;
 	float RailDraw = 0.f;              // 1 at a railgun volley, fading: the lights sag
+	float RailDrawGap = 0.f;           // seconds before the next sag may start
 	FString HullNumber = TEXT("CVC-01");
 	void ApplyHullNumber();            // the name on her flanks and the plate on the bridge carry her number
 	bool bTurning = false;
@@ -454,6 +459,7 @@ private:
 	float SpaceEV = 6.6f;
 	FString CaptainPlanetside;
 	TArray<FAstraMarchFleet> MarchFleets;
+	double MarchAt = 0.0;
 	TArray<FString> MarchBattles;          // systems where the March has a battle the high command knows of
 	FString ChannelParty;             // the channel open now (a hail, ours or theirs, until it is closed)
 	FVector PlanetDirNow = FVector::DownVector;
