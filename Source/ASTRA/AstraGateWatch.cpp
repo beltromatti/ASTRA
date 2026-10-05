@@ -155,3 +155,16 @@ void UAstraBattleSubsystem::GetAllyViews(int32 Max, TArray<FVector4>& Out) const
 		Out.Add(FVector4(ToWorld(Near[i]->Pos), 100.f * Near[i]->Radius));
 	}
 }
+
+bool UAstraBattleSubsystem::GetContactView(const FString& Contact, FVector& OutWorld, FQuat& OutAtt, float& OutSizeCm) const
+{
+	const FAstraBattleShip* S = Contact.Equals(TEXT("aquila"), ESearchCase::IgnoreCase) ? (Ships.Num() ? &Ships[0] : nullptr) : FindByContact(Contact);
+	if (!S)
+	{
+		return false;
+	}
+	OutWorld = ToWorld(S->Pos);
+	OutAtt = ToWorldRot(S->Att);
+	OutSizeCm = 100.f * S->Radius;
+	return true;
+}

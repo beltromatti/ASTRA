@@ -12,6 +12,7 @@
 #include "Camera/CameraActor.h"
 #include "Camera/CameraComponent.h"
 #include "Camera/PlayerCameraManager.h"
+#include "Containers/Ticker.h"
 #include "AstraCampaign.h"
 #include "Components/LightComponent.h"
 #include "Engine/DirectionalLight.h"
@@ -265,6 +266,133 @@ namespace
 			if (UAstraIntroSubsystem* I = World ? World->GetSubsystem<UAstraIntroSubsystem>() : nullptr)
 			{
 				I->Skip();
+			}
+		}));
+}
+
+// ---------------------------------------------------------------------------------------------------- the photo camera (testing, screenshots)
+namespace AstraPhotoCam
+{
+	// a free camera for pictures of the game (the README's, a bug's): placed in the world, aimed at a point, or framing a ship of the battle and
+	// following it as it moves; the Captain's own eyes come back with `astra.cam off`
+	TWeakObjectPtr<ACameraActor> Cam;
+	FString Follow;                       // a contact id ("aquila", "T-41") the camera keeps framing; empty: it stays where it was put
+	double Az = 0.0, El = 0.0, Dist = 3.0;
+	FTSTicker::FDelegateHandle Tick;
+
+	ACameraActor* Ensure(UWorld* W, float Fov)
+	{
+		if (!Cam.IsValid() || Cam->GetWorld() != W)
+		{
+			FActorSpawnParameters SP;
+			SP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+			SP.ObjectFlags |= RF_Transient;
+			Cam = W->SpawnActor<ACameraActor>(FVector::ZeroVector, FRotator::ZeroRotator, SP);
+			if (Cam.IsValid())
+			{
+				Cam->GetCameraComponent()->bConstrainAspectRatio = false;
+			}
+		}
+		if (Cam.IsValid())
+		{
+			Cam->GetCameraComponent()->SetFieldOfView(Fov);
+			if (APlayerController* PC = UGameplayStatics::GetPlayerController(W, 0); PC && PC->GetViewTarget() != Cam.Get())
+			{
+				PC->SetViewTarget(Cam.Get());
+			}
+		}
+		return Cam.Get();
+	}
+
+	bool Frame(UWorld* W)
+	{
+		const UAstraBattleSubsystem* B = W ? W->GetSubsystem<UAstraBattleSubsystem>() : nullptr;
+		FVector P;
+		FQuat Q;
+		float Size = 0.f;
+		if (!Cam.IsValid() || !B || !B->GetContactView(Follow, P, Q, Size))
+		{
+			return false;
+		}
+		// azimuth round the ship from its bow (to starboard), elevation above its deck, distance in the ship's sizes
+		const FVector Dir = Q.RotateVector(FRotator(El, Az, 0.0).Vector());
+		const FVector At = P + Dir * Size * Dist;
+		Cam->SetActorLocationAndRotation(At, (P - At).Rotation());
+		return true;
+	}
+
+	void Off(UWorld* W)
+	{
+		Follow.Reset();
+		if (Tick.IsValid())
+		{
+			FTSTicker::GetCoreTicker().RemoveTicker(Tick);
+			Tick.Reset();
+		}
+		if (APlayerController* PC = W ? UGameplayStatics::GetPlayerController(W, 0) : nullptr; PC && PC->GetPawn())
+		{
+			PC->SetViewTarget(PC->GetPawn());
+		}
+		if (Cam.IsValid())
+		{
+			Cam->Destroy();
+		}
+		Cam.Reset();
+	}
+
+	FAutoConsoleCommandWithWorldAndArgs CmdCam(TEXT("astra.cam"),
+		TEXT("A free camera (screenshots): astra.cam at <x y z> <yaw pitch> [fov] | look <x y z> <tx ty tz> [fov] | ship <contact|aquila> <azimuth elevation sizes> [fov] | off"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* W)
+		{
+			if (!W || A.Num() == 0 || A[0] == TEXT("off"))
+			{
+				Off(W);
+				return;
+			}
+			const auto F = [&A](int32 i, double Def) { return A.IsValidIndex(i) ? FCString::Atod(*A[i]) : Def; };
+			if (A[0] == TEXT("at") && A.Num() >= 6)
+			{
+				Follow.Reset();
+				if (ACameraActor* C = Ensure(W, (float)F(6, 60.0)))
+				{
+					C->SetActorLocationAndRotation(FVector(F(1, 0), F(2, 0), F(3, 0)), FRotator(F(5, 0), F(4, 0), 0.0));
+				}
+			}
+			else if (A[0] == TEXT("look") && A.Num() >= 7)
+			{
+				Follow.Reset();
+				if (ACameraActor* C = Ensure(W, (float)F(7, 60.0)))
+				{
+					const FVector From(F(1, 0), F(2, 0), F(3, 0)), To(F(4, 0), F(5, 0), F(6, 0));
+					C->SetActorLocationAndRotation(From, (To - From).Rotation());
+				}
+			}
+			else if (A[0] == TEXT("ship") && A.Num() >= 2)
+			{
+				Follow = A[1];
+				Az = F(2, 35.0);
+				El = F(3, 12.0);
+				Dist = F(4, 3.0);
+				Ensure(W, (float)F(5, 40.0));
+				if (!Frame(W))
+				{
+					UE_LOG(LogASTRA, Warning, TEXT("[Cam] no ship %s"), *Follow);
+					Off(W);
+					return;
+				}
+				if (!Tick.IsValid())
+				{
+					TWeakObjectPtr<UWorld> WW(W);
+					Tick = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([WW](float)
+					{
+						if (!WW.IsValid() || Follow.IsEmpty() || !Frame(WW.Get()))
+						{
+							Tick.Reset();
+							return false;
+						}
+						return true;
+					}));
+				}
 			}
 		}));
 }

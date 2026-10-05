@@ -583,6 +583,8 @@ public:
 	bool GetGateView(FVector& OutPos, FVector& OutAxis, float& OutRadiusCm) const;
 	/** ... and the allied warships nearest the Aquila (no craft, no fixtures): where each is drawn (world cm, XYZ) and its size (cm, W), nearest first. */
 	void GetAllyViews(int32 Max, TArray<FVector4>& Out) const;
+	/** ... and one ship by its contact id ("aquila": the Aquila): where it is drawn (world cm), its attitude and its size (cm). */
+	bool GetContactView(const FString& Contact, FVector& OutWorld, FQuat& OutAtt, float& OutSizeCm) const;
 	/** The system the gate is tuned to: the run under way, else Fleet's orders ("" = none). */
 	FString GetGateDestination() const { return GateRun != EAstraGateRun::None ? GateDest : FleetOrderedDest; }
 	/** Where a live contact is from the Aquila, aimed at its lead point (for the helm's intercept). */

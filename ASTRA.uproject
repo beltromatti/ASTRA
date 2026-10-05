@@ -77,24 +77,15 @@
 		},
 		{
 			"Name": "MetaHumanCharacter",
-			"Enabled": true,
-			"TargetAllowList": [
-				"Editor"
-			]
+			"Enabled": false
 		},
 		{
 			"Name": "MetaHumanSDK",
-			"Enabled": true,
-			"TargetAllowList": [
-				"Editor"
-			]
+			"Enabled": false
 		},
 		{
 			"Name": "MetaHumanGenerator",
-			"Enabled": true,
-			"TargetAllowList": [
-				"Editor"
-			]
+			"Enabled": false
 		},
 		{
 			"Name": "AstraMetalFX",
@@ -105,10 +96,11 @@
 		},
 		{
 			"Name": "NNEDenoiser",
-			"Enabled": true,
-			"TargetAllowList": [
-				"Editor"
-			]
+			"Enabled": false
+		},
+		{
+			"Name": "MetaHuman",
+			"Enabled": false
 		}
 	]
 }

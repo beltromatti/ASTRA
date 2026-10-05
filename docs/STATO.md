@@ -1,9 +1,58 @@
 # STATO DEI LAVORI — ASTRA
 
-*Questo file è la memoria operativa del progetto: lo aggiorno a ogni passo. Chi riprende il lavoro (io in una nuova sessione) parte da qui.*
+*The project's working memory, updated at every step: a new session starts here. From 5 October 2026 new entries are in English; the older
+sections below stay in Italian.*
 
-**Ultimo aggiornamento:** 2026-10-05 sera · **Traguardo corrente:** **versione stabile chiusa** (sotto); poi Piano v0.7 ([PIANO.md §0bis](PIANO.md)):
-il cuore del gioco (chiarezza, controllo, battaglie epiche e continue, niente attriti); **principio delle intelligenze** ([ARCHITETTURA §1bis](ARCHITETTURA.md))
+**Last update:** 2026-10-05 night · **Current milestone:** **ASTRA 0.1.0-alpha**, the first public release (below). Next: Piano v0.7
+([PIANO.md §0bis](PIANO.md)) and the open items at the end of this section.
+
+## ALPHA 0.1.0 (5 October 2026, night): the first public release
+
+The owner's request: apply the balance, improve performance, final Mac optimizations, a Windows build prepared from the Mac, complete
+settings, the OpenRouter key on first start, a spoken tutorial, shorter narrated interludes, endings without bugs, the interior fixes, a
+general bug check, a game a non-developer can install and play; English from now on in code and game; CLAUDE.md and README in English; a
+signed and notarized Mac build; a GitHub alpha release; the repository public.
+
+**Done in this stretch** (main from `1a97da0` on; the helpers are all closed, the lead worked alone):
+- **Balance** (`29b39f0`, [GUERRA.md §11.13](GUERRA.md)): believable shields (absorption by charge, slower shift between faces: they no
+  longer read 100 % while fires spread), the Mandate hunts the flagship (`prize` 0.6), longer rails (Styx 30, Lethe 24, Acheron 38 km).
+  Bench, 4 seeds: the strike group 4/4 alive at 33 %, the opening 3/4 at 53 %, mb2 4/4 at 60 %, mb3 4/4 at 80 %.
+- **Interiors** (`1a97da0`): the transporter never leaves the Captain inside a wall (`PlaceCaptain` searches a clear floor); the flight
+  deck and Main Engineering are reachable on foot through room lifts (`AstraRoomLift`); duplicate and coplanar floor instances no longer
+  flicker (`AstraDeckShell`); `astra.check.map` checks floors and doors of every deck.
+- **Settings** (`dbae8ae`): graphics (quality, image, frame rate, display mode, motion blur, field of view), audio (master, music, voices,
+  subtitles), the crew's language at the start of a session (default English) and whether it then follows the Captain's, the controls
+  (mouse sensitivity, invert, the talk and orders keys, rebindable), the AI key.
+- **The OpenRouter key** (`dbae8ae`): a first-start page (paste, verify, get a key) that lets nobody into the war without a working key;
+  it checks the key and its credit (`AstraApiKey`), the key is editable in SETTINGS, and the mind reports a bad key, no credit, a rate limit
+  or no network on screen while playing. No key ever ships: the release script checks the bundle for every value of the local `.env`.
+- **Narrated story cards** (`c720b1d`, `f76e656`): the end of a chapter is told by a narrator on a black screen in the Captain's language,
+  each card held until the voice is done, the game paused under it (the controller ticks in the pause, so the cards are seen); the war holds
+  still while the loss of the ship is told; no black screen after a new command.
+- **The introduction** (`fa3666b`, `AstraIntro.*`): a spoken, subtitled tour of twelve shots before the first campaign (the Aquila from
+  outside, an ally, the bridge, its stations, the main screen, the holo table, the chair, a corridor, the flight deck, the Gate), the
+  narrator in the player's language (seven scripts), Space for the next shot, Esc to skip; INTRODUCTION in the title menu plays it again.
+- **Rourke** speaks the Captain's language from the first word to the last (`5992fb5`, the prompt).
+- **A lighter, faster package** (`f76e656` and after): the MetaHuman plugins are off (their content was ~800 MB of the package; the
+  MetaHuman crew experiment in `Content/ASTRA/Crew/MetaHumans` is not cooked; to resume it, enable `MetaHumanCharacter`, `MetaHumanSDK`,
+  `MetaHumanGenerator` and `MetaHuman` in `ASTRA.uproject`), the NNE denoiser is off (100 MB that cooked itself), the release is a Shipping
+  build. A packaged mind keeps Python's bytecode in its data folder, never inside the signed app (`PYTHONPYCACHEPREFIX`).
+- **The macOS release pipeline** (`tools/release_mac.sh`): Shipping, uv inside, the secrets check, Developer ID signature with the hardened
+  runtime, notarization with the App Store Connect API key, stapling, Gatekeeper's check, one zip under 2 GiB. The identity and the key
+  live in `.release.env` (ignored by git).
+- **Windows**: the code is portable (`tools/portability.py`: 0 findings; `AstraMindLaunch`: 64 checks pass), the package script ships
+  uv and never a key file, and the package asks for the OpenRouter key on first start. Unreal cannot build Windows from a Mac: the Windows
+  package is one command on a PC (README, [WINDOWS.md](WINDOWS.md)).
+- **Docs**: CLAUDE.md and README.md rewritten in English, LICENSE (MIT for ASTRA's own code and assets), CREDITS.md, CONTRIBUTING.md.
+- **OpenRouter credit: 9.21 $** left (of 30 $; 20.79 $ spent on the whole project so far).
+
+**Open items** (in order of value for the player):
+1. A Windows release: run `tools\windows\Pacchetto-Windows.ps1 -Config Shipping -Zip` on a PC with UE 5.8.3 and Visual Studio 2022,
+   then tune `Config/Windows/WindowsEngine.ini` on that PC (every value there was measured on the Air).
+2. Performance in the heaviest battles (the dynamic resolution sits at its floor; lighting 6.1 ms, translucency 3.6, Lumen ~4 on the Air).
+3. The door check of `astra.check.map` is noisy (unbuilt lobbies); the plan bounds of the old rooms are approximate.
+4. The war told coherently (Rourke's fleet news against the map; two officers asking the same question).
+5. The MetaHuman crew (blocked on Epic's MetaHuman authorization, RICHIESTE), more ships, the planet, multiplayer.
 
 ## CHIUSURA DEL 5/10 SERA — la versione stabile (da qui si riprende)
 Richiesta dell'utente: «una versione stabile con tutti i moduli e i lavori fatti finora integrati, tutto funzionante, in poco tempo».
