@@ -1244,6 +1244,9 @@ namespace
 		}
 	};
 
+	TMap<FString, FDrillTable> GDrillTabs;                       // what the infantry orders' scenarios measured, by name (the checks at the end of each compare them)
+	TMap<FString, double> GDrillNums;
+
 	FDrillResult DrillResultOf(const FAstraBoardSim& Sim, const FRunResult& R)
 	{
 		FDrillResult D;
@@ -1386,9 +1389,21 @@ static void BoardScenarioTake(FRig& Rig, int32 Seed, int32 Seeds)
 						}
 					}
 					BNote(FString::Printf(TEXT("    %-34s %s"), Mode.Kind == 1 && Doors == 2 ? (Sync ? TEXT("take, both doors, one sync") : TEXT("take, each door by itself")) : Mode.Name, *Tab.Text()));
+					GDrillTabs.Add(FString::Printf(TEXT("take/%d/%d/%d/%d"), bPrepared ? 1 : 0, Doors, Mode.Kind, Sync), Tab);
 				}
 			}
 		}
+	}
+	// the order must be worth something: more rooms taken than by walking in, for no more marines lost
+	const auto T = [](int32 Prep, int32 Dr, int32 Kind, int32 Sync) -> const FDrillTable* { return GDrillTabs.Find(FString::Printf(TEXT("take/%d/%d/%d/%d"), Prep, Dr, Kind, Sync)); };
+	const FDrillTable *W0 = T(0, 1, 0, 0), *K0 = T(0, 1, 1, 0), *W1 = T(1, 1, 0, 0), *K1 = T(1, 1, 1, 0), *Wd = T(0, 2, 0, 0), *Kd = T(0, 2, 1, 0), *Ks = T(0, 2, 1, 1);
+	if (W0 && K0 && W1 && K1 && Wd && Kd && Ks)
+	{
+		BCheck("take: stacking and going in together beats walking in (one door)", K0->Taken > W0->Taken && K1->Taken > W1->Taken && K0->MarinesLost <= W0->MarinesLost && K1->MarinesLost <= W1->MarinesLost,
+		       FString::Printf(TEXT("unalerted guards: %d of %d against %d walking in, %.1f marines lost against %.1f; alerted: %d against %d, %.1f against %.1f"), K0->Taken, K0->N, W0->Taken, K0->MarinesLost / FMath::Max(1, K0->N),
+		                       W0->MarinesLost / FMath::Max(1, W0->N), K1->Taken, W1->Taken, K1->MarinesLost / FMath::Max(1, K1->N), W1->MarinesLost / FMath::Max(1, W1->N)));
+		BCheck("take: a sync takes the room with two doors at least as often as each door by itself, and more than walking in", Ks->Taken >= Kd->Taken && Kd->Taken > Wd->Taken,
+		       FString::Printf(TEXT("two doors, unalerted guards: sync %d, each by itself %d, walking in %d of %d; %.0f s, %.0f s, %.0f s"), Ks->Taken, Kd->Taken, Wd->Taken, Ks->N, Ks->T / FMath::Max(1, Ks->N), Kd->T / FMath::Max(1, Kd->N), Wd->T / FMath::Max(1, Wd->N)));
 	}
 }
 
@@ -1491,7 +1506,17 @@ static void BoardScenarioBreach(FRig& Rig, int32 Seed, int32 Seeds)
 				}
 			}
 			BNote(FString::Printf(TEXT("    %-30s %s; the bulkhead open at %4.1f s"), Mode == 0 ? TEXT("the drill alone (torches)") : TEXT("breach: stack, charge, in"), *Tab.Text(), Counted ? Through / Counted : -1.0));
+			GDrillTabs.Add(FString::Printf(TEXT("breach/%d/%d"), bAlerted ? 1 : 0, Mode), Tab);
+			GDrillNums.Add(FString::Printf(TEXT("breach/%d/%d/open"), bAlerted ? 1 : 0, Mode), Counted ? Through / Counted : -1.0);
 		}
+	}
+	const FDrillTable *Tw = GDrillTabs.Find(TEXT("breach/0/0")), *Tb = GDrillTabs.Find(TEXT("breach/0/1")), *Aw = GDrillTabs.Find(TEXT("breach/1/0")), *Ab = GDrillTabs.Find(TEXT("breach/1/1"));
+	if (Tw && Tb && Aw && Ab)
+	{
+		const double OpenW = GDrillNums.FindRef(TEXT("breach/0/0/open")), OpenB = GDrillNums.FindRef(TEXT("breach/0/1/open"));
+		BCheck("breach: a charge opens the bulkhead sooner than the torches and the room is taken in less time", OpenB > 0.0 && OpenB + 6.0 < OpenW && Tb->T < Tw->T && Ab->T < Aw->T && Tb->Taken >= Tw->Taken && Ab->Taken >= Aw->Taken,
+		       FString::Printf(TEXT("open at %.0f s against %.0f s; room taken in %.0f s against %.0f s (alerted guards: %.0f against %.0f); %d against %d taken"), OpenB, OpenW, Tb->T / FMath::Max(1, Tb->N), Tw->T / FMath::Max(1, Tw->N),
+		                       Ab->T / FMath::Max(1, Ab->N), Aw->T / FMath::Max(1, Aw->N), Tb->Taken, Tw->Taken));
 	}
 }
 
@@ -1651,6 +1676,17 @@ static void BoardScenarioSweep(FRig& Rig, int32 Seed, int32 Seeds)
 		}
 		BNote(FString::Printf(TEXT("    %-26s done in %5.1f s with at least three marines on their feet %2d of %2d; marines lost %4.1f, guards put down %4.1f of 8, guards still on their feet behind them %4.1f, rooms cleared %.1f"),
 		                      Mode == 0 ? TEXT("advance to the far end") : TEXT("sweep the four rooms"), Done / FMath::Max(1, Runs), Tab.Taken, Tab.N, Tab.MarinesLost / FMath::Max(1, Tab.N), Tab.FoesLost / FMath::Max(1, Tab.N), GuardsLeft / FMath::Max(1, Runs), RoomsClear / FMath::Max(1, Runs)));
+		GDrillTabs.Add(FString::Printf(TEXT("sweep/%d"), Mode), Tab);
+		GDrillNums.Add(FString::Printf(TEXT("sweep/%d/left"), Mode), GuardsLeft / FMath::Max(1, Runs));
+		GDrillNums.Add(FString::Printf(TEXT("sweep/%d/rooms"), Mode), RoomsClear / FMath::Max(1, Runs));
+		GDrillNums.Add(FString::Printf(TEXT("sweep/%d/s"), Mode), Done / FMath::Max(1, Runs));
+	}
+	const FDrillTable *Wk = GDrillTabs.Find(TEXT("sweep/0")), *Sw = GDrillTabs.Find(TEXT("sweep/1"));
+	if (Wk && Sw)
+	{
+		BCheck("sweep: the four rooms are cleared, fewer guards are left behind and more marines stand at the end", GDrillNums.FindRef(TEXT("sweep/1/rooms")) >= 3.0 && GDrillNums.FindRef(TEXT("sweep/1/left")) < GDrillNums.FindRef(TEXT("sweep/0/left")) && Sw->Taken > Wk->Taken,
+		       FString::Printf(TEXT("%.1f rooms cleared; guards left alive behind %.1f against %.1f; %d of %d with three on their feet against %d; %.0f s against %.0f s"), GDrillNums.FindRef(TEXT("sweep/1/rooms")), GDrillNums.FindRef(TEXT("sweep/1/left")),
+		                       GDrillNums.FindRef(TEXT("sweep/0/left")), Sw->Taken, Sw->N, Wk->Taken, GDrillNums.FindRef(TEXT("sweep/1/s")), GDrillNums.FindRef(TEXT("sweep/0/s"))));
 	}
 }
 
@@ -1733,7 +1769,16 @@ static void BoardScenarioAmbush(FRig& Rig, int32 Seed, int32 Seeds)
 			BNote(FString::Printf(TEXT("    %2d boarders, twelve marines at the place: %-9s the Mandate beaten %2d of %2d (take Engineering %d), first contact at %4.1f s, ends %5.1f s; marines lost %4.1f, Mandate lost %4.1f, ambushes sprung %d"),
 			                      Boarders, Mode == 0 ? TEXT("hold") : TEXT("ambush"), Beaten, N, Takes, Contact / FMath::Max(1, N), T / FMath::Max(1, N), LossA / FMath::Max(1, N), LossM / FMath::Max(1, N), Ambushes));
 			(void)FirstDown;
+			GDrillNums.Add(FString::Printf(TEXT("ambush/%d/%d/beaten"), Boarders, Mode), Beaten);
+			GDrillNums.Add(FString::Printf(TEXT("ambush/%d/%d/lost"), Boarders, Mode), LossA / FMath::Max(1, N));
+			GDrillNums.Add(FString::Printf(TEXT("ambush/%d/%d/sprung"), Boarders, Mode), Ambushes);
 		}
+	}
+	if (!GTrace && GDrillNums.Contains(TEXT("ambush/12/1/beaten")))
+	{
+		BCheck("ambush: against twelve boarders it beats the same marines holding with their fire free, for no more marines lost", GDrillNums.FindRef(TEXT("ambush/12/1/beaten")) > GDrillNums.FindRef(TEXT("ambush/12/0/beaten")) && GDrillNums.FindRef(TEXT("ambush/12/1/lost")) <= GDrillNums.FindRef(TEXT("ambush/12/0/lost")) && GDrillNums.FindRef(TEXT("ambush/12/1/sprung")) > 0.0,
+		       FString::Printf(TEXT("beaten %.0f against %.0f, marines lost %.1f against %.1f, %.0f ambushes sprung"), GDrillNums.FindRef(TEXT("ambush/12/1/beaten")), GDrillNums.FindRef(TEXT("ambush/12/0/beaten")), GDrillNums.FindRef(TEXT("ambush/12/1/lost")),
+		                       GDrillNums.FindRef(TEXT("ambush/12/0/lost")), GDrillNums.FindRef(TEXT("ambush/12/1/sprung"))));
 	}
 }
 
@@ -1846,8 +1891,25 @@ static void BoardScenarioHold(FRig& Rig, int32 Seed, int32 Seeds)
 				}
 				BNote(FString::Printf(TEXT("    %d craft, %2d boarders, twelve marines in Engineering: %-24s the Mandate beaten %2d of %2d (take Engineering %2d), first contact %4.1f s, ends %5.1f s; marines lost %4.1f, Mandate lost %4.1f"),
 				                      Craft, Boarders, Mode == 0 ? TEXT("no order (meet them)") : Mode == 1 ? TEXT("hold the place") : TEXT("hold wide (a section)"), Beaten, N, Takes, Contact / FMath::Max(1, N), T / FMath::Max(1, N), LossA / FMath::Max(1, N), LossM / FMath::Max(1, N)));
+				GDrillNums.Add(FString::Printf(TEXT("hold/%d/%d/%d/beaten"), Craft, Boarders, Mode), Beaten);
+				GDrillNums.Add(FString::Printf(TEXT("hold/%d/%d/%d/lost"), Craft, Boarders, Mode), LossA / FMath::Max(1, N));
 			}
 		}
+	}
+	if (!GTrace && GBoarders == 0 && GSetup < 0)
+	{
+		bool bOk = true;
+		FString Detail;
+		for (const int32 Craft : {1, 2})
+		{
+			for (const int32 Boarders : {12, 16})
+			{
+				const double Place = GDrillNums.FindRef(FString::Printf(TEXT("hold/%d/%d/1/beaten"), Craft, Boarders)), Wide = GDrillNums.FindRef(FString::Printf(TEXT("hold/%d/%d/2/beaten"), Craft, Boarders)), None = GDrillNums.FindRef(FString::Printf(TEXT("hold/%d/%d/0/beaten"), Craft, Boarders));
+				bOk &= Place > Wide && Place > None;
+				Detail += FString::Printf(TEXT("%s%d craft, %d boarders: the place %.0f, wide %.0f, no order %.0f"), Detail.IsEmpty() ? TEXT("") : TEXT("; "), Craft, Boarders, Place, Wide, None);
+			}
+		}
+		BCheck("hold: the place that matters beats a whole section and no order, against twelve boarders and more", bOk, Detail);
 	}
 }
 
@@ -1930,7 +1992,14 @@ static void BoardScenarioSeal(FRig& Rig, int32 Seed, int32 Seeds)
 			BNote(FString::Printf(TEXT("    %2d boarders, six marines fall back to Engineering: %-22s the Mandate beaten %2d of %2d, first contact %5.1f s, ends %5.1f s; marines lost %4.1f, Mandate lost %4.1f, bulkheads shut behind them %.1f"),
 			                      Boarders, Mode ? TEXT("seal behind") : TEXT("no seal"), Beaten, N, Contact / FMath::Max(1, N), T / FMath::Max(1, N), LossA / FMath::Max(1, N), LossM / FMath::Max(1, N), Seals / FMath::Max(1, N)));
 			(void)Cuts;
+			GDrillNums.Add(FString::Printf(TEXT("seal/%d/%d/contact"), Boarders, Mode), Contact / FMath::Max(1, N));
+			GDrillNums.Add(FString::Printf(TEXT("seal/%d/%d/seals"), Boarders, Mode), Seals / FMath::Max(1, N));
 		}
+	}
+	if (GDrillNums.Contains(TEXT("seal/8/1/contact")))
+	{
+		BCheck("seal: bulkheads shut behind the squad put the pursuit on it much later", GDrillNums.FindRef(TEXT("seal/8/1/contact")) >= GDrillNums.FindRef(TEXT("seal/8/0/contact")) + 30.0 && GDrillNums.FindRef(TEXT("seal/8/1/seals")) >= 1.0 && GDrillNums.FindRef(TEXT("seal/8/0/seals")) == 0.0,
+		       FString::Printf(TEXT("first contact at %.0f s against %.0f s, %.1f bulkheads shut"), GDrillNums.FindRef(TEXT("seal/8/1/contact")), GDrillNums.FindRef(TEXT("seal/8/0/contact")), GDrillNums.FindRef(TEXT("seal/8/1/seals"))));
 	}
 }
 
