@@ -59,6 +59,8 @@ AQUILA_SHIELD_DROP = 30.0                               # ... or of shield stren
 SETTLE_S = 3.0                                          # a burst of events is read together: wait for it to end (at most MAX_SETTLE_S)
 MAX_SETTLE_S = 8.0
 QUIET_END_S = 75.0                                      # a fight with nothing happening for this long is over
+TAKEOVER_GAP_S = 90.0                                   # a seat's new commander is told of the succession once in this long (5 October: a group's leader flapped between two ships
+                                                        # and the captain «took command from himself» 226 times, a call to the model each: a quarter of the session's spend)
 PULSE_TIMEOUT_S = 28.0                                  # a model that has not finished by now is left to its reflexes
 ROUND2_TIMEOUT_S = 12.0
 # The physics the doctrine quotes (data/war/classes.json and the damage tuning) and the ranges the bench measured as the best between equal forces
@@ -110,6 +112,23 @@ ALLY_POOL: list[dict[str, Any]] = [
          bio="A Core Worlds aristocrat who earned his command the hard way; courteous, proud, wary of the Mandate's tricks."),
     dict(name="Commander Mina Sato", rank="Commander", voice="fantine", gender="f",
          bio="Young, brilliant, sleepless; she knows her ship's every system and says so; a little too eager for the fight."),
+    # (a fleet of a dozen ships has a dozen captains: on 5 October the pool of six wrapped, two ships had the same captain's name, and the group that held them took command from itself)
+    dict(name="Captain Hana Lindgren", rank="Captain", voice="cosette", gender="f",
+         bio="A logistics officer who ended up commanding a frigate; precise, patient, unimpressed by heroics; her ships come home."),
+    dict(name="Commander Joaquim Pereira", rank="Commander", voice="michael", gender="m",
+         bio="Loud, generous, a gambler's grin; fights like he plays cards, all at once, and never forgets a name."),
+    dict(name="Captain Leila Haddad", rank="Captain", voice="anna", gender="f",
+         bio="Former Gate pilot, forty, tired and fearless; she speaks in short sentences and expects the same back."),
+    dict(name="Commander Dmitri Volkov", rank="Commander", voice="marius", gender="m",
+         bio="Taciturn engineer-turned-captain; trusts his reactor more than his orders, and is usually right about both."),
+    dict(name="Captain Odile Marchand", rank="Captain", voice="fantine", gender="f",
+         bio="A diplomat's daughter with a gunnery medal; formal on the net, merciless in the fight."),
+    dict(name="Commander Ravi Menon", rank="Commander", voice="juergen", gender="m",
+         bio="Young for his command, fast-talking, quick with numbers; he has something to prove to the old captains."),
+    dict(name="Captain Ifeoma Adeyemi", rank="Captain", voice="anna", gender="f",
+         bio="Thirty years of picket duty; slow to speak, slower to retreat; her crew would follow her through the Gate."),
+    dict(name="Commander Tobias Kessler", rank="Commander", voice="michael", gender="m",
+         bio="A Core-born marksman with a dry wit; he reports hits as a bookkeeper reports sums."),
 ]
 BENCH_ADMIRAL = dict(key="marsh", name="Rear Admiral Ione Marsh", rank="Rear Admiral", ship="the ASTRA flagship", voice="alba", gender="f",
                      bio="Commands the ASTRA fleet in this action; experienced, economical with words, unwilling to waste ships.")
@@ -815,6 +834,7 @@ class Mind:
     new_enemy: list[str] = field(default_factory=list)
     period: float = 0.0                                 # how long until the next look on the clock (drawn after each look)
     takeover: str = ""                                  # a new commander took the seat (a succession): they look at once
+    took_over: float = -1e9                             # when the last takeover was told: a seat whose leader flaps between ships is not a succession every two seconds
     aquila_km: float | None = None                      # (ASTRA group) how far from the Aquila it was at the last look
     drawn_away: int = 0                                 # how many looks in a row the Aquila's drawing away has called (each needs twice the distance of the last)
     aquila_seen: tuple[float | None, float | None, float] | None = None    # (ASTRA group) the Aquila's hull and shield strength at its last look, and when
@@ -920,7 +940,9 @@ class WarMinds:
         fixed = ALLIES.get(contact)
         if fixed is not None:
             return self._tell_captain(self.register_ally(contact, fixed))
-        p = dict(ALLY_POOL[self.pool_used % len(ALLY_POOL)])         # a ship the story has not named a captain for: one from the pool
+        taken = {c.name for c in self.allies.values()} | {a.get("name") for a in ALLIES.values()}
+        free = [q for q in ALLY_POOL if q["name"] not in taken]      # a ship the story has not named a captain for: one from the pool whose name no captain of ours carries yet
+        p = dict(free[0] if free else ALLY_POOL[self.pool_used % len(ALLY_POOL)])
         self.pool_used += 1
         p["ship"] = f"the {cls or 'warship'} {contact}"
         p["key"] = "ally_" + re.sub(r"\W", "", contact.lower())
@@ -1005,8 +1027,12 @@ class WarMinds:
                 if side == "astra" and seat.kind == "admiral":
                     cmd = Commander(contact=leader, side="astra", **BENCH_ADMIRAL)
                 if mind.commander is not None and mind.commander.contact != cmd.contact:
-                    self.journal(side, "command", f"the command of {seat.group or 'the fleet'} passed from {mind.commander.name} to {cmd.name} ({cmd.contact})")
-                    mind.takeover = f"you have just taken command of {seat.group or 'the fleet'} from {mind.commander.name}"
+                    if mind.commander.name == cmd.name:
+                        cmd = mind.commander                        # (the same captain: a group's leader passing between two ships of one name is no succession)
+                    elif now - mind.took_over >= TAKEOVER_GAP_S:
+                        self.journal(side, "command", f"the command of {seat.group or 'the fleet'} passed from {mind.commander.name} to {cmd.name} ({cmd.contact})")
+                        mind.takeover = f"you have just taken command of {seat.group or 'the fleet'} from {mind.commander.name}"
+                        mind.took_over = now
                 mind.commander = cmd
             self._feed_mind(mind, view, state, events, active, now)
 

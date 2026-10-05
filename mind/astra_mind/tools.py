@@ -21,7 +21,8 @@ MESS = [f"mess{i}" for i in range(1, 13)] + ["mess_cook"]   # the Mess Hall's pl
 SPEAK = _fn("speak", "Someone aboard speaks aloud: an officer, a wounded crewman in the Medbay, someone off duty in "
                      "the Mess Hall, or the ship's computer (`computer`: only in a lift, where it answers the Captain's travel orders) "
                      "(one call per line, in speaking order). Short and specific: one sentence, and an "
-                     "acknowledgement always says WHAT was set or answered (never a bare 'aye').", {
+                     "acknowledgement always says WHAT was set or answered (never a bare 'aye') and nothing around it: no ranges, no enemy positions, "
+                     "no advice (that is the XO's picture).", {
     "speaker": {"type": "string", "enum": list(CREW) + PATIENTS + MESS + ["computer"]},
     "text": {"type": "string", "description": "The spoken line, in the Captain's language: usually one short sentence "
                                               "(6-16 words); two only when the second carries something needed; more only "

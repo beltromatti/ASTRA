@@ -106,6 +106,10 @@ class Replay:
         for t in self.tasks:
             t.cancel()
         await asyncio.gather(*self.tasks, return_exceptions=True)
+        rest = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]       # (the voice engine's generators, the loops a test started: none outlives the loop)
+        for t in rest:
+            t.cancel()
+        await asyncio.gather(*rest, return_exceptions=True)
         models.LEDGER.write_file = self._ledger
 
     @staticmethod
