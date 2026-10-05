@@ -37,7 +37,7 @@ abbordaggi contro l'Aquila, chiesto da ABBORDAGGI).
   tace da 4; la dottrina dell'iniziativa per entrambi); lo schermo principale che non cambia risoluzione a ogni sguardo. Uniti i rami finiti
   di ARTE-INTERNI-2, ABBORDAGGI-3 e SPAZIO-VIVO-2 (M7–M9: il Falcon raccoglie le capsule con R, i getti dei velivoli, convogli e pattuglie);
   in corso nell'editor la ricostruzione degli interni e l'importazione del kit dei ponti nemici.
-- **Credito OpenRouter: 3,55 $** (le partite del 5/10 ~1,8 $): segnalato in RICHIESTE.
+- **Credito OpenRouter: 3,30 $** (le partite del 5/10 ~1,8 $): segnalato in RICHIESTE.
 - **Che cosa arriva dal Gate** (il lead, `AstraGateWatch.cpp`): il tavolo olografico mostra il Janus Gate e, per una forza annunciata (il transito
   visto da Keeper Station, i rinforzi di Fleet, le flotte della Marcia dirette qui), un anello che pulsa dove uscirà con quante navi e fra quanto;
   lo schermo principale lo mette in testa («GATE · 4 HOSTILE INBOUND · IN 1:32»); un'incursione oscura resta una sorpresa. Provato nel gioco
@@ -48,6 +48,13 @@ abbordaggi contro l'Aquila, chiesto da ABBORDAGGI).
   la pagina THE BRIDGE'S LOG sul datapad. ~4 battute al minuto nell'avvicinamento di Solm (prima 6,8). Resta: tre soccorsi di mercantili in
   80 s durante l'avvicinamento (VOCI-3 tappa 3), la dottrina dell'equipaggio (tappa 2). Rourke che chiama il Capitano ora si sente con la sua
   voce (tell_captain e task_aquila diretti).
+- **Unite VOCI-3 tappe 2 e 3** (e558fa1, suite offline verdi): l'XO voce del quadro, ritmo dei rapporti, soccorsi in una riga e poi sul
+  registro, delegazione advise per volo e timone ricordata nella campagna, canali che si chiudono dopo 75 s, router che non lascia uscire
+  ciò che è nostro, 14 capitani alleati. Da provare nella partita lunga dopo BATTAGLIA-3. VOCI-3 sta facendo il ventaglio della flotta e
+  i nomi della campagna al riconoscitore, poi chiude. Richieste inoltrate: report=false per gli eventi di routine (a BATTAGLIA-3), rethink e
+  chiave «Capitano a bordo» per la rete dei marine (ad ABBORDAGGI-4).
+- **Lo schermo principale racconta lo scontro a tagli** (il lead): il bersaglio, poi «ASN AQUILA · FIRING ON …» (l'Aquila da fuori che spara,
+  `astra.viewscreen.broadside`), poi il bersaglio. Provato nel gioco. Brief pronti: **VFX-2**, **PRESTAZIONI-GPU** (oltre ad ARTE-SCAFI).
 - **Da indagare (PRESTAZIONI-GPU)**: nel gioco di prova (1600x900, 60 fps di obiettivo) la risoluzione dinamica sta al minimo (33–34 %) e
   alcuni fotogrammi escono a blocchi (MetalFX attivo; in battaglia e con la ruota aperta: `Saved/Play/fx2.png`, `wheel1.png`, `gatelive.png`),
   altri lisci; non riprodotto a comando con r.AstraMetalFX 0/1.

@@ -114,6 +114,16 @@ class Exchange:
         self._heard: dict[str, float] = {}
         self._said: dict[str, float] = {}
         self._words: dict[str, str] = {}
+        self._opened: dict[str, float] = {}
+
+    def opened(self, party: str) -> None:
+        """A channel with this party was opened (a hail, theirs or ours): the exchange begins."""
+        self._opened[party] = time.monotonic()
+
+    def idle_s(self, party: str) -> float | None:
+        """Seconds since anything passed on this party's channel: it opened, they spoke, the Captain spoke to them. None: nothing was ever noted."""
+        last = max(self._opened.get(party, 0.0), self._heard.get(party, 0.0), self._said.get(party, 0.0))
+        return None if last <= 0.0 else max(0.0, time.monotonic() - last)
 
     def heard(self, party: str, words: str = "") -> None:
         self._heard[party] = time.monotonic()
@@ -134,6 +144,7 @@ class Exchange:
         self._heard.clear()
         self._said.clear()
         self._words.clear()
+        self._opened.clear()
 
 
 def known_speakers(ids: Any) -> tuple[str, ...]:

@@ -806,6 +806,50 @@ class AstraTests(Fixture):
         self.assertIsNone(await self.minds.rethink("castellan", "x", 30.0, "Aquila, the", "it"))
 
 
+class SuccessionTests(Fixture):
+    """5 October: the pool of six captains wrapped (two ships of one name), a group's leader flapped between them every two seconds and the captain «took command from himself»
+    226 times, a call to the model each. A fleet of a dozen ships has a dozen captains, and a succession is told once."""
+
+    sides = ("astra",)
+
+    async def test_a_dozen_ships_have_a_dozen_captains(self) -> None:
+        names = [self.minds.persona_of("astra", f"T-{n}", "frigate").name for n in range(40, 52)]
+        self.assertEqual(len(set(names)), 12, names)
+        self.assertEqual(len({self.minds.persona_of("astra", f"T-{n}", "frigate").name for n in range(40, 52)}), 12, "asked again: the same captains")
+
+    async def test_a_leader_that_flaps_between_two_ships_is_one_succession_not_one_every_two_seconds(self) -> None:
+        self.llm.policy = null_policy
+
+        def state(lead: str) -> dict[str, Any]:
+            return astra_state([group("Aurelia Reserve", 1, [member("T-01", "praetorian"), member("T-02", "vigilant")], leader=lead)], ENEMIES(), None,
+                               contacts=[{"id": "T-01", "name": "ASN Praetorian", "status": "friendly", "range_km": 4.5, "bearing_deg": 25, "hull_pct": 100},
+                                         {"id": "T-02", "name": "ASN Vigilant", "status": "friendly", "range_km": 5.5, "bearing_deg": 30, "hull_pct": 100}])
+        await self.feed(state("T-01"))
+        await self.feed(state("T-01"), 9)
+        told = lambda: [p for p in self.minds.pulses if any("taken command" in w for w in p["why"])]  # noqa: E731
+        n0 = len(told())
+        for lead in ("T-02", "T-01", "T-02", "T-01", "T-02"):
+            await self.feed(state(lead), 3)
+        self.assertEqual(len(told()) - n0, 1, "one succession in all that flapping")
+        await self.feed(state("T-01"), 100)                                                # (long after: another real change is told again)
+        await self.feed(state("T-02"), 4)
+        self.assertEqual(len(told()) - n0, 2)
+
+    async def test_two_ships_of_one_captain_pass_the_command_between_them_unnoticed(self) -> None:
+        self.llm.policy = null_policy
+        mind_ships = [("T-61", "frigate"), ("T-62", "frigate")]
+        p1 = self.minds.persona_of("astra", *mind_ships[0])
+        self.minds.allies["T-62"] = self.minds.register_ally("T-62", dict(name=p1.name, rank=p1.rank, ship="the frigate T-62", voice=p1.voice))      # (one name on two ships)
+
+        def state(lead: str) -> dict[str, Any]:
+            return astra_state([group("Aurelia Reserve", 1, [member("T-61", "frigate"), member("T-62", "frigate")], leader=lead)], ENEMIES(), None, contacts=[])
+        await self.feed(state("T-61"))
+        await self.feed(state("T-61"), 9)
+        for lead in ("T-62", "T-61", "T-62"):
+            await self.feed(state(lead), 3)
+        self.assertEqual([p for p in self.minds.pulses if any("taken command" in w for w in p["why"])], [])
+
+
 class ChainOfCommandTests(Fixture):
     sides = ("astra",)
 

@@ -136,10 +136,10 @@ Everyone wears a neural translator implant, "the Interpreter": people hear each 
 # good and bad acknowledgements in the Captain's language (the model imitates what it sees: show it the register)
 _ACK = {
     "it": ('"Intercetto il Cocytus, tengo sei chilometri." · "Scudi a prua, novanta per cento." · "Fuoco continuo sul Cocytus fino a '
-           'distruzione." · "Già in fuoco libero, Capitano: il Cocytus è a sette chilometri, i railgun lo battono."',
+           'distruzione." · "Già in fuoco libero, Capitano."',
            '"Agli ordini, Capitano." · "Ricevuto." · "Sì, signore." · "Eseguo." (alone: they say nothing) · "Nessun ordine nuovo da eseguire." (a console\'s words, not an officer\'s)'),
     "en": ('"Intercepting the Cocytus, holding six kilometres." · "Shields fore, ninety percent." · "Continuous fire on the Cocytus '
-           'until it falls." · "Already weapons free, Captain: the Cocytus is at seven kilometres, the railguns are on her."',
+           'until it falls." · "Already weapons free, Captain."',
            '"Aye aye, Captain." · "Understood." · "Yes sir." · "Executing." (alone: they say nothing) · "Nothing new to set." (a console\'s words, not an officer\'s)'),
     "es": ('"Interceptando al Cocytus, manteniendo seis kilómetros." · "Escudos a proa, noventa por ciento." · "Fuego continuo sobre '
            'el Cocytus hasta destruirlo."', '"A sus órdenes, Capitán." · "Recibido." · "Sí, señor." (solos: no dicen nada)'),
@@ -161,7 +161,8 @@ def _speech_rules(lang: str) -> str:
   when it carries something the Captain needs: a number, a risk, a choice, a doubt. As long as the content needs, and still
   plain speech, when the Captain asks for a report or an explanation (a status, "what do you think", a briefing) — not
   longer. No lists, no markdown, no stage directions, no emojis.
-- Every acknowledgement carries content: WHAT was set and on what, with the value that matters. Never a bare "aye". Good: {good}
+- Every acknowledgement carries content, in as few words as carry it: WHAT was set and on what, with the value that matters, and nothing around it (no ranges, no enemy
+  positions, no what-it-means, no advice: if he needs more than the order, that is the XO's line). Never a bare "aye". Good: {good}
   Bad: {bad} When the ship already is as ordered, say so in those terms.
 - Every number you say is one you have: from the ship's state, from the Captain's words, or from a tool result you have
   read. A value your order will only produce (the new heading, a time to arrive, a range still to be reached) is not yet
@@ -178,9 +179,14 @@ def _speech_rules(lang: str) -> str:
   and the officer goes on working inside the orders given.
 - The Captain first. Answer the Captain's words before anything else; drop what you were about to report. Never make the
   Captain wait for a report, and never repeat a report the Captain has just heard.
-- The officer who owns the console answers (see duties). The XO answers general questions and advises: a general report on the
-  situation is the XO's alone — two or three sentences: the contacts, our state, the one thing that matters — and another officer
-  adds a line only when asked or when they know what the XO cannot. If the Captain
+- ONE VOICE FOR THE PICTURE. The Captain hears every word said on the bridge, so every word must earn its place. The XO (Serra) is the voice of the picture and of advice: what
+  is happening, what it means, what he might do — one or two sentences (the contacts, our state, the one thing that matters), and nobody else summarises. The other officers speak
+  for their console in three cases only: the Captain called them or gave an order for their station (a short acknowledgement); there is danger in their field that he can act on
+  NOW (a salvo inbound, a breach, the reactor or the heat at a limit, a squadron lost); or a decision in their field is his to make. Everything else is routine and goes on the
+  console's log (`console_log`), not into his ears: a range or a percentage that moved, a rearm or a repair done, a fire out, a contact that faded, point defence splashing a
+  missile, a mode they set inside the orders. What has been said once is said: not in other words, not by another officer, not again because it is still true.
+- The officer who owns the console answers (see duties); the XO answers general questions and advises, and another officer adds a line to a general report only when asked or
+  when they know what the XO cannot. If the Captain
   names an officer, that officer answers; when the thing belongs to another console they hand it over in one line
   ("Voss, fuoco sul Cocytus.") and the owner acts and answers. Address the Captain as "{cap}" (never the English word in
   another language, never another title) only when it matters — to catch their attention for something they must decide,
@@ -550,12 +556,15 @@ WHERE_HEAD = ("Where the Captain is NOW (the ship's live reading of him, from hi
 
 
 def bridge_now(ship_state: dict[str, Any], recent_events: list[str], hearing: str = "", said_aloud: str = "", waiting: str = "", context: str = "",
-               orders: str = "", where: str = "", logs: str = "") -> str:
+               orders: str = "", where: str = "", logs: str = "", news: bool = False) -> str:
     """The bridge as it is this moment, for the last message of a crew turn: the recent events, the consoles, the room, the live
     telemetry. Kept out of the system prompt so that the system prompt and the conversation before this turn are the same from one call
     to the next: the provider's prompt cache then covers them (with the telemetry inside the system prompt the cache stopped at it, and a
-    battle cost twice as much). `where`: the Captain's live position (context.where_now), the first thing in it."""
+    battle cost twice as much). `where`: the Captain's live position (context.where_now), the first thing in it. `news`: the turn is a report of news (an event turn): the
+    recent events are then labelled as what they are, the things that happened (an older one was news in its own turn and is not reported again)."""
     events = "\n".join(f"- {e}" for e in recent_events[-8:]) or "- (none)"
+    older = (" (the last things that happened, oldest first: the NEWS of this turn is the event at the end of this message; an older item here was news in its own turn and is not "
+             "reported again)") if news else ""
     board = station_model.board(ship_state, {k: v.title for k, v in CREW.items()})
     view = {k: v for k, v in ship_state.items() if not k.startswith("_") and (k not in ("stations", "sim_time_s") or not board)}
     if isinstance(view.get("transporter"), dict):
@@ -565,13 +574,14 @@ def bridge_now(ship_state: dict[str, Any], recent_events: list[str], hearing: st
     room = f"The room: {hearing}\n" if hearing else ""
     fleet = str(ship_state.get("_fleet_board") or "")           # the allied groups and their captains (the war minds' fleet board, set by the server)
     front = str(ship_state.get("_march_board") or "")           # the front as Fleet knows it, beyond the Aquila's sky (the March's board, set by the server)
-    said = f"Said aloud on the bridge in the last minute (what the Captain has heard, oldest first)\n{said_aloud}\n" if said_aloud else ""
+    said = (f"Said aloud on the bridge in the last minute (the Captain has HEARD these: never say them again, in other words or from another officer either; oldest first)\n"
+            f"{said_aloud}\n") if said_aloud else ""
     said += f"Waiting to be said (queued behind whoever is speaking, in the order it will be said)\n{waiting}\n" if waiting else ""
     said += (f"On the nets and the consoles' logs, NOT said aloud (the Captain has not heard these: he reads them on the consoles and the datapad, and asks when he wants; "
              f"a net that is quiet here may still have spoken, and what is here is not news to say again)\n{logs}\n") if logs else ""
     said = (f"The Captain's last words to the bridge (newest last; an order still stands unless he changed it)\n{orders}\n" if orders else "") + said
     here = f"{WHERE_HEAD}\n{where}\n" if where else ""
-    return ((context + "\n\n" if context else "") + f"[The bridge now]\n{here}Recent events\n{events}\n" + said
+    return ((context + "\n\n" if context else "") + f"[The bridge now]\n{here}Recent events{older}\n{events}\n" + said
             + (("Consoles now (who runs what, since when, how it is going)\n" + board + "\n") if board else "")
             + (("The fleet: our battle groups and their captains, from the fleet datalink\n" + fleet + "\n") if fleet else "")
             + (("The front, as Fleet knows it (what comms and the plot hold of the war beyond this sky; what is not here is not known)\n" + front + "\n") if front else "")
