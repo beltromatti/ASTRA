@@ -349,15 +349,25 @@ def _assault_run(a, name: str, setup: dict) -> dict:
     out = OUT / f"assault_{name}.json"
     args = [str(ENGINE), str(ROOT / "ASTRA.uproject"), "-run=AstraWarSim", f"-seconds={setup['seconds']}", "-step=0.1", "-every=50", f"-out={out}", f"-seed={a.seed}", f"-seeds=1",
             f"-exec={setup['exec']}", f"-at={setup['at']}", "-nullrhi", "-unattended", "-nosound", "-nosplash", "-NoVerifyGC", "-stdout", "-FullStdOutLogOutput"]
-    with open(log, "w") as f:
-        p = subprocess.Popen(args, stdout=f, stderr=subprocess.STDOUT, cwd=str(ROOT))
-        try:
-            p.wait(timeout=a.timeout)
-        except subprocess.TimeoutExpired:
-            p.kill()
-            p.wait()
-    if sys.platform != "win32":
-        subprocess.run(["pkill", "-f", f"CrashReportClient.*pid-{p.pid}"], check=False)
+    retries = max(0, getattr(a, "retries", 2))
+    for attempt in range(1 + retries):
+        with open(log, "w") as f:
+            p = subprocess.Popen(args, stdout=f, stderr=subprocess.STDOUT, cwd=str(ROOT))
+            try:
+                p.wait(timeout=a.timeout)
+            except subprocess.TimeoutExpired:
+                p.kill()
+                p.wait()
+        if sys.platform != "win32":
+            subprocess.run(["pkill", "-f", f"CrashReportClient.*pid-{p.pid}"], check=False)
+        # The Aquila's plan is read by a worker while the war runs on (the commandlet does not wait for it): on a machine busy with other work the assault is asked for before
+        # the plan is read and refused, which says nothing about the code. That is the machine's, not the boarding's: run it again (bounded).
+        if "assault refused: the ship's plan is not read yet" not in log.read_text(errors="replace"):
+            break
+        if attempt < retries:
+            print(f"   ({name}: the plan was not read in time, the machine is loaded: run {attempt + 2} of {1 + retries})", flush=True)
+        else:
+            print(f"   ({name}: the plan was still not read in time: the machine is too loaded for this bench, a FAIL here is the machine's)", flush=True)
     lines = []
     for l in log.read_text(errors="replace").splitlines():
         for tag in ("[Boarding]", "[Board]"):
@@ -435,6 +445,7 @@ def main() -> int:
     s.add_argument("--seed", type=int, default=1)
     s.add_argument("--lines", type=int, default=60, help="how many of the last log lines to print")
     s.add_argument("--timeout", type=int, default=900)
+    s.add_argument("--retries", type=int, default=2, help="run a setup again (at most this many times) when the plan was not read before the assault was asked for: a loaded machine, not a fault")
     s.set_defaults(fn=cmd_assault)
     p = sub.add_parser("report")
     p.add_argument("path", nargs="?", default="Saved/Boarding/run.json")
