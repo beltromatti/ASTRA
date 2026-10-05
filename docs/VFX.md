@@ -326,13 +326,16 @@ Nessuno cambia la simulazione: se `astra.fx.enable 0` o mancano i materiali (`M_
 3. Nell'editor, **senza PIE**: `tools/ue.py pyfile tools/ue_scripts/make_war_fx.py` — importa le texture e fa i materiali `M_WAR_*`,
    `M_WAR_DamageDecal` e le otto `MI_WAR_Damage_*`. Ogni materiale ha il suo try/except: il log finale dice quali sono fatti e quali no, e uno
    che fallisce non ferma gli altri. Il gioco tace e ripiega sul disegno vecchio finché ne manca uno dei sette essenziali (dardo, tubo,
-   bagliore, fuoco, fumo, pennacchio, scudo); i detriti e i decal hanno il loro ripiego.
+   bagliore, fuoco, fumo, pennacchio, scudo); i detriti e i decal hanno il loro ripiego. **Si rilancia a ogni unione che cambia `war_fx_hlsl.py` o `make_war_fx.py`**
+   (VFX-2 ha cambiato DART, TUBE e GLOW: cilindri e tubi con la luce normalizzata, §2bis): i materiali nascono dallo script e i `.uasset` rigenerati non si uniscono (sono binari).
 4. Avviare il gioco, in una battaglia o fuori: `astra.fx.swatch`, poi `astra.fx.scene 6 0` e i comandi del §12.
 5. Guardare, nell'ordine: **(a)** il log all'avvio (`[WarFX] effects ready ...`; se dice "materials missing" lo script non è passato);
    **(b)** `astra.fx.swatch`: ogni elemento deve leggersi (se il materiale è nero o bianco: l'intensità, vedi §16; se è un quadrato: lo
    shader del disco non compila, vedi il log degli shader); **(c)** la stessa fila nello schermo principale con zoom ×40–×80 (puntandolo al
    punto davanti alla prua): niente lastre, niente rettangoli, i bagliori restano tondi; **(d)** `astra.fx.shield bow 40` su `FX-T`, vista dalla
-   plancia e dal posto di Ops; **(e)** `astra.fx.break mid`, `reactor`, `disable`.
+   plancia e dal posto di Ops; **(e)** `astra.fx.break mid`, `reactor`, `disable`; **(f)** il fuoco dalla ripresa «FIRING ON ...»: `astra.fx.scene 25 0`,
+   `astra.fx.cam broadside T`, `astra.cmd fire_weapons {"weapon":"railguns","contact_id":"FX-T","salvo":3}` (il fuoco dell'Aquila ha bisogno del suo budget di tiro: se lo stato dice «rails 0»
+   non parte), `astra.fx.series bc 60 0.15 cam` (§12).
 
 ## 16. Come tarare (cosa girare e dove)
 
