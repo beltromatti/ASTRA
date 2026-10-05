@@ -47,6 +47,43 @@ namespace AstraFx
 		}
 		return nullptr;
 	}
+
+	// The skin of each capital hull seen from the six faces of its box, in decimetres (tools/art/war_fx_hull_surface.py, from the ship generators; tools/art/war_fx_data.py writes the table)
+	constexpr int32 SurfNx = 48, SurfNy = 16, SurfNz = 16;       // cells along the ship, across it, up it
+	struct FHullSurface
+	{
+		const TCHAR* Mesh;
+		float Bounds[6];                                          // the mesh's own bounds, m: x0 x1 y0 y1 z0 z1 (the ship's frame: x forward, y starboard, z up)
+		int16 Top[SurfNx * SurfNy], Bottom[SurfNx * SurfNy];      // over (x, y): the z of the outermost skin seen from above, from below
+		int16 Starboard[SurfNx * SurfNz], Port[SurfNx * SurfNz];  // over (x, z): the y of the outermost skin seen from the right, from the left
+		int16 Bow[SurfNy * SurfNz], Stern[SurfNy * SurfNz];       // over (y, z): the x of the outermost skin seen from ahead, from astern
+	};
+
+	static const FHullSurface GHullSurfaces[] =
+#include "AstraWarFXSurface.inl"
+	;
+
+	const FHullSurface* FindSurface(const FString& MeshName)
+	{
+		for (const FHullSurface& H : GHullSurfaces)
+		{
+			if (MeshName.Equals(H.Mesh))
+			{
+				return &H;
+			}
+		}
+		return nullptr;
+	}
+
+	/** A grid of decimetres, bilinear between the cell centres: A and B run 0..1 over it. */
+	float SkinAt(const int16* G, int32 Na, int32 Nb, float A, float B)
+	{
+		const float Fa = FMath::Clamp(A * (float)Na - 0.5f, 0.f, (float)(Na - 1)), Fb = FMath::Clamp(B * (float)Nb - 0.5f, 0.f, (float)(Nb - 1));
+		const int32 A0 = (int32)Fa, B0 = (int32)Fb, A1 = FMath::Min(A0 + 1, Na - 1), B1 = FMath::Min(B0 + 1, Nb - 1);
+		const float Ta = Fa - (float)A0, Tb = Fb - (float)B0;
+		const auto V = [G, Nb](int32 I, int32 J) { return (float)G[I * Nb + J] * 0.1f; };
+		return FMath::Lerp(FMath::Lerp(V(A0, B0), V(A0, B1), Tb), FMath::Lerp(V(A1, B0), V(A1, B1), Tb), Ta);
+	}
 }
 
 namespace
@@ -101,16 +138,67 @@ FVector UAstraWarFX::HullPoint(const FAstraBattleShip& S, int32 Section, float A
 	if (SideB >= 0.999f)
 	{
 		L = FVector(X, SideA * S.Box.Hy * 0.8f, S.Box.Hz * Sh);          // the upper hull
+		if (bSurface)
+		{
+			SnapToHull(S, AstraWar::Dorsal, L);                                        // (on its skin, not on the plane of the box)
+		}
 	}
 	else if (SideB <= -0.999f)
 	{
 		L = FVector(X, SideA * S.Box.Hy * 0.8f, -S.Box.Hz * Sh);         // the keel
+		if (bSurface)
+		{
+			SnapToHull(S, AstraWar::Ventral, L);
+		}
 	}
 	else
 	{
 		L = FVector(X, (SideA >= 0.f ? 1.f : -1.f) * S.Box.Hy * Sh, SideB * S.Box.Hz * 0.8f);   // a flank
+		if (bSurface)
+		{
+			SnapToHull(S, SideA >= 0.f ? AstraWar::Starboard : AstraWar::Port, L);
+		}
 	}
 	return S.Pos + S.Att.RotateVector(L);
+}
+
+bool UAstraWarFX::SnapToHull(const FAstraBattleShip& S, int32 Facing, FVector& L) const
+{
+	const FHullSurface* H = S.Box.Valid() ? FindSurface(FxMeshOf(S)) : nullptr;
+	if (!H)
+	{
+		return false;
+	}
+	const float* B = H->Bounds;
+	// the box is centred on the ship's origin and the mesh is not (a tower stands on one side of it): the box's range on each axis is laid over the mesh's
+	const auto Lay = [](float V, float A0, float A1, float M0, float M1) { return M0 + (V - A0) / FMath::Max(A1 - A0, 1.e-3f) * (M1 - M0); };
+	const float X = Lay(L.X, S.Box.Mid - S.Box.Hx, S.Box.Mid + S.Box.Hx, B[0], B[1]);
+	const float Y = Lay(L.Y, -S.Box.Hy, S.Box.Hy, B[2], B[3]);
+	const float Z = Lay(L.Z, -S.Box.Hz, S.Box.Hz, B[4], B[5]);
+	const float U = (X - B[0]) / FMath::Max(B[1] - B[0], 1.e-3f), V = (Y - B[2]) / FMath::Max(B[3] - B[2], 1.e-3f), W = (Z - B[4]) / FMath::Max(B[5] - B[4], 1.e-3f);
+	constexpr float Lift = 0.4f;                       // m off the skin, so that what is put there is not inside the plating
+	switch (Facing)
+	{
+	case AstraWar::Dorsal:
+		L = FVector(X, Y, SkinAt(H->Top, SurfNx, SurfNy, U, V) + Lift);
+		break;
+	case AstraWar::Ventral:
+		L = FVector(X, Y, SkinAt(H->Bottom, SurfNx, SurfNy, U, V) - Lift);
+		break;
+	case AstraWar::Starboard:
+		L = FVector(X, SkinAt(H->Starboard, SurfNx, SurfNz, U, W) + Lift, Z);
+		break;
+	case AstraWar::Port:
+		L = FVector(X, SkinAt(H->Port, SurfNx, SurfNz, U, W) - Lift, Z);
+		break;
+	case AstraWar::Bow:
+		L = FVector(SkinAt(H->Bow, SurfNy, SurfNz, V, W) + Lift, Y, Z);
+		break;
+	default:
+		L = FVector(SkinAt(H->Stern, SurfNy, SurfNz, V, W) - Lift, Y, Z);
+		break;
+	}
+	return true;
 }
 
 FVector UAstraWarFX::MuzzleOf(const FAstraBattleShip& S, EAstraMountKind Kind, const FVector& AimDir, int32 Salt)
@@ -217,6 +305,10 @@ void UAstraWarFX::AddScar(const FAstraBattleShip& S, const FAstraFxHit& H)
 		Kind = H.Felt > 70.f ? 2 : (FMath::RandBool() ? 3 : 6);   // torn, impact, gouge
 		break;
 	}
+	if (TestScarKind >= 0)
+	{
+		Kind = FMath::Clamp(TestScarKind, 0, 7);                 // (astra.fx.scar: the one asked for)
+	}
 	UMaterialInterface* Mat = DamageMats[Kind];
 	if (!Mat)
 	{
@@ -272,6 +364,16 @@ void UAstraWarFX::AddScar(const FAstraBattleShip& S, const FAstraFxHit& H)
 		// the scar goes where the blow struck the hull box, along the face's normal, reaching 30 m in
 		N = F.DirToWorld(S.Att.RotateVector(AstraWar::FacingVector(H.Facing)));
 		Loc = W;
+		if (H.bOnSkin)
+		{
+			HalfDepth = 2000.f;                      // the point is on the skin: the decal need only hold the plating round it
+		}
+		else if (S.Box.Valid())
+		{
+			// the plating is somewhere under the box's face (a tapered hull is far from it in places): the decal reaches down to the middle of the hull, so that it meets whatever is there
+			const float Half = H.Facing == AstraWar::Bow || H.Facing == AstraWar::Stern ? S.Box.Hx : (H.Facing == AstraWar::Port || H.Facing == AstraWar::Starboard ? S.Box.Hy : S.Box.Hz);
+			HalfDepth = FMath::Clamp((5.f + Half) * 100.f, 3000.f, 12000.f);
+		}
 	}
 	FShipFx& Fx = ShipOf(S.Id);
 	const int32 MaxHere = 8 + 4 * FMath::Clamp((int32)S.SizeTier, 0, 3);
@@ -321,6 +423,65 @@ void UAstraWarFX::AddScar(const FAstraBattleShip& S, const FAstraFxHit& H)
 	Scars.Add(X);
 	++Fx.Scars;
 	++Made;
+	static int32 Logged = 0;
+	if (Logged < 12)
+	{
+		++Logged;
+		int32 Receivers = 0, Prims = 0;
+		TInlineComponentArray<UPrimitiveComponent*> Pc(On);
+		for (const UPrimitiveComponent* C : Pc)
+		{
+			++Prims;
+			Receivers += C->bReceivesDecals ? 1 : 0;
+		}
+		UE_LOG(LogASTRA, Log, TEXT("[WarFX] scar %d on %s: kind %d, felt %.0f, %.0f m across and %.0f m deep at %s (the hull's box face), %d of %d components receive decals, material %s"),
+		       Logged, S.bPlayer ? TEXT("the Aquila") : *S.ContactId, Kind, H.Felt, Half * 0.02f, HalfDepth * 0.02f, *Loc.ToString(), Receivers, Prims, *Mat->GetName());
+	}
+}
+
+void UAstraWarFX::AddWound(const FAstraBattleShip& S, const FAstraFxHit& H)
+{
+	if (!IsActive() || !S.Dmg.bModel)
+	{
+		return;
+	}
+	FShipFx& Fx = ShipOf(S.Id);
+	FWound W;
+	W.Lp = S.Att.UnrotateVector(H.Pos - S.Pos);
+	W.R = FMath::Clamp(3.f + 1.1f * FMath::Sqrt(FMath::Max(H.Felt, 1.f)), 4.f, 16.f) * ASTRA_FX_TUNE("wound_size", 1.f);
+	W.Seed = FMath::FRand();
+	if (Fx.Wounds.Num() >= 12)
+	{
+		Fx.Wounds.RemoveAt(0);
+	}
+	Fx.Wounds.Add(W);
+}
+
+void UAstraWarFX::DrawWounds(const FAstraBattleShip& S, FShipFx& Fx)
+{
+	// the glow of a place that was hit hard: white-orange while it is fresh, deep red as it cools, over about a minute; it rides on the hull (the ship's frame)
+	const float Cool = FMath::Max(ASTRA_FX_TUNE("wound_cool", 45.f), 1.f);
+	const float Peak = ASTRA_FX_TUNE("wound", 40.f) * Intensity;
+	for (int32 i = Fx.Wounds.Num() - 1; i >= 0; --i)
+	{
+		FWound& W = Fx.Wounds[i];
+		W.Heat -= Dt / Cool;
+		if (W.Heat <= 0.03f)
+		{
+			Fx.Wounds.RemoveAtSwap(i, EAllowShrinking::No);
+			continue;
+		}
+		FTransform* X;
+		if (float* D = Glows.Next(X))
+		{
+			const FVector P = F.ToWorld(S.Pos + S.Att.RotateVector(W.Lp));
+			const float Flick = 0.82f + 0.18f * FMath::Sin(Clock * 9.f + W.Seed * 40.f) * FMath::Sin(Clock * 5.3f + W.Seed * 17.f);
+			const FLinearColor Col = Mix(FLinearColor(1.f, 0.2f, 0.04f), FLinearColor(1.f, 0.6f, 0.26f), W.Heat);
+			const float R = W.R * GlowK;
+			*X = FTransform(FQuat::Identity, P, FVector(R * 2.f));
+			Fill(D, Col, Peak * W.Heat * W.Heat * Flick, 0.f, 0.f, 0.f, W.Seed, R * 2.f, 0.f);
+		}
+	}
 }
 
 void UAstraWarFX::TickScars()
@@ -399,6 +560,7 @@ void UAstraWarFX::HullEmitters(const FAstraBattleShip& S, FShipFx& Fx)
 		return;
 	}
 	const bool bNear = Dist2 < FMath::Square(60000.0);
+	DrawWounds(S, Fx);
 	const float SizeK = FMath::Clamp(S.Radius / 150.f, 0.5f, 3.2f);
 	const bool bAstra = S.Side == EAstraSide::Astra;
 	const float K = FMath::Clamp(Density, 0.2f, 2.f);

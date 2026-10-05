@@ -64,6 +64,7 @@ struct FAstraFxHit
 	FVector LocalOut = FVector::ForwardVector;// the outward direction of the struck point, ship frame
 	float SectorFrac = 1.f;                   // what is left of that shield sector (0..1) after the blow
 	bool bSectorFell = false;                 // this blow took the sector to nothing
+	bool bOnSkin = false;                    // Pos has been put on the hull's skin (SnapToHull); the simulation's is on the face of its box
 };
 
 /** A number the look of the effects hangs on: its default, or what `astra.war.tune fx_<name> <value>` set since (the war's own live tuning table: no build, no restart). */
@@ -74,7 +75,7 @@ namespace AstraFx
 	constexpr int32 Stride = 12;              // floats of per-instance custom data (colour 0-2, intensity 3, age 4, P1 5, P2 6, seed 7, width 8, length 9)
 
 	/** Capacity of each layer (instances) and of the particle lists: the budget of the effects. */
-	constexpr int32 CapDarts = 1500, CapTubes = 2000, CapGlows = 700, CapFires = 200, CapSmokes = 220, CapPlumes = 220, CapDebris = 140;
+	constexpr int32 CapDarts = 2000, CapTubes = 2000, CapGlows = 900, CapFires = 200, CapSmokes = 220, CapPlumes = 220, CapDebris = 140;
 	constexpr int32 CapPuffs = 900, CapSparks = 1800, CapBeams = 360, CapDebrisSim = CapDebris, CapPieces = 36, CapWakes = 160;
 	constexpr int32 MaxLights = 8;
 	constexpr float GlowK = 1.7f;             // a glow's soft falloff reaches ~0.6 of its sphere: spheres are drawn this much larger than the glow they stand for
@@ -228,6 +229,15 @@ namespace AstraFx
 		FVector Axes = FVector(100.f);          // the shell's semi-axes (m) as last set
 	};
 
+	/** A place where a hull has been hit hard: it glows there, on the hull, and cools. */
+	struct FWound
+	{
+		FVector Lp = FVector::ZeroVector;     // the ship's frame, m
+		float R = 6.f;                       // m: how far the glow reaches
+		float Heat = 1.f;                    // 1 fresh, 0 cold (it is gone at 0.03)
+		float Seed = 0.f;
+	};
+
 	/** The effects' state for one ship. */
 	struct FShipFx
 	{
@@ -242,6 +252,7 @@ namespace AstraFx
 		float BreakBlast = 0.f;                // secondary blasts while the hull is breaking
 		FShield Shield;
 		int32 Scars = 0;
+		TArray<FWound> Wounds;                 // where it has been hit hard (a dozen at most: the oldest goes)
 		const struct FShipTable* Table = nullptr;   // its drive bells and pieces (found once)
 		bool bTableKnown = false;
 		bool bDark = false;                    // its lights have been put out (disabled)
@@ -401,6 +412,7 @@ private:
 	UPROPERTY() TObjectPtr<UAstraBattleSubsystem> Owner;
 	UPROPERTY() TObjectPtr<AActor> Host;
 	UPROPERTY() TObjectPtr<AActor> TestCamera;                 // astra.fx.cam: a free camera for the tests (AstraWarFXTest.cpp)
+	int32 TestScarKind = -1;                                   // astra.fx.scar: the kind of mark to leave (-1: as the blow says)
 	UPROPERTY() TObjectPtr<UTextureRenderTarget2D> TestTarget;
 	UPROPERTY() TObjectPtr<UStaticMesh> SphereMesh;
 	UPROPERTY() TObjectPtr<UStaticMesh> BallMesh;          // a smoother sphere for the shields (if the project has it)
@@ -509,7 +521,13 @@ private:
 
 	// ---- hulls (AstraWarFXHull.cpp)
 	void AddScar(const FAstraBattleShip& S, const FAstraFxHit& Hit);
+	/** A hard blow leaves a glow on the hull where it fell (a decal is a dark patch: it cannot be seen from far, and the glow can). */
+	void AddWound(const FAstraBattleShip& S, const FAstraFxHit& Hit);
+	void DrawWounds(const FAstraBattleShip& S, AstraFx::FShipFx& Fx);
 	void HullEmitters(const FAstraBattleShip& S, AstraFx::FShipFx& Fx);
+	/** A point on the face of a ship's box (its frame, m) put on the hull's skin under it: the box is a plane and the hull is not (a cruiser's deck is forty metres below the top of its box). False
+	 *  when the ship has no skin table, the point is then as it was. */
+	bool SnapToHull(const FAstraBattleShip& S, int32 Facing, FVector& Local) const;
 	/** A section of a warship has just been gutted (it went to zero): the burst of its going. */
 	void GutBurst(const FAstraBattleShip& S, int32 Section);
 	void PowerDown(const FAstraBattleShip& S, AstraFx::FShipFx& Fx);

@@ -95,16 +95,18 @@ dal cannone al bersaglio.
 | `Source/ASTRA/AstraWarFXHull.cpp` | tabella per nave, punti sullo scafo, la bocca dei cannoni, i segni di danno, fuochi e sfiati, spegnimento, pezzi, scudi, motori |
 | `Source/ASTRA/AstraWarFXTest.cpp` | i comandi `astra.fx.*` (anche `series`, `cam`, `reset`: §12) |
 | `Source/ASTRA/AstraWarFXData.inl` | **generato**: campane dei motori, pezzi e facce di taglio per ogni nave (non si modifica a mano) |
+| `Source/ASTRA/AstraWarFXSurface.inl` | **generato** (VFX-2): la pelle di ogni scafo capitale vista dalle sei facce del suo box (§9bis): dove stanno davvero lampi, fuochi, braci e segni |
 | `tools/ue_scripts/make_war_fx.py` | i materiali e le texture nell'editor |
 | `tools/ue_scripts/war_fx_hlsl.py` | gli shader (testo semplice, uno per Custom node) |
 | `tools/art/war_fx_textures.py` | i flipbook del fuoco e del fumo (`art/_cache/fx`, non in git) e le anteprime |
-| `tools/art/war_fx_nozzles.py`, `war_fx_data.py` | le campane dei motori (Blender, dai generatori delle navi: `data/war/fx_nozzles.json`) e la tabella C++ |
+| `tools/art/war_fx_nozzles.py`, `war_fx_hull_surface.py`, `war_fx_data.py` | le campane dei motori (`data/war/fx_nozzles.json`) e la pelle degli scafi (`data/war/fx_hull_surface.json`), tutte e due da Blender con i generatori delle navi; `war_fx_data.py` scrive le due tabelle C++ |
 | `tools/art/war_fx_shader_preview.py`, `war_fx_hlsl_check.py` + `dxc_check.cpp`, `war_fx_script_check.py` | le prove offline del §2 |
 | `tools/art/war_fx_view_angles.py` | dardo, fascio e scia visti da 90° a 0° (vecchio contro nuovo): la prova del §2bis |
 | `docs/progressi/vfx/vfx2_*.png` | le catture dal gioco di prova di VFX-2 (salve, missili, battaglia, reattore, rottura) |
 
-La tabella per nave si rigenera solo quando cambia uno scafo: `blender -b --factory-startup -P tools/art/war_fx_nozzles.py`
-e poi `python3 tools/art/war_fx_data.py` (il manifesto delle sezioni `art/export/ships_v3/manifest.json` non è in git).
+Le tabelle per nave si rigenerano solo quando cambia uno scafo (i generatori `art/blender/ship3_*.py`): `blender -b --factory-startup --python-exit-code 1 -P tools/art/war_fx_nozzles.py`
+(le campane), `blender -b --factory-startup --python-exit-code 1 -P tools/art/war_fx_hull_surface.py` (la pelle: un minuto per tutte le navi, nessuna esportazione) e poi `python3 tools/art/war_fx_data.py` (il manifesto delle sezioni
+`art/export/ships_v3/manifest.json` non è nel repository: si passa con `--manifest` dal checkout principale), poi si ricompila. Non c'è nulla da reimportare nell'editor: sono tabelle compilate nel gioco.
 
 ## 4. I livelli, i materiali, i dati per istanza
 
@@ -114,8 +116,8 @@ e poi `python3 tools/art/war_fx_data.py` (il manifesto delle sezioni `art/export
 | `Fires` | sfera | `M_WAR_Fire` (additivo) | 200 | 0 | palle di fuoco (flipbook `T_WAR_Fire`) |
 | `Plumes` | cilindro | `M_WAR_Plume` | 220 | 1 | pennacchi dei motori |
 | `Tubes` | cilindro | `M_WAR_Tube` | 2000 | 2 | fasci laser, traccianti, **scie delle schegge, fiamma e fumo dei missili, scarico dei caccia** |
-| `Darts` | cilindro (fuso) | `M_WAR_Dart` | 1500 | 3 | colpi di rotaia, scintille, perle delle scie dei missili |
-| `Glows` | sfera | `M_WAR_Glow` | 700 | 4 | lampi, riverberi, punti caldi, bagliore dei motori, bordo delle onde d'urto |
+| `Darts` | cilindro (fuso) | `M_WAR_Dart` | 2000 | 3 | colpi di rotaia, scintille, perle delle scie dei missili |
+| `Glows` | sfera | `M_WAR_Glow` | 900 | 4 | lampi, riverberi, punti caldi, bagliore dei motori, bordo delle onde d'urto |
 | `DebrisL` | cubo | `M_WAR_Debris` (opaco, illuminato) | 140 | 0 | frammenti di scafo |
 
 Più: `M_WAR_Shield` (il guscio, un attore per nave), `M_WAR_DamageDecal` e le otto `MI_WAR_Damage_<Burn|Hole|Torn|Impact|Strafe|Melt|Gouge|Blast>`
@@ -126,7 +128,7 @@ Più: `M_WAR_Shield` (il guscio, un attore per nave), `M_WAR_DamageDecal` e le o
 scia / 3 scintilla; tubo `Style` 1 fascio / 2 scia di perle (P2: l'età alla testa) / 4 tracciante / **5 scia luminosa** (P2: il decadimento, e^-P2 alla coda contro 1 alla testa); bagliore `Kind` 0 palla / 1 lampo con strisce / 2 riverbero / 3 bordo di
 onda d'urto; pennacchio: 0 ASTRA, 1 Mandate (P1) e il balbettio del motore malato (P2).
 
-Esposizione: fissa nello spazio, EV100 6,6 (STILE §8): un emissivo di ~116 legge come bianco. Intensità usate: colpo 700, scia 190, fascio 520,
+Esposizione: fissa nello spazio, EV100 6,6 (STILE §8): un emissivo di ~116 legge come bianco. Intensità usate: colpo 700, scia 190, fascio laser 240 (`astra.war.tune fx_laser`: a 520 tutta la larghezza era sopra il bianco, il fascio nei colori della parte non si vedeva),
 cannone 420, difesa di punto 360, **fuoco 85** (era 190: sommati, i fuochi di una nave che salta facevano uno schermo di 5000), bagliori 110–460, pennacchio 70,
 fumo 45 (colore 0,42/0,40/0,38), guscio dello scudo 48 × `Gain` (l'intensità). Con l'esposizione dei mondi (EV 8,3, quasi due stop più scura) gli effetti leggono più deboli, nello schermo principale (EV 5,6, un diaframma più
 aperto) più forti: si regola con `astra.fx.intensity`.
@@ -189,7 +191,9 @@ reattore dell'Aquila: cambiano raggio e potenza):
 
 Tutte le intensità e le durate di una esplosione si cambiano **a gioco acceso** con `astra.war.tune fx_<nome> <valore>` (la tabella di taratura della guerra, senza compilare):
 `fx_blast` (1: tutto insieme), `fx_flash` (420), `fx_fire` (85), `fx_halo` (12), `fx_smoke` (45), `fx_wave` (90), `fx_light` (4000: candele per R²), `fx_reactor_flash` (380),
-`fx_reactor_light` (4e9), `fx_cut_flash` (520: il lampo al taglio di una rottura), `fx_break_light` (1e9). I valori scritti qui sono quelli di serie.
+`fx_reactor_light` (4e9), `fx_cut_flash` (520: il lampo al taglio di una rottura), `fx_break_light` (1e9), `fx_laser` (240: il fascio laser, vale per i fasci nuovi), `fx_far` (1: la crescita con la distanza delle morti lontane), `fx_wound`, `fx_wound_size`, `fx_wound_cool` (la brace-ferita, §9). I valori scritti qui sono quelli di serie.
+
+**Le morti lontane crescono con la distanza** (VFX-2, dopo la prova del lead: da 23–37 km lo schermo principale mostrava poco): a una nave che muore oltre i 10 km il raggio di tutto lo scoppio (palla di fuoco, lampo, onda, scoppi minori) si moltiplica per `1 + clamp((km − 10) / 15, 0, 1,5)`: uguale fino a 10 km, doppio a 25, due e mezzo da 32 km in su (una misura da artista, non da fisico). `astra.war.tune fx_far 0` la toglie. `GetBlasts` dà il raggio già moltiplicato, quindi la regia che lo usa inquadra quello che si vede davvero.
 
 **La sezione che va a zero** (`GutBurst`, quando `GuttedT` diventa 0): lo scoppio del suo cuore, il rivestimento che salta: un lampo, una palla di fuoco, un anello sullo scafo, dieci lastre di rivestimento e una pioggia di scintille, una luce. Poi brucia e sfiata (sotto).
 
@@ -230,6 +234,14 @@ sullo scafo supera 90, `Blast`); rotaie → strappo, impatto, solco (`Torn` oltr
 (`Heat` 1) che si spegne in meno di un minuto. **Tetti**: 8 + 4 × classe per nave (il più vecchio di quello scafo se ne va), 150 in
 tutto, al massimo 3 per frame, e solo per i colpi che hanno passato scudo e corazza (`Felt > 8`).
 
+**La brace-ferita** (VFX-2): un decal è una chiazza scura, e a 20 km nessuno la vede. Ogni colpo che lascia il segno (`Felt > 8`) lascia anche **un bagliore sullo scafo, nel punto colpito, nel riferimento della nave** (segue la nave se ruota): un livello dei bagliori, bianco-arancio quando è fresco e rosso scuro quando si raffredda, in circa 45 s, fino a dodici per scafo (il più vecchio cede). È un primitivo dell'attore degli effetti, quindi lo schermo principale lo disegna come ogni altro bagliore. Manopole: `astra.war.tune fx_wound` (intensità, 40), `fx_wound_size` (1), `fx_wound_cool` (45 s).
+
+## 9bis. I colpi stanno sullo scafo, non sul piano del box (VFX-2)
+
+La simulazione conosce una nave come un box (docs/GUERRA.md): un colpo cade su una delle sue sei facce, un fuoco nasce su una sua superficie. La mesh non è il box: l'Acheron è alto 149 m con la torre, il box ha la stessa altezza ma è centrato a zero mentre lo scafo va da −57 a +92 m, e il ponte sta quaranta metri sotto il piano alto del box. Fino a VFX-2 lampi, fuochi, braci e decal stavano sul piano del box, quindi **galleggiavano sopra la nave** (visto il 5/10 nel feed dello schermo principale: esplosioni e fuochi dei colpi sospesi sopra l'Acheron). Ora `tools/art/war_fx_hull_surface.py` costruisce ogni nave con i generatori (Blender, quasi senza dettaglio sparso) e, dai vertici dello scafo, registra per ognuna delle sei facce una griglia grossolana di dove sta la pelle (48×16 celle: alto e basso su (x, y) → z, destra e sinistra su (x, z) → y, prua e poppa su (y, z) → x; ogni cella tiene un percentile alto dei suoi vertici, così un'antenna non fa una cella alta quanto l'antenna). `AstraWarFXSurface.inl` la porta nel gioco e `SnapToHull` ci appoggia i punti: il range del box su ogni asse è steso sul range della mesh (il box è centrato, la mesh no) e la coordinata lungo la normale della faccia diventa quella della pelle, più 0,4 m.
+
+Dove si usa: **`OnHit`** (il lampo, le scintille, l'esplosione, la brace-ferita e il decal di un colpo vanno dove sta la pelle; l'increspatura dello scudo resta dov'è, perché lo scudo è un guscio intorno al box), **`HullPoint`** quando il punto è di superficie (fuochi, sfiati, `GutBurst`), **`AddScar`** (un decal già sulla pelle non deve più "cercare" lo scafo: 40 m di profondità invece di fino a 240). Non toccati: la bocca dei cannoni (`MuzzleOf`, viene dagli affusti), la fine dei fasci laser sul bersaglio, i fuochi dei piani interni delle navi con un interno (`FleetFxPoint`), i punti interni al box (`bSurface` falso: scoppi dentro lo scafo). I fuochi di uno scafo si staccano e salgono (dorso) o scendono (chiglia) di qualche decina di metri nei loro secondi di vita: è il fuoco che esce, non un difetto.
+
 ## 10. I motori e le luci
 
 - **Motori**: ogni campana (posizioni dalla tabella generata) ha un pennacchio (tubo di lunghezza `R × (5 + 25 × spinta)`, larghezza
@@ -243,7 +255,7 @@ tutto, al massimo 3 per frame, e solo per i colpi che hanno passato scudo e cora
 ## 11. Il budget
 
 I tetti stanno in `AstraWarFX.h` (`namespace AstraFx`) e sono pensati per il MacBook Air (senza ventola):
-istanze 1500 dardi, 1200 tubi, 700 bagliori, 200 fuochi, 220 fumi, 220 pennacchi, 140 detriti; liste di particelle: 900 nuvole, 1800
+istanze 2000 dardi, 2000 tubi, 900 bagliori, 200 fuochi, 220 fumi, 220 pennacchi, 140 detriti; liste di particelle: 900 nuvole, 1800
 scintille, 360 fasci, 140 detriti simulati (quando sono pieni il più vecchio cede il posto); 36 pezzi; 8 luci. **Chi lancia particelle chiede posto** (`Room(livello)`,
 `RoomSparks()`): più il livello è pieno, meno ne lancia (le scintille scendono fino al 12%, i fuochi fino al 40%): la più grande
 esplosione di una battaglia non spinge fuori le scintille del resto e un fuoco lungo non riempie il cielo di fumo. Un livello che si riempie
@@ -267,20 +279,23 @@ Girano il vero codice della guerra (`ApplyHit`, `FireRail`, `Destroy`...): ciò 
 | `astra.fx.hit <rail\|laser\|missile\|torpedo\|cannon> [danno 40] [faccia] [su T]` | un colpo che passa lo scudo: lampo, scintille, esplosione, macchia sullo scafo |
 | `astra.fx.burn [su T]` | fuochi e sfiati in ogni sezione, una sventrata (e le sue esplosioni secondarie) |
 | `astra.fx.break <bow\|mid\|stern\|reactor\|disable> [su T]` | la fine della nave, come la guerra la chiude |
+| `astra.fx.scar [su T] [tipo 0-7] [faccia dorsal] [felt 60]` | **un segno di battaglia, da solo** (senza colpo): al centro di quella faccia dello scafo, del tipo dato (0 bruciatura, 1 squarcio, 2 strappo, 3 impatto, 4 raffica, 5 fusione, 6 solco, 7 esplosione). Serve a vedere se i decal ci sono e dove; il log dice dei primi dodici dove nascono, quanto sono larghi e profondi e quanti componenti dello scafo li ricevono |
 | `astra.fx.clear` | le navi della scena spariscono (senza esplosione) |
 | `astra.fx.reset` | tutto ciò che gli effetti tengono sparisce: i pezzi dell'ultima rottura, le particelle, le macchie, i gusci (un cielo pulito per la prova dopo; senza, i relitti dell'ultima rottura restano e lo schermo principale li inquadra al posto del bersaglio nuovo, che ha lo stesso id) |
 | `astra.fx.stats` | cosa c'è e cosa costa (istanze ora/picco per livello, scartati, particelle, scie, pezzi, macchie, luci, ms/frame **senza il tempo delle catture di prova**) |
 | `astra.fx.series <prefisso> [n 8] [ogni_s 0,25] [vs] [cam] [do <comando>]` | **n immagini della vista del gioco** (senza interfaccia) a intervalli dell'orologio degli effetti, dal fotogramma del comando; dopo `do` il comando da provare (`astra.fx.series b 30 0.1 cam do fire rail 3 aquila T`: una salva a passi). `vs` aggiunge il feed dello schermo principale (`<prefisso>_NN_vs.png`), `cam` la camera libera (`_NN_cam.png`). Una prova che prima era un colpo di screenshot a caso. |
-| `astra.fx.cam <x> <y> <z> <yaw> <pitch> [fov 60]` \| `broadside [T]` \| `off` | una **camera libera di prova**: una SceneCapture che vede tutto ciò che vedrebbe la plancia (stesso EV 6,6), da dove la metti (metri nel riferimento del ponte: x avanti, y a dritta, z su; il centro dello scafo dell'Aquila è 172 m a poppa e 62 m sotto il ponte). `broadside` è la ripresa «ASN AQUILA · FIRING ON ...» dello schermo principale (320 m dietro il suo centro, 210 di lato, 100 su, lungo la linea di tiro, 46°) **senza passare dalla regia**: si prova il fuoco senza aspettare che il regista tagli. |
+| `astra.fx.cam <x> <y> <z> <yaw> <pitch> [fov 60]` \| `broadside [T]` \| `look <T> <distanza_m> <azimut> <elevazione> [fov 50]` \| `off` | una **camera libera di prova**: una SceneCapture che vede tutto ciò che vedrebbe la plancia (stesso EV 6,6), da dove la metti (metri nel riferimento del ponte: x avanti, y a dritta, z su; il centro dello scafo dell'Aquila è 172 m a poppa e 62 m sotto il ponte). **Una posa fissa vale solo con l'Aquila ferma** (`astra.cmd station {'station':'helm','aspect':'course','mode':'course','params':{'speed_pct':0}}`: il riferimento del ponte gira e si muove con lei, mentre la scena resta dov'è); `look` invece segue la nave qualunque cosa faccia l'Aquila: sta a quella distanza dalla nave, all'azimut dato (0 dalla parte dell'Aquila, 90 alla sua destra, in gradi) e all'elevazione data (89: la guarda dall'alto), e la inquadra al centro. `broadside` è la ripresa «ASN AQUILA · FIRING ON ...» dello schermo principale (320 m dietro il suo centro, 210 di lato, 100 su, lungo la linea di tiro, 46°) **senza passare dalla regia**: si prova il fuoco senza aspettare che il regista tagli. |
 
 Cvar: `astra.fx.enable` (0 spegne tutto: si torna al vecchio disegno, da cambiare prima della battaglia), `astra.fx.intensity` (0,1–6, la
 luminosità di tutto), `astra.fx.density` (0,2–2: quante particelle), `astra.fx.lights` (0 niente luci), `astra.fx.sim` (1: la
 simulazione degli effetti gira anche dove non si disegna, cioè sul banco), `astra.fx.log N` (i contatori nel log ogni N secondi), **`astra.fx.wake`** (0–3: la luminosità delle righe
 che scie e caccia disegnano; 0 le toglie) e **`astra.fx.muzzle`** (0,2–3: la misura del lampo alla bocca). Le intensità delle esplosioni: `astra.war.tune fx_*` (§7).
 
+**Gli argomenti dei comandi `astra.fx.*` sono posizionali** (`astra.fx.hit rail 60 port T`, `astra.fx.fire rail 3 aquila T`): le parole `on`, `from` e `at` delle righe di aiuto sono solo per chi legge e il banco le ignora (prima no: `astra.fx.hit rail 60 port on T` prendeva «on» per il nome della nave, non trovava nessuna nave e non faceva nulla, e si concludeva che gli effetti sullo scafo non si vedevano).
+
 **Le prove di VFX-2 si fanno così** (nessun editor, il gioco di prova del worktree: `ASTRA_HARNESS_PORT=8771 tools/play.py launch --nomind --res 1280x720`): `astra.fx.scene 25 0`,
 `astra.fx.cam broadside T`, `astra.cmd fire_weapons {'weapon':'railguns','contact_id':'FX-T','salvo':3}`, `astra.fx.series bc 60 0.15 cam`; per un'esplosione `astra.fx.reset`, `astra.fx.scene 5 0`,
-`astra.fx.cam 1500 800 100 -12.9 1.2 35` e `astra.fx.series rc 30 0.12 cam do break reactor T`.
+`astra.fx.cam look T 3600 -13 2 35` (o la posa fissa `astra.fx.cam 1500 800 100 -12.9 1.2 35`, che vale solo con l'Aquila ferma) e `astra.fx.series rc 30 0.12 cam do break reactor T`.
 
 ## 13. Misure (banco senza grafica, MacBook Air M4)
 
@@ -291,9 +306,12 @@ Sono i costi CPU della *simulazione e dello staging* degli effetti (il banco non
 |---|---|---|---|
 | apertura (Aurelia, 120 s: 9 navi, 14 caccia) | 0,01–0,02 ms | 0,035 ms | tutti sotto un decimo dei tetti |
 | `scale_30x150` (300 s: 30 navi, 148 caccia, 5+2 reattori, 2 rotture, 66 colpi) | 0,02–0,055 ms (max 0,2–0,6 ms nei frame delle esplosioni) | 0,11–0,31 ms | dardi 1247/1500, bagliori 405/700, fuochi 149/200, fumi 200/220, pennacchi 86/220, detriti al tetto (140); nessuno scarto |
+| **dopo VFX-2** `scale_30x150` (300 s, 101 colpi in volo al picco; scie, fumo lungo, strisce dei caccia) | 0,117 ms (max 5,3, una volta sola, nei primi 30 s) | 1,08 ms (con la simulazione di BATTAGLIA-3) | dardi 1330/1500, **tubi 673/2000**, bagliori 412/700, fuochi 141/200, fumi 186/220, pennacchi 86/220; nessuno scarto |
+| **dopo VFX-2** `scale_60x300` (300 s: 60 navi, 296 velivoli, 269 colpi in volo al picco) | 0,446 ms (max 7,6) | 5,6 ms | dardi **1500/1500** (25 000 scartati), tubi 1443/2000, bagliori **700/700** (130 000 scartati), fuochi 165/200, fumi 205/220, pennacchi 172/220 |
 
-(Le due righe del tick variano da una prova all'altra con il carico della macchina: il lead usa il gioco mentre il banco gira.) I
-livelli restano dentro i tetti anche nella battaglia più grande; il tetto dei detriti è raggiunto e funziona come deve (il chunk più vecchio
+(Le righe del tick variano da una prova all'altra con il carico della macchina: il lead usa il gioco mentre il banco gira. Le due righe di VFX-2 sono state girate **in secondo piano sui core piccoli** del M4 — `taskpolicy -b`, perché il lead giocava —: i tempi sono un
+massimo, non il costo su un core grande.) I livelli restano dentro i tetti nella battaglia che il gioco fa davvero (30 navi, 148 caccia); nella doppia (60 e 296) dardi e bagliori toccano il tetto e **scartano**, senza danni: i bagliori dei motori dei velivoli si disegnano per ultimi (`DrawDrives`
+dopo `DrawPuffs`), quindi a soffrire sono loro e non i lampi delle esplosioni; i tubi (scie, fumo lungo) restano a 1443 su 2000. Il tetto dei detriti è raggiunto e funziona come deve (il chunk più vecchio
 cede il posto a uno nuovo). **Il costo della GPU non è ancora misurato in modo pulito: vedi §19**; il gate di [ricerca/11](ricerca/11-efficienza-grafica.md) resta il riferimento.
 
 **La misura che si fa offline: la dimensione degli shader.** `tools/art/war_fx_hlsl_check.py` compila ogni nodo Custom con il DXC del motore (con gli ingressi in un buffer di costanti, perché il compilatore
@@ -326,13 +344,16 @@ Nessuno cambia la simulazione: se `astra.fx.enable 0` o mancano i materiali (`M_
 3. Nell'editor, **senza PIE**: `tools/ue.py pyfile tools/ue_scripts/make_war_fx.py` — importa le texture e fa i materiali `M_WAR_*`,
    `M_WAR_DamageDecal` e le otto `MI_WAR_Damage_*`. Ogni materiale ha il suo try/except: il log finale dice quali sono fatti e quali no, e uno
    che fallisce non ferma gli altri. Il gioco tace e ripiega sul disegno vecchio finché ne manca uno dei sette essenziali (dardo, tubo,
-   bagliore, fuoco, fumo, pennacchio, scudo); i detriti e i decal hanno il loro ripiego.
+   bagliore, fuoco, fumo, pennacchio, scudo); i detriti e i decal hanno il loro ripiego. **Si rilancia a ogni unione che cambia `war_fx_hlsl.py` o `make_war_fx.py`**
+   (VFX-2 ha cambiato DART, TUBE e GLOW: cilindri e tubi con la luce normalizzata, §2bis): i materiali nascono dallo script e i `.uasset` rigenerati non si uniscono (sono binari).
 4. Avviare il gioco, in una battaglia o fuori: `astra.fx.swatch`, poi `astra.fx.scene 6 0` e i comandi del §12.
 5. Guardare, nell'ordine: **(a)** il log all'avvio (`[WarFX] effects ready ...`; se dice "materials missing" lo script non è passato);
    **(b)** `astra.fx.swatch`: ogni elemento deve leggersi (se il materiale è nero o bianco: l'intensità, vedi §16; se è un quadrato: lo
    shader del disco non compila, vedi il log degli shader); **(c)** la stessa fila nello schermo principale con zoom ×40–×80 (puntandolo al
    punto davanti alla prua): niente lastre, niente rettangoli, i bagliori restano tondi; **(d)** `astra.fx.shield bow 40` su `FX-T`, vista dalla
-   plancia e dal posto di Ops; **(e)** `astra.fx.break mid`, `reactor`, `disable`.
+   plancia e dal posto di Ops; **(e)** `astra.fx.break mid`, `reactor`, `disable`; **(f)** il fuoco dalla ripresa «FIRING ON ...»: `astra.fx.scene 25 0`,
+   `astra.fx.cam broadside T`, `astra.cmd fire_weapons {"weapon":"railguns","contact_id":"FX-T","salvo":3}` (il fuoco dell'Aquila ha bisogno del suo budget di tiro: se lo stato dice «rails 0»
+   non parte), `astra.fx.series bc 60 0.15 cam` (§12).
 
 ## 16. Come tarare (cosa girare e dove)
 
@@ -410,5 +431,6 @@ del modulo dal 1/10; in VFX-2 è nuovo lo scoppio della sezione sventrata. Le ma
 **Come vederlo.** `astra.fx.scene 25 0` + `astra.fx.cam broadside T` + `astra.cmd fire_weapons {"weapon":"railguns","contact_id":"FX-T","salvo":3}` + `astra.fx.series bc 60 0.15 cam`: la salva dell'Aquila vista dal Broadside;
 `astra.fx.reset`, `astra.fx.scene 5 0`, `astra.fx.cam 1500 800 100 -12.9 1.2 35`, `astra.fx.series rc 30 0.12 cam do break reactor T`: il reattore a 3,6 km.
 
-**Costo.** Il banco (CPU, senza grafica) dà 0,02–0,055 ms/frame per gli effetti nella battaglia più grande (30 navi e 148 caccia, §13: misure di prima delle scie; con le scie e il fumo lungo il tetto dei tubi è salito a 2000 e il picco si legge con `astra.fx.stats`); in gioco `astra.fx.stats` conta ora le scie (`wakes`) insieme a tubi, pezzi, macchie e luci e **non include il tempo delle
-catture di prova**. La misura pulita della GPU (milisecondi con un'esplosione che riempie lo schermo) è la prova che manca (§17): il gioco di prova ha girato carico (4 commandlet più il gioco del lead) e i suoi fps non sono il gate del MacBook Air.
+**Costo.** Il banco (CPU, senza grafica, §13) dopo le scie, il fumo lungo e le strisce dei caccia: 0,117 ms/frame per gli effetti in una battaglia di 30 navi e 148 caccia (sui core piccoli del M4, un massimo), tubi al picco 673 su 2000, nessuno scarto; nella battaglia doppia (60 navi, 296 velivoli) 0,446 ms, tubi 1443 su 2000, e dardi e bagliori toccano il tetto e scartano (prima i bagliori dei motori dei velivoli, mai i lampi).
+
+**Costo in gioco, `fleet_battle` (5/10, il gioco di prova a 1280×720, dalla plancia, niente catture): le scie non costano.** `astra.war.scenario fleet_battle aquila hold`, da 25 a 260 s di battaglia, con 78–132 colpi e missili in volo; `astra.fx.wake 1` contro `0` alternati nella stessa battaglia (quattro finestre da 6 s, 28 campioni l'una): GPU mediana 13,3 / 13,5 / 12,7 / 13,0 ms, game thread 15,5 / 14,9 / 17,2 / 16,1 ms, 50–51 fps: nessuna differenza misurabile (la risoluzione dinamica del gioco di prova stava al 34–43 % senza andamento tra acceso e spento). Gli effetti in CPU: 0,46 ms/frame in media su 20 000 frame di battaglia; i tubi arrivano a 907 su 2000. **Nella fleet_battle dardi (1500) e bagliori (700) toccano il tetto** (12 000 e 4 000 istanze scartate in tutta la corsa): cadono per primi i bagliori dei motori dei velivoli, mai i lampi; i tetti sono stati alzati (dardi 2000, bagliori 900). La GPU di un'esplosione che riempie lo schermo resta la prova che manca (§17); gli shader sono di poche centinaia di istruzioni per pixel (§13), quindi il costo vero è la sovrapposizione.

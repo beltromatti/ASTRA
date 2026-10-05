@@ -21,6 +21,11 @@
 //                                                   centred 172 m aft of and 62 m below the bridge); astra.fx.cam broadside [T] is the main viewscreen's «ASN AQUILA · FIRING
 //                                                   ON ...» camera (320 m behind her centre, 210 m aside, 100 m up, looking down the line of fire to the target, 46 degrees);
 //                                                   astra.fx.cam off. Its pictures come with astra.fx.series ... cam
+//   astra.fx.cam look <T|A|S|aquila> <range_m> <azimuth_deg> <elevation_deg> [fov 50]   a camera that keeps a ship in the middle of its picture whatever the Aquila does: range
+//                                                   off the ship; azimuth 0 on the Aquila's side of it, 90 to the right of the line between them; elevation up from the level
+//                                                   (89: looking straight down on it). (The poses above are fixed in the bridge's frame: they mean something only while the Aquila is held.)
+//   astra.fx.scar [on T|A|S|aquila] [kind 0-7] [facing dorsal] [felt 60]   one mark of battle damage at the middle of that face, of that kind (burn, hole, torn, impact,
+//                                                   strafe, melt, gouge, blast), with no blow to go with it: whether the decals are there, and where
 
 #include "AstraWarFX.h"
 #include "AstraBattleSubsystem.h"
@@ -51,7 +56,8 @@ struct FAstraWarFXTest
 	static float SeriesGap, SeriesNext;
 	static FString SeriesPrefix;
 	static bool bSeriesVs, bSeriesCam;
-	static bool bCamOn, bCamBroadside;     // astra.fx.cam: the free camera is kept at its pose (a fixed one, or the Aquila's broadside)
+	static bool bCamOn, bCamBroadside, bCamLook;     // astra.fx.cam: the free camera is kept at its pose (a fixed one, the Aquila's broadside, or round a ship)
+	static float CamLookRange, CamLookAz, CamLookEl;  // (look: metres off the ship, degrees round it from the Aquila's side, degrees up)
 	static FVector CamPos, BroadSide;      // bridge frame, cm
 	static float CamYaw, CamPitch, CamFov;
 	static int32 CamW, CamH;
@@ -354,10 +360,21 @@ struct FAstraWarFXTest
 			CamW = 1280;
 			CamH = 720;
 			BroadSide = FVector::ZeroVector;
+			bCamLook = false;
 			if (A0 == TEXT("broadside"))
 			{
 				bCamBroadside = true;
 				CamTarget = Arg(1, TEXT("T"));
+			}
+			else if (A0 == TEXT("look"))
+			{
+				bCamBroadside = false;
+				bCamLook = true;
+				CamTarget = Arg(1, TEXT("T"));
+				CamLookRange = FMath::Max(FCString::Atof(*Arg(2, TEXT("1000"))), 20.f);
+				CamLookAz = FCString::Atof(*Arg(3, TEXT("0")));
+				CamLookEl = FCString::Atof(*Arg(4, TEXT("0")));
+				CamFov = FCString::Atof(*Arg(5, TEXT("50")));
 			}
 			else
 			{
@@ -400,6 +417,36 @@ struct FAstraWarFXTest
 					break;
 				}
 			}
+		}
+		else if (Name == TEXT("scar"))
+		{
+			FAstraBattleShip* To = Pick(Fx, Arg(0, TEXT("T")));
+			if (!To)
+			{
+				UE_LOG(LogASTRA, Warning, TEXT("[WarFX] no scene: astra.fx.scene first"));
+				return;
+			}
+			const int32 Facing = FacingOf(Arg(2, TEXT("dorsal")));
+			FVector Lp = AstraWar::FacingVector(Facing);
+			if (To->Box.Valid())
+			{
+				Lp = FVector(Lp.X * To->Box.Hx, Lp.Y * To->Box.Hy, Lp.Z * To->Box.Hz);
+				Lp.X += To->Box.Mid;
+			}
+			else
+			{
+				Lp *= To->Radius;
+			}
+			FAstraFxHit H;
+			H.Pos = To->Pos + To->Att.RotateVector(Lp);
+			H.Dir = -To->Att.RotateVector(AstraWar::FacingVector(Facing));
+			H.Kind = EAstraHitKind::Rail;
+			H.Facing = Facing;
+			H.LocalOut = AstraWar::FacingVector(Facing);
+			H.Felt = FCString::Atof(*Arg(3, TEXT("60")));
+			Fx.TestScarKind = FMath::Clamp(FCString::Atoi(*Arg(1, TEXT("0"))), 0, 7);
+			Fx.AddScar(*To, H);
+			Fx.TestScarKind = -1;
 		}
 		else if (Name == TEXT("burn"))
 		{
@@ -630,7 +677,28 @@ struct FAstraWarFXTest
 		FVector Pos = CamPos;
 		FRotator Rot(CamPitch, CamYaw, 0.f);
 		float Fov = CamFov;
-		if (bCamBroadside)
+		if (bCamLook)
+		{
+			// round the ship, in the bridge's frame (the world's): the Aquila's side of it at azimuth 0, her right at 90
+			const FVector Hull(-17200.0, 0.0, -6200.0);
+			if (const FAstraBattleShip* T = Pick(Fx, CamTarget))
+			{
+				const FVector TgtW = Fx.F.ToWorld(T->Pos);
+				FVector Dir = TgtW - Hull;
+				Dir.Z = 0.0;
+				Dir = Dir.GetSafeNormal();
+				if (Dir.IsNearlyZero())
+				{
+					Dir = FVector::ForwardVector;
+				}
+				const FVector Right = FVector::CrossProduct(FVector::UpVector, Dir).GetSafeNormal();
+				const double Az = FMath::DegreesToRadians((double)CamLookAz), El = FMath::DegreesToRadians((double)CamLookEl);
+				const FVector Off = (-Dir * FMath::Cos(Az) + Right * FMath::Sin(Az)) * FMath::Cos(El) + FVector::UpVector * FMath::Sin(El);
+				Pos = TgtW + Off * (double)CamLookRange * 100.0;
+				Rot = (TgtW - Pos).GetSafeNormal().Rotation();
+			}
+		}
+		else if (bCamBroadside)
 		{
 			const FVector Hull(-17200.0, 0.0, -6200.0);                   // her centre in the bridge's frame (cm)
 			const FAstraBattleShip* T = Pick(Fx, CamTarget);
@@ -733,6 +801,8 @@ struct FAstraWarFXTest
 			}
 			const FString Name = Parts[0];
 			Parts.RemoveAt(0);
+			// the help reads "[on T]", "[from S] [at T]": the little words are for the reader (the arguments are positional)
+			Parts.RemoveAll([](const FString& W) { return W.Equals(TEXT("on"), ESearchCase::IgnoreCase) || W.Equals(TEXT("from"), ESearchCase::IgnoreCase) || W.Equals(TEXT("at"), ESearchCase::IgnoreCase); });
 			Run(Fx, Name, Parts);
 		}
 	}
@@ -752,6 +822,10 @@ bool FAstraWarFXTest::bSeriesVs = false;
 bool FAstraWarFXTest::bSeriesCam = false;
 bool FAstraWarFXTest::bCamOn = false;
 bool FAstraWarFXTest::bCamBroadside = false;
+bool FAstraWarFXTest::bCamLook = false;
+float FAstraWarFXTest::CamLookRange = 1000.f;
+float FAstraWarFXTest::CamLookAz = 0.f;
+float FAstraWarFXTest::CamLookEl = 0.f;
 FVector FAstraWarFXTest::CamPos = FVector::ZeroVector;
 FVector FAstraWarFXTest::BroadSide = FVector::ZeroVector;
 float FAstraWarFXTest::CamYaw = 0.f;
@@ -785,9 +859,10 @@ ASTRA_FX_COMMAND(reset, "Everything the effects hold goes: the pieces of a broke
 ASTRA_FX_COMMAND(fire, "Fire a weapon in the test scene: astra.fx.fire <rail|laser|missile|torpedo|pd|cannon|all> [n 1] [from S|A|T|aquila] [at T|A|S|aquila]");
 ASTRA_FX_COMMAND(shield, "Hit a shield sector in the test scene: astra.fx.shield [bow|stern|port|starboard|dorsal|ventral] [n 4] [on T|A|S|aquila] (enough hits and it falls)");
 ASTRA_FX_COMMAND(hit, "One blow that gets through, in the test scene: astra.fx.hit <rail|laser|missile|torpedo|cannon> [damage 40] [facing bow] [on T|A|S|aquila]");
+ASTRA_FX_COMMAND(scar, "One mark of battle damage at the middle of a hull's face, with no blow: astra.fx.scar [on T|A|S|aquila] [kind 0-7 (burn, hole, torn, impact, strafe, melt, gouge, blast)] [facing dorsal] [felt 60]");
 ASTRA_FX_COMMAND(burn, "Fires and venting in every section of a test ship: astra.fx.burn [on T|A|S]");
 ASTRA_FX_COMMAND(break, "End a test ship: astra.fx.break <bow|mid|stern|reactor|disable> [on T|A|S]");
 ASTRA_FX_COMMAND(swatch, "A lineup of every kind of effect 1.2 km ahead of the bridge, in both sides' colours (the material check): astra.fx.swatch [seconds 40]; 0 puts it away");
 ASTRA_FX_COMMAND(stats, "What the war's effects hold and what they cost");
 ASTRA_FX_COMMAND(series, "Pictures of the game's view in steps: astra.fx.series <prefix> [n 8] [every_s 0.25] [vs] [cam] [do <astra.fx command>] (Saved/Play/<prefix>_NN.png; vs: the main viewscreen's feed too; cam: the free camera's)");
-ASTRA_FX_COMMAND(cam, "A free camera for the tests: astra.fx.cam <x> <y> <z> <yaw> <pitch> [fov 60] (metres in the bridge's frame) | broadside [T] (the Aquila-firing shot of the main viewscreen) | off");
+ASTRA_FX_COMMAND(cam, "A free camera for the tests: astra.fx.cam <x> <y> <z> <yaw> <pitch> [fov 60] (metres in the bridge's frame: only while the Aquila is held) | broadside [T] (the Aquila-firing shot of the main viewscreen) | look <T> <range_m> <azimuth> <elevation> [fov 50] (round a ship, whatever the Aquila does) | off");

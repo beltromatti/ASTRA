@@ -222,17 +222,29 @@ void UAstraWarFX::ShieldHit(const FAstraBattleShip& To, const FAstraFxHit& H)
 	}
 }
 
-void UAstraWarFX::OnHit(const FAstraBattleShip& To, const FAstraFxHit& H)
+void UAstraWarFX::OnHit(const FAstraBattleShip& To, const FAstraFxHit& Hit)
 {
-	if (!IsActive() || !Owner || FVector::DistSquared(H.Pos, F.Origin) > FMath::Square(170000.0))
+	if (!IsActive() || !Owner || FVector::DistSquared(Hit.Pos, F.Origin) > FMath::Square(170000.0))
 	{
 		return;
+	}
+	// the simulation puts a blow on the face of the ship's box; what it strikes is the hull's skin, which can be forty metres under that plane (a cruiser's deck, a tower on one side):
+	// the flash, the sparks, the glow and the scar go where the skin is (the shield is a shell round the box: its ripple stays where the blow met it)
+	FAstraFxHit H = Hit;
+	if (To.Dmg.bModel)
+	{
+		FVector Local = To.Att.UnrotateVector(Hit.Pos - To.Pos);
+		if (SnapToHull(To, Hit.Facing, Local))
+		{
+			H.Pos = To.Pos + To.Att.RotateVector(Local);
+			H.bOnSkin = true;
+		}
 	}
 	const bool bAstra = To.Side == EAstraSide::Astra;
 	const FLinearColor Col = ShotColor(!bAstra, H.Kind);   // (the shooter's colour: the other side's)
 	if (H.ShieldTook > 0.4f && To.Dmg.bModel)
 	{
-		ShieldHit(To, H);
+		ShieldHit(To, Hit);
 	}
 	else if (H.ShieldTook > 0.4f)
 	{
@@ -312,6 +324,7 @@ void UAstraWarFX::OnHit(const FAstraBattleShip& To, const FAstraFxHit& H)
 	}
 	if (H.Felt > 8.f)
 	{
+		AddWound(To, H);                    // the hull glows where it was hit, and cools
 		AddScar(To, H);                    // the plating remembers it
 	}
 }
@@ -388,7 +401,10 @@ bool UAstraWarFX::OnShipDestroyed(FAstraBattleShip& S, const FAstraDeathEvent& E
 		return false;
 	}
 	const bool bAstra = S.Side == EAstraSide::Astra;
-	const float R = FMath::Max(S.Radius, 40.f);
+	// a ship that dies far off is a few pixels in the bridge's window and a thumb of the main viewscreen at the width of a shot: the blast grows with the distance (an artist's size, not a
+	// physicist's): as it is up to 10 km, twice at 25, two and a half from 32 km (astra.war.tune fx_far 0 puts it back)
+	const float Far = 1.f + ASTRA_FX_TUNE("far", 1.f) * FMath::Clamp((float)((FVector::Dist(S.Pos, F.Origin) - 10000.0) / 15000.0), 0.f, 1.5f);
+	const float R = FMath::Max(S.Radius, 40.f) * Far;
 	const FVector Centre = S.Pos + S.Att.RotateVector(FVector(S.Box.Valid() ? S.Box.Mid : 0.f, 0.f, 0.f));
 	const bool bReactor = E.How == EAstraFate::ReactorBreach;
 	// the hull's pieces: the whole ship is hidden and its three pieces take its place, in the same frame (the picture does not change)
