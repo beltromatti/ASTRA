@@ -432,10 +432,15 @@ class MarchOpeningTest(Fixture):
         self.assertGreaterEqual(wake.t, 90.0)                                                # (the order is given at 90 s: MARCH_OPENING)
         self.assertGreater(arrival - wake.t, 60.0)
         self.assertIn("they need about 4 min 04 s after it to reach her", wake.text["astra"])
+        # ... and a track: the game's holo table and main screen draw the force coming out of the Gate, how many and how soon
+        tr = self.m.tracks["astra"].get("F-M1")
+        self.assertIsNotNone(tr)
+        self.assertEqual((tr.system, tr.moving_to), ("Thule", "Aurelia"))
+        self.assertGreater(tr.arrive_t, wake.t)
         self.assertTrue(140.0 < arrival < 330.0, arrival)                                 # (the first strike comes in the first minutes, but not at the first)
         # the ships are the fleet's own, led by the people of the game's own opening
         names = sorted(sp["name"] for g in beat["groups"] for sp in g["ships"])
-        self.assertEqual(names, ["Acheron", "Cocytus", "Phlegethon", "Styx"])
+        self.assertEqual(names, ["Acheron", "Cocytus", "Hecate", "Phlegethon", "Styx"])   # (two cruisers since 5 Oct)
         self.assertEqual(beat["groups"][0]["commander"]["name"], "Archon Varek Solm")
         self.assertFalse(beat["dark"])
         self.assertTrue(beat["hail"])                                                      # (Archon Solm opens a channel as the group comes through, as he does in the script)

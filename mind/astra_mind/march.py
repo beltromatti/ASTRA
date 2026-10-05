@@ -212,7 +212,7 @@ class Sys:
     restore_s: float = 0.0                                       # how long the owner has had the place to itself since its post went silent
 
     def to_dict(self) -> dict[str, Any]:
-        return {"name": self.name, "fort_hp": round(self.fort_hp, 3), "post": self.post, "build": self.build, "progress": round(self.progress, 3), "siege_by": self.siege_by,
+        return {"name": self.name, "fort_hp": round(self.fort_hp, 3), "post": self.post, "build": self.build, "progress": round(self.progress, 6), "siege_by": self.siege_by,
                 "siege_s": round(self.siege_s, 1), "claim_by": self.claim_by, "claim_s": round(self.claim_s, 1), "blockaded_by": self.blockaded_by,
                 "last_fight_t": round(self.last_fight_t, 1), "raid_s": round(self.raid_s, 1), "restore_s": round(self.restore_s, 1)}
 
@@ -253,14 +253,16 @@ class Track:
     classes: dict[str, int] | None
     hull: float | None
     moving_to: str = ""
+    arrive_t: float = 0.0                                        # when it comes out at `moving_to`, as the Gate's cycling told it (0: not known)
 
     def to_dict(self) -> dict[str, Any]:
         return {"fid": self.fid, "system": self.system, "seen_t": round(self.seen_t, 1), "level": self.level, "n": self.n, "classes": self.classes, "hull": self.hull,
-                "moving_to": self.moving_to}
+                "moving_to": self.moving_to, "arrive_t": round(self.arrive_t, 1)}
 
     @staticmethod
     def from_dict(d: dict[str, Any]) -> "Track":
-        return Track(d["fid"], d["system"], float(d["seen_t"]), int(d["level"]), int(d["n"]), d.get("classes"), d.get("hull"), d.get("moving_to", ""))
+        return Track(d["fid"], d["system"], float(d["seen_t"]), int(d["level"]), int(d["n"]), d.get("classes"), d.get("hull"), d.get("moving_to", ""),
+                     float(d.get("arrive_t", 0.0)))
 
 
 @dataclass
@@ -905,8 +907,15 @@ class March:
             return
         txt = {}
         for s in sides:
-            txt[s] = (f"The Gate at {dest} is cycling: a force of {self._estimate(s, f, max(1, self.sees(s, dest) - 1))} is coming through in about {fmt_s(max(0.0, f.arrive_at - self.t))}"
+            lvl = max(1, self.sees(s, dest) - 1)
+            txt[s] = (f"The Gate at {dest} is cycling: a force of {self._estimate(s, f, lvl)} is coming through in about {fmt_s(max(0.0, f.arrive_at - self.t))}"
                       + (self.reach_note(f) if (dest == self.real_system and s == "astra") else "") + ".")
+            # what the watchers know is a track too: where it comes from, where and when it comes out (the holo tables and the main screen draw it; it was
+            # only words, 5 Oct: «a force is coming through» and nothing on the plot)
+            old = self.tracks[s].get(f.id)
+            if old is None or old.system != dest:
+                n, cls = self._noisy(s, f, lvl)
+                self.tracks[s][f.id] = Track(f.id, f.hop_from or (old.system if old else ""), self.t, lvl, n, cls, None, dest, f.arrive_at)
         self.say("wake", dest, txt, tuple(sides), 2 if f.n >= 6 or self.value(dest) >= 6 else 1, (f.id,), eta=round(f.arrive_at - self.t, 1))
 
     def reach_note(self, f: Fleet) -> str:
@@ -1739,7 +1748,8 @@ class March:
             f = self.fleets.get(tr.fid)
             if f is None:
                 continue
-            eta = round(max(0.0, tr.seen_t + self.pace["hop_base_s"] + self.pace["hop_per_ship_s"] * tr.n - self.t)) if tr.moving_to else None
+            eta = (round(max(0.0, tr.arrive_t - self.t)) if tr.arrive_t else round(max(0.0, tr.seen_t + self.pace["hop_base_s"] + self.pace["hop_per_ship_s"] * tr.n - self.t))) \
+                if tr.moving_to else None
             fleets.append({"id": tr.fid, "side": f.side, "name": f"enemy force {tr.fid}", "system": tr.system, "to": tr.moving_to, "next": tr.moving_to, "eta_s": eta, "ships": tr.n,
                            "classes": tr.classes or {}, "strength": round(self.track_power(tr), 1), "order": "", "state": "tracked", "known": False,
                            "age_s": round(self.t - tr.seen_t), "level": tr.level})
