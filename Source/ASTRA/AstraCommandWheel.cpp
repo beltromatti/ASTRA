@@ -5,6 +5,7 @@
 #include "AstraShipSubsystem.h"
 #include "AstraStations.h"
 #include "AstraViewscreen.h"
+#include "AstraWarClasses.h"
 #include "Camera/PlayerCameraManager.h"
 #include "Dom/JsonObject.h"
 #include "Dom/JsonValue.h"
@@ -248,15 +249,32 @@ void FAstraCommandWheel::Build(APlayerController* PC)
 		I.Label = TEXT("ENGAGE");
 		I.Sub = bT ? T + TEXT(": guns and bow on it") : TEXT("no target");
 		I.bEnabled = bT;
-		I.Run = [W, T](FString& D)
+		// the helm takes her to the range her guns like (the middle of the Aquila's band, classes.json: her rails outreach every Mandate hull there), and a ship
+		// that runs is cut off a little inside the band instead of chased from behind (BATTAGLIA-3: 85% of the time in reach against 31%)
+		float Band = 24.f, Cut = 16.f;
+		if (const AstraWar::FShipClass* Cl = AstraWar::FindClass(TEXT("aquila")); Cl && Cl->RangeMaxKm > 0.f)
+		{
+			Band = 0.5f * (Cl->RangeMinKm + Cl->RangeMaxKm);
+			Cut = FMath::Max(8.f, Cl->RangeMinKm - 2.f);
+		}
+		bool bRuns = false;
+		if (const UAstraBattleSubsystem* B = W ? W->GetSubsystem<UAstraBattleSubsystem>() : nullptr)
+		{
+			const UAstraBattleSubsystem::FContactView* C = B->Contacts().FindByPredicate([&T](const UAstraBattleSubsystem::FContactView& X) { return X.ContactId == T; });
+			bRuns = C && C->bFleeing;
+		}
+		I.Run = [W, T, Band, Cut, bRuns](FString& D)
 		{
 			FString D2;
 			const bool bA = Run(W, TEXT("station"), StationArgs(TEXT("tactical"), TEXT("engagement"), TEXT("engage"), T), D);
-			const bool bB = Run(W, TEXT("station"), StationArgs(TEXT("helm"), TEXT("course"), TEXT("keep_on_bow"), T), D2);
+			const TSharedPtr<FJsonObject> H = StationArgs(TEXT("helm"), TEXT("course"), bRuns ? TEXT("intercept") : TEXT("keep_on_bow"), T);
+			H->GetObjectField(TEXT("params"))->SetNumberField(TEXT("standoff_km"), bRuns ? Cut : Band);
+			const bool bB = Run(W, TEXT("station"), H, D2);
 			D = D + TEXT("; ") + D2;
 			return bA || bB;
 		};
-		I.Told = FString::Printf(TEXT("engage %s: tactical's guns on it and the helm keeping the bow on it"), *T);
+		I.Told = bRuns ? FString::Printf(TEXT("engage %s: tactical's guns on it and the helm cutting it off at %.0f km as it runs"), *T, Cut)
+		               : FString::Printf(TEXT("engage %s: tactical's guns on it and the helm keeping the bow on it at %.0f km, the Aquila's own range"), *T, Band);
 		Items.Add(I);
 	}
 	// 3 — a missile salvo: engage it and saturate
