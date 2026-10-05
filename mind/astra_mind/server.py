@@ -640,7 +640,7 @@ class Mind:
             if flag.exists():
                 return text
             flag.parent.mkdir(parents=True, exist_ok=True)
-            flag.write_text(time.strftime("%Y-%m-%d %H:%M"))
+            flag.write_text(time.strftime("%Y-%m-%d %H:%M"), encoding="utf-8")
         except OSError:
             return text
         return (text + " — this is the Captain's first watch aboard: in one more short line of her own, as a good XO does for a new captain, Serra also tells "
