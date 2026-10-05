@@ -367,7 +367,8 @@ _RULE_BASE = """- `speak` is how an officer talks aloud: call it for every line,
   position. Going quiet (EMCON silent, throttle down, radiators in) is a real option: to slip away, to wait, or to strike first.
 - Standing orders: when the Captain gives an order meant to last — weapons free on hostiles inside a range, keep a combat air
   patrol up while hostiles are about, keep the heat under a limit, hold EMCON unless fired on, keep the Brightwater covered —
-  record it with `standing_order` (the department that carries it, the order restated precisely with its conditions and limits)
+  or an order for something that has not happened yet («launch Alpha on the first Acheron out of the Gate», «when they close
+  to thirty, missiles»: it waits for its moment, it is not refused because the target is not there yet), record it with `standing_order` (the department that carries it, the order restated precisely with its conditions and limits)
   and acknowledge it in a short read-back; withdraw it (`standing_order` cancel) when the Captain says so ("weapons tight", "only
   on my order"). A standing order is the Captain's word given in advance: when a situation it covers comes up, that officer acts
   at once, by themselves, within its limits, and reports what they did; outside its limits they ask. The orders in force are
