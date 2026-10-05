@@ -56,6 +56,7 @@ from war_fight import cmd_fight  # noqa: E402  (the fight log's reader, BATTAGLI
 #   standoff engage, plus the helm holds the range of the action (keep_on_bow with a standoff, in km, after the colon: standoff:20)
 #   bow      engage, plus the helm keeps the bow on the action
 #   intercept engage, plus the helm closes on the action on a lead course and holds the standoff (intercept:<km>)
+#   aim      engage with the gunners on a system of the target (aim:engines | sensors | weapons | hangar | bridge | reactor | bow | midships | stern)
 CAPTAIN_SCRIPTS = {
     "engage": ["1=astra.cmd station {'station':'tactical','mode':'engage','params':{'targets':['hostiles']}}",
                "1=astra.cmd station {'station':'engineering','mode':'combat'}"],
@@ -63,18 +64,27 @@ CAPTAIN_SCRIPTS = {
 
 
 def captain_script(name: str) -> list[str]:
-    """The `--at` items of a named script of the Captain's (see CAPTAIN_SCRIPTS); `standoff:<km>` and `bow` are made here."""
+    """The `--at` items of a named script of the Captain's (see CAPTAIN_SCRIPTS). Parts join with `+`: `intercept:15+aim:engines` closes on the action to 15 km and has the gunners aim at its engines."""
     if not name:
         return []
-    base, _, arg = name.partition(":")
-    items = list(CAPTAIN_SCRIPTS["engage"]) if base in ("engage", "standoff", "bow", "intercept") else []
-    if base == "standoff":
-        items.append("1=astra.cmd station {'station':'helm','mode':'keep_on_bow','params':{'target':'action','standoff_km':%s}}" % (arg or "20"))
-    elif base == "bow":
-        items.append("1=astra.cmd station {'station':'helm','mode':'keep_on_bow','params':{'target':'action'}}")
-    elif base == "intercept":
-        items.append("1=astra.cmd station {'station':'helm','mode':'intercept','params':{'target':'action','standoff_km':%s}}" % (arg or "20"))
-    return items
+    engage, aim, helm = False, "", []
+    for part in name.split("+"):
+        base, _, arg = part.partition(":")
+        engage = engage or base in ("engage", "standoff", "bow", "intercept", "aim")
+        if base == "aim":
+            aim = arg or "engines"
+        elif base == "standoff":
+            helm.append("1=astra.cmd station {'station':'helm','mode':'keep_on_bow','params':{'target':'action','standoff_km':%s}}" % (arg or "20"))
+        elif base == "bow":
+            helm.append("1=astra.cmd station {'station':'helm','mode':'keep_on_bow','params':{'target':'action'}}")
+        elif base == "intercept":
+            helm.append("1=astra.cmd station {'station':'helm','mode':'intercept','params':{'target':'action','standoff_km':%s}}" % (arg or "20"))
+    items = []
+    if engage:
+        params = "{'targets':['hostiles']" + (",'aim':'%s'" % aim if aim else "") + "}"
+        items = ["1=astra.cmd station {'station':'tactical','mode':'engage','params':%s}" % params,
+                 "1=astra.cmd station {'station':'engineering','mode':'combat'}"]
+    return items + helm
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -356,6 +366,7 @@ SUITE = [
     ("duel Aquila-Styx", "duel_aq_styx", 600, -1, "engage", ""),
     ("duel Aquila-Acheron", "duel_aq_acheron", 900, -1, "engage", ""),
     ("Aquila v the strike group", "duel_aq_strike", 900, -1, "engage", ""),
+    ("... helm at 24 km (the wheel)", "duel_aq_strike", 900, -1, "standoff:24", ""),
     ("Styx v Styx", "duel_styx_styx", 600, -1, "", ""),
     ("cruiser+destroyer a side", "duel_cruisers", 900, -1, "", ""),
     ("sym_small 3 v 3", "sym_small", 900, -1, "", ""),
@@ -419,10 +430,14 @@ def chase_of(d: dict, t0: float) -> dict:
         return {}
     rail_km = 45.0
     in_reach, rng, hull0, hull1 = 0, [], None, None
+    speeds, engines = [], []                                  # the raiders' speed and engines in the four minutes after the order: what the Aquila's guns did to their drives
     for f in frames:
         ships = [s for s in f["ships"] if s["side"] == "mandate" and not s["craft"] and s["alive"] and s.get("km")]
         if not ships:
             continue
+        if f["t"] <= t0 + 240.0:
+            speeds.extend(s["v"] for s in ships)
+            engines.extend(s["systems"][0] for s in ships if s.get("systems"))
         near = min(math.sqrt(sum(c * c for c in s["km"])) for s in ships)
         rng.append(near)
         in_reach += 1 if near <= rail_km else 0
@@ -433,7 +448,8 @@ def chase_of(d: dict, t0: float) -> dict:
     dead = sum(1 for s in fin if s["side"] == "mandate" and not s["craft"] and fate_of(s) in ("destroyed", "disabled"))
     aq = next((s for s in fin if s["c"] == "AQUILA"), None)
     return {"in_reach": in_reach / max(1, len(rng)), "range_end": rng[-1] if rng else float("nan"), "range_mean": statistics.mean(rng) if rng else float("nan"),
-            "hull_lost": (hull0 - hull1) if hull0 is not None else 0.0, "out": dead, "aquila": aq.get("hull", 0) if aq and aq["alive"] else 0}
+            "hull_lost": (hull0 - hull1) if hull0 is not None else 0.0, "out": dead, "aquila": aq.get("hull", 0) if aq and aq["alive"] else 0,
+            "speed": statistics.mean(speeds) if speeds else float("nan"), "engines": statistics.mean(engines) if engines else float("nan")}
 
 
 def cmd_chase(a: argparse.Namespace) -> None:
@@ -441,8 +457,9 @@ def cmd_chase(a: argparse.Namespace) -> None:
     seeds = list(range(1, a.seeds + 1))
     withdraw = f"{a.order_at}=astra.cmd group_order {{'side':'mandate','group':'all','order':'withdraw','by':'admiral'}}"
     variants = [("hold (the default: bow to the action)", "engage"), ("keep the bow on it", "bow"), ("hold 25 km (bow, throttle)", "standoff:25"),
-                ("intercept, 25 km", "intercept:25"), ("intercept, 15 km", "intercept:15")]
-    print(f"{'helm':<40} {'in reach%':>9} {'range now':>9} {'mean':>6} {'hull lost':>9} {'out':>4} {'Aquila':>7}")
+                ("intercept, 25 km", "intercept:25"), ("intercept, 15 km", "intercept:15"),
+                ("intercept, 15 km, aim at the engines", "intercept:15+aim:engines")]
+    print(f"{'helm':<40} {'in reach%':>9} {'range now':>9} {'mean':>6} {'hull lost':>9} {'out':>4} {'Aquila':>7} {'speed':>6} {'engines':>8}")
     for name, script in variants:
         if a.only and a.only.lower() not in name.lower() and a.only.lower() not in script.lower():
             continue
@@ -457,7 +474,7 @@ def cmd_chase(a: argparse.Namespace) -> None:
             print(f"{name:<40} (no records)")
             continue
         m = lambda k: statistics.mean(r[k] for r in rows)
-        print(f"{name:<40} {100 * m('in_reach'):8.0f}% {m('range_end'):8.1f}k {m('range_mean'):5.1f}k {m('hull_lost'):8.0f}% {m('out'):4.1f} {m('aquila'):6.0f}%")
+        print(f"{name:<40} {100 * m('in_reach'):8.0f}% {m('range_end'):8.1f}k {m('range_mean'):5.1f}k {m('hull_lost'):8.0f}% {m('out'):4.1f} {m('aquila'):6.0f}% {m('speed'):5.0f}m {m('engines'):7.0f}%")
         sys.stdout.flush()
 
 
@@ -811,7 +828,7 @@ def main() -> None:
     p.add_argument("--only", default="", help="a part of a battle's name or scenario")
     p.add_argument("--exec", default="")
     p.set_defaults(fn=cmd_suite)
-    p = sub.add_parser("chase", help="the helm on a retreat: five ways of steering the Aquila after a Mandate force that is ordered to break off")
+    p = sub.add_parser("chase", help="the helm on a retreat: six ways of steering and aiming the Aquila after a Mandate force that is ordered to break off")
     common(p, 600, -1)
     p.add_argument("--seeds", type=int, default=6)
     p.add_argument("--jobs", type=int, default=2)

@@ -101,6 +101,9 @@ private:
 	double LastDecoysAt = -1e9;
 	double NextReflexAt = 0.0;
 	double HelmAvoidTold = -1e9;           // the last time the helm said it was bending her course clear of a ship
+	FString AimSet;                      // the aim the tactical engagement last asked of the gunners ("" the middle of the hull): the executor keeps the gunners on it
+	int32 HelmQuarter = 0;               // the posture the helm holds under fire: 0 bow on, +1 the port quarter to the enemy, -1 the starboard (HelmPosture, AstraStations.cpp)
+	double HelmQuarterAt = -1e9;         // when it last changed
 	void Expire(const FString& Station, const FString& AspectName, const FString& Fallback, const FString& Why);
 	void UpdateStatus();
 };

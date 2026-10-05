@@ -2099,6 +2099,7 @@ TSharedRef<FJsonObject> UAstraBattleSubsystem::PlayerWeaponsJson() const
 	{
 		InFlight += (!Pr.bDead && Pr.Owner == P.Id && Pr.Kind == EAstraProjKind::Missile) ? 1 : 0;
 	}
+	W->SetStringField(TEXT("aim"), PlayerAim.IsEmpty() ? FString(TEXT("the middle of the hull")) : FString::Printf(TEXT("the target's %s (placed shots: a slug from dead ahead still enters at the bow)"), *PlayerAim));
 	W->SetStringField(TEXT("missiles"), FString::Printf(TEXT("%d in the VLS, %s; %d of ours in flight; range %.0f km"), P.Missiles,
 		P.MissileT > 0.f ? *FString::Printf(TEXT("cycling, next salvo in %.0f s"), P.MissileT) : TEXT("ready (max 8 per salvo)"), InFlight, P.MissileRange / OneKm));
 	return W;
