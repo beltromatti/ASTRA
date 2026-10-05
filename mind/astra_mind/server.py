@@ -323,6 +323,15 @@ class Mind:
             self.exchange.heard(self.enemy.contact, text)    # (an exchange is going on: comms knows what they just said)
         elif speaker == ADMIRAL["key"]:
             self.exchange.heard("fleet", text)
+        contact = next((c for c, p in COMMANDERS.items() if p.get("key") == speaker), None) if rethink is None else None
+        if contact is not None:
+            async def rethink(t: str, waited: float, cut_after: str) -> str | None:
+                # a Mandate commander's call that waited for the floor (or was cut off): one whose ship has gone since says nothing more (5 Oct: the
+                # Tartarus's commander called the Aquila a minute after her ship blew up, twice); the others think again with the battle as it is now
+                if contact in self.enemy.dead:
+                    log.info("%s's call is not said: the %s is gone", speaker, contact)
+                    return None
+                return await self.war.rethink_transmission(speaker, t, waited, cut_after, lang)
         await self.voice.say(speaker, text, lang, tone, addressed=True, rethink=rethink)
 
     async def _ally_say(self, speaker: str, text: str, lang: str, tone: str, *, urgent: bool = False, answer: bool = False,
