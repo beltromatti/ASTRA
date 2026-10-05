@@ -26,7 +26,7 @@ from typing import Any
 
 from lingua import Language, LanguageDetectorBuilder
 
-from .agent import EVENT_ASK, NET_ASK, WHEEL_ASK, BridgeAgent, ShipLink
+from .agent import WHEEL_ASK, BridgeAgent, ShipLink, net_ask
 from .audio_in import PushToTalk
 from .crew import CREW, WHEEL_EVENT
 from .enemy import COMMANDERS, EnemyAgent
@@ -937,7 +937,7 @@ class Mind:
                             TACTICAL_ASK if any(e.startswith("bridge: tactical check") for e in events) else \
                             VISIT_ASK if any("has come to the Captain's quarters in person" in e for e in events) else None
                         if ask is None and any(e.startswith(NET_EVENT) for e in events):
-                            ask = EVENT_ASK + NET_ASK                      # (net traffic among the news: the listener's doctrine goes with the general ask)
+                            ask = net_ask(events)                          # (net traffic among the news: the listener's doctrine, alone if the news is only traffic)
                         t = await self._event_turn(events, ask)
                     finally:
                         self.voice.low_priority = False

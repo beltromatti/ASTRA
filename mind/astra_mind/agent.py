@@ -20,6 +20,7 @@ from . import context as context_model
 from . import models
 from . import stations as station_model
 from .crew import CREW, bridge_now, crew_context, system_prompt
+from .nets import NET_EVENT
 from .openrouter import Completion, OpenRouter, ToolCall
 from .tools import CONSOLE_LOG, DEPT_TOOLS, LOOKUPS, SHIP_TOOL_NAMES, SILENT_TOOLS, SPEAK, initiative_names, owner_of, tools_for
 
@@ -542,19 +543,29 @@ EVENT_ASK = ("The Captain should hear this: the responsible officer reports it n
              "tool call does nothing and misleads the Captain. What needs the Captain's word (course changes on your own, a "
              "new offensive, leaving, breaking off, a channel with the enemy) is proposed instead — unless a standing order in "
              "force covers it.")
-NET_ASK = (" NET TRAFFIC (the «net:» events above): radio on a net that the Captain has NOT heard — it is not on the bridge's speaker, he can read it on the consoles' logs and "
-           "the datapad. The officer who has the watch on that net decides what he must hear from it, and says only that, in one short line of their own (not the sender's words read "
-           "back): a request that needs his answer, a warning he has not had, an order from Fleet, a ship or a squadron lost, a marine down, something he must decide or act on now. "
-           "Everything else is routine: write it on the console's log with console_log (one telegraphic line, in English) and say nothing aloud. What the Captain has already heard "
-           "(«Said aloud», in any words), what his own order just produced, and what the boards show are not told again: the log, or nothing. When lines are already waiting to be "
-           "said, only what outweighs them is worth adding. Most net traffic is for the log.")
-WHEEL_ASK = ("THE COMMAND WHEEL: the Captain has just given an order WITHOUT A WORD, from his command wheel (the event above). It is HIS ORDER, exactly as if he had spoken it, and the "
-             "console has already carried it out: do not carry it out again (you only have `speak`). The officer whose station it is for acknowledges it at once, in a word or two, in the "
-             "Captain's language and in character — «Aye, helm.», «Weapons free, aye.», «Falcons launching.», «Red alert.» (Helm for course and speed, Tactical for targets, weapons, shields "
-             "and decoys, Flight Control for the flight deck and the squadrons, Operations for power, damage control and the transporter, the XO for the alert level) — and that is all: no "
-             "question about whether he meant it, no explanation of what it does or why, no repeating what the wheel shows (the heading, the target, the range), nothing from any other "
-             "officer, the XO included. Only if the order did not go through (the detail says it failed or was refused) or it will hurt the ship in a way the Captain may not see (it "
-             "turns her broadside to a missile salvo, it cuts the shields with a torpedo in the water), the officer says so in one short line, after the acknowledgement or instead of it.")
+NET_ASK = ("NET TRAFFIC (the «net:» event above): radio on a net that the Captain has NOT heard — it is not on the bridge's speaker; he reads the consoles' logs and the datapad. The "
+           "officer who has the watch on that net decides, line by line, between two things. "
+           "TELL HIM — one short `speak` line of their own (never the sender's words read back), and the log as well if they like — when: the event says [URGENT]; a line calls the "
+           "Captain or needs his answer; it is an order from Fleet; a ship, a squadron, a pilot or a marine is lost or down; or it is a warning he has not had (an attack coming, a ship "
+           "under fire). "
+           "LOG IT — `console_log`, one telegraphic line in English, and NO `speak` — when it is routine: a position, a range, a bearing, a formation held, a «ready», a rearm done, a team "
+           "in place, a bulkhead sealed, an ally holding. A turn of routine traffic has no `speak` call at all. "
+           "What the Captain has already heard («Said aloud», in any words), what his own order just produced, and what the boards show are never told again; when lines are already "
+           "waiting to be said, only what outweighs them is worth adding.")
+
+
+def net_ask(events: list[str]) -> str:
+    """The ask of a report turn that has net traffic among its news: the listener's doctrine alone when the news is only traffic (the general ask says «report it», and the officers
+    follow the first thing they are told), with the general ask when other news is there too."""
+    return NET_ASK if all(e.startswith(NET_EVENT) for e in events) else EVENT_ASK + " " + NET_ASK
+WHEEL_ASK = ("THE COMMAND WHEEL: the event above is an order the Captain gave WITHOUT A WORD, from his command wheel. It is HIS ORDER, exactly as if he had spoken it, and the console has "
+             "already carried it out (you only have `speak`: do not carry it out again). ONE officer answers, the one whose station it is — Helm for course and speed, Tactical for targets, "
+             "weapons, shields and decoys, Flight Control for the flight deck and the squadrons, Operations for power, damage control and the transporter, the XO for the alert level — and "
+             "he acknowledges it in a few words and no more, in the Captain's language and in character: «Aye, helm.» «Weapons free.» «Red alert.» «Falcons launching.» Not «Red alert, "
+             "Captain: all hands to battle stations» (that says what it means), not «Weapons free on the Cocytus at fifteen kilometres» (that reads the wheel's own picture back). He "
+             "does not say what will happen next or why, does not ask whether the Captain meant it, and no other officer says anything, the XO included. Only when the order did not "
+             "go through (the detail says refused or failed), or it will hurt the ship in a way the Captain cannot see on the wheel (it turns her broadside to a missile salvo, it "
+             "drops the shields with a torpedo in the water), the officer says that instead, in one short line.")
 STANDING_ASK = (" Standing orders in force (see them in the rules) are the Captain's orders given in advance: when this "
                 "event is what one is about, that officer carries it out now, fully (weapons free means firing: fire_weapons or "
                 "an engage mode, not just a target), with the tool calls in this same turn, and says what was done.")

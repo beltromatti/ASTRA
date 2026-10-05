@@ -386,6 +386,37 @@ def wheel_model(r: Replay, acks: dict[str, tuple[float, str, str]]) -> list[dict
     return seen
 
 
+class TestListenerAsk(unittest.TestCase):
+    """The first live runs (voci3_live): with the general ask first («report it») the listeners read routine traffic aloud in half the runs; with the listener's doctrine alone
+    they log it every time, and tell what is urgent, what calls the Captain, a pilot or a marine down. So a turn of net traffic alone is asked by the doctrine alone."""
+
+    TRAFFIC = nets_mod.NET_EVENT + "traffic on the flight net — 1 line the Captain has NOT heard. Price has the watch on this net:\n - 1 s ago · Hex: «Alpha rearmed.»"
+
+    def test_traffic_alone_is_asked_by_the_listeners_doctrine_alone(self) -> None:
+        ask = agent_mod.net_ask([self.TRAFFIC])
+        self.assertEqual(ask, agent_mod.NET_ASK)
+        self.assertNotIn("The Captain should hear this", ask)
+        for needle in ("TELL HIM", "LOG IT", "console_log", "NO `speak`", "[URGENT]"):
+            self.assertIn(needle, ask)
+
+    def test_traffic_with_other_news_has_the_general_ask_too(self) -> None:
+        ask = agent_mod.net_ask([self.TRAFFIC, "sensors: second contact detected"])
+        self.assertTrue(ask.startswith(agent_mod.EVENT_ASK))
+        self.assertTrue(ask.endswith(agent_mod.NET_ASK))
+
+    def test_the_turn_worker_asks_a_listener_that_way(self) -> None:
+        async def go() -> None:
+            async with Replay() as r:
+                seen = wheel_model(r, {})
+                await r.mind.turns.put(("\x00event:" + self.TRAFFIC, "it"))
+                await r.settle(3.0)
+                asked = [str(k["messages"][-1]["content"]) for k in seen if "[Ship systems event" in str(k["messages"][-1]["content"])]
+                self.assertEqual(len(asked), 1)
+                self.assertIn("NET TRAFFIC (the «net:» event above)", asked[0])
+                self.assertNotIn("The Captain should hear this", asked[0])
+        run(go())
+
+
 class TestWhatTheCaptainsWordsDoNotLose(unittest.TestCase):
     """When the Captain's words take the floor, the news waiting for a quiet bridge stays in the ship's state; a warning of danger, and a call to him on a net, are not lost to
     the gap between the news and the turn: they are told after his order (5 October: the 0.6 s to 3 s the turn worker waits for a warning to gather what comes with it)."""
@@ -434,7 +465,7 @@ class TestCommandWheel(unittest.TestCase):
         self.assertIn(crew_mod.WHEEL_EVENT.split(":", 1)[1].strip(), prompt)
         self.assertIn("ALREADY carried it out", prompt)
         self.assertIn("nobody else says anything about it", prompt)
-        for needle in ("HIS ORDER", "in a word or two", "no question about whether he meant it", "nothing from any other officer", "did not go through"):
+        for needle in ("HIS ORDER", "in a few words and no more", "does not ask whether the Captain meant it", "no other officer says anything", "did not go through"):
             self.assertIn(needle, agent_mod.WHEEL_ASK)
 
     def test_the_turn_can_only_speak_and_carries_no_standing_orders(self) -> None:
