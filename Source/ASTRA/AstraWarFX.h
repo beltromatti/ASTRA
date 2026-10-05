@@ -154,6 +154,7 @@ namespace AstraFx
 		FVector Start = FVector::ZeroVector;   // where its path began: the muzzle (system frame)
 		FVector WakeTail = FVector::ZeroVector;// the far end of the wake it drew last (a slug's wake: Wake below), system frame
 		float WakeKappa = 0.f;                 // and its decay
+		float WakeWidth = 1.8f;                // and its width (m)
 		bool bWake = false;                    // it has drawn a wake
 		FVector Hist[TrailPts];                // where the trail has been (system frame), newest first
 		int32 HistN = 0;
@@ -175,7 +176,8 @@ namespace AstraFx
 		int32 N = 0;
 		FVector Long[FTrack::LongPts + 1];    // the long smoke, newest first
 		int32 LongN = 0;
-		float Age = 0.f, Life = 1.4f;
+		float Age = 0.f, Life = 1.4f;         // Life: the whole ghost's (the long smoke hangs longer than the beads)
+		float BeadLife = 1.4f;                // the beads' own
 		uint8 Style = 1;
 		FLinearColor Col = FLinearColor::White;
 		uint8 Seed = 0;

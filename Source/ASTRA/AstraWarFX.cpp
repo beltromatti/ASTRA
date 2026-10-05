@@ -705,11 +705,12 @@ void UAstraWarFX::DrawShots()
 					const FVector Along = (HeadW - TailW).GetSafeNormal();
 					T.WakeTail = TailS;
 					T.WakeKappa = (float)(WakeLen / (Speed * (double)WakeTau));
+					T.WakeWidth = 1.6f + Pr.Damage * 0.012f;
 					T.bWake = true;
 					FTransform* Xw;
 					if (float* Dw = Tubes.Next(Xw))
 					{
-						const float WakeW = 1.6f + Pr.Damage * 0.012f;
+						const float WakeW = T.WakeWidth;
 						*Xw = FTransform(FQuat::FindBetweenNormals(FVector::ZAxisVector, Along), (TailW + HeadW) * 0.5, FVector(WakeW, WakeW, (float)WakeLen));
 						Fill(Dw, T.Col, 190.f * Intensity * WakeGain, 0.f, 5.f, T.WakeKappa, (float)(Pr.FxSlot & 255) / 255.f, WakeW, (float)WakeLen);
 					}
@@ -845,6 +846,7 @@ void UAstraWarFX::DrawShots()
 				Wk.Head = T.Last;
 				Wk.Tail = T.WakeTail;
 				Wk.Kappa = T.WakeKappa;
+				Wk.Width = T.WakeWidth;
 				Wk.Col = T.Col;
 				Wk.Seed = (float)(i & 255) / 255.f;
 			}
@@ -860,7 +862,19 @@ void UAstraWarFX::DrawShots()
 				G.Style = T.Style;
 				G.Col = T.Col;
 				G.Seed = (uint8)(i & 255);
-				G.Life = 1.0f + 0.5f * (T.Style == 2);
+				G.BeadLife = 1.0f + 0.5f * (T.Style == 2);
+				G.Life = G.BeadLife;
+				if (T.LongN > 0)
+				{
+					// the long smoke stays where the missile drew it and thins away over a few seconds (the head's end first)
+					G.Long[0] = T.Last;
+					G.LongN = FMath::Min(T.LongN + 1, (int32)FTrack::LongPts + 1);
+					for (int32 k = 1; k < G.LongN; ++k)
+					{
+						G.Long[k] = T.LongHist[k - 1];
+					}
+					G.Life = 3.2f;
+				}
 			}
 			T.Frame = -2;
 			FreeTracks.Add(i);
@@ -901,9 +915,9 @@ void UAstraWarFX::DrawShots()
 			Ghosts.RemoveAtSwap(g, EAllowShrinking::No);
 			continue;
 		}
-		const float Shift = G.Age / G.Life;
+		const float Shift = FMath::Min(1.f, G.Age / G.BeadLife);
 		const float Hot = G.Style == 2 ? 1.5f : (G.Style == 3 ? 0.7f : 1.f);
-		for (int32 k = 0; k + 1 < G.N; ++k)
+		for (int32 k = 0; k + 1 < G.N && Shift < 1.f; ++k)
 		{
 			const FVector A = F.ToWorld(G.Pts[k]), B = F.ToWorld(G.Pts[k + 1]);
 			const double L = FVector::Dist(A, B);
@@ -921,6 +935,30 @@ void UAstraWarFX::DrawShots()
 				const float Len = (float)(L / 100.0) * 1.7f;
 				*X = FTransform(FQuat::FindBetweenNormals(FVector::ZAxisVector, Dir), (A + B) * 0.5, FVector(Width, Width, Len));
 				Fill(D, G.Col, 65.f * Intensity * Hot, AgeTail, 2.f, AgeHead, (float)G.Seed / 255.f, Width, Len);
+			}
+		}
+		if (G.LongN > 1 && WakeGain > 0.f)
+		{
+			// the long smoke of the missile that has ended, thinning where it was drawn (the same tubes as the living one, their ages running on)
+			const float LShift = G.Age / G.Life;
+			const FLinearColor Pale = Mix(G.Col, FLinearColor::White, 0.5f);
+			for (int32 k = 0; k + 1 < G.LongN; ++k)
+			{
+				const FVector A = F.ToWorld(G.Long[k]), B = F.ToWorld(G.Long[k + 1]);
+				const double L = FVector::Dist(A, B);
+				FTransform* X;
+				if (L > 200.0)
+				{
+					if (float* D = Tubes.Next(X))
+					{
+						const float AgeTail = FMath::Min(1.f, (float)(k + 1) / (float)(FTrack::LongPts + 1) + LShift), AgeHead = FMath::Min(1.f, (float)k / (float)(FTrack::LongPts + 1) + LShift);
+						const float Width = (G.Style == 2 ? 4.f : 2.6f) * (1.f + 1.6f * AgeTail);
+						const FVector Dir = (A - B) / L;
+						const float Len = (float)(L / 100.0);
+						*X = FTransform(FQuat::FindBetweenNormals(FVector::ZAxisVector, Dir), (A + B) * 0.5, FVector(Width, Width, Len));
+						Fill(D, Pale, 34.f * Intensity * Hot * WakeGain, AgeTail, 2.f, AgeHead, (float)G.Seed / 255.f, Width, Len);
+					}
+				}
 			}
 		}
 	}
