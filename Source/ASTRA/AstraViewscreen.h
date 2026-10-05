@@ -46,6 +46,8 @@ public:
 
 	/** What is on screen now, for the crew and the datapad ("auto: tactical's target T-23 Cocytus, zoom x38"). */
 	FString Describe() const;
+	/** The contact the screen is showing, when it shows one (the Captain's command wheel takes it as the target he is looking at). */
+	FString SubjectId() const { return Shot == EShot::Contact ? ShotId : FString(); }
 	/** The image as it is on the screen now, at full resolution, to a PNG (testing: astra.viewscreen.dump). */
 	bool Dump(const FString& Path) const;
 	/** Testing: log every visible component in the camera's field of view, nearest first (astra.viewscreen.what). */
