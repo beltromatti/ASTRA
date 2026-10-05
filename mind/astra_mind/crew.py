@@ -421,6 +421,10 @@ _RULE_ASSAULT = """- Boarding by boats (`boarding_boats` in the ship state: the 
   (they are flown against her): what stops them is her point defence, her fighters and a shield on the face, never the distance. Once the marines are aboard they are Major Reyes's net: they report their
   own news as net traffic (the XO tells the Captain what he must know) and nobody repeats it; the boats wait at the hatches and take the survivors home. To stop it: `board_ship` with action call_off (with the marines on
   her decks it orders them out by their hatches and the boats let go when they are aboard). Never say a boarding is on its way unless `board_ship` said so in this turn.
+  A WRECK (a piece of a broken ship: `boarding_options` lists the near ones with `wreck`: true, the `part` and the contact id, W-02S) can be boarded the same way, with `board_ship` and her contact id, and it is
+  not a fight: nobody is alive aboard her, nothing defends her, no shield, no point defence; the marines cut in at a hatch or at her torn end and search her decks, where her dead lie and where some rooms have no
+  air; they hold what the objective names two minutes and the boats take them home. A piece has only the places of her part of the ship: an objective she has not is refused and the result says what she still
+  has; the XO says what a boarding of a wreck IS (a search, the dead to be found) and what the result says, not more. A wreck keeps the way her ship was going when she broke, so the Aquila leaves her behind unless the helm stays with her: one ordered long after the loss is a long flight, and the order is refused (the result says why) when she would be out of reach before the boats could be home.
   The Mandate does the same to the Aquila: when their skiffs launch for her (`boarding` shows the boats, direction in, a minute or less to the hull) the bridge reports it in one line (how many, where they
   will latch, how long) and the marine net takes it: the Captain decides whether to meet the boats with the point defence and the Falcons, and where to be."""
 

@@ -229,6 +229,12 @@ void UAstraBoardSubsystem::RunBenchOrder(const TSharedPtr<FJsonObject>& Args)
 		const TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> Wr2 = TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>::Create(&Snap);
 		FJsonSerializer::Serialize(Snapshot(), Wr2);
 		UE_LOG(LogASTRA, Log, TEXT("[Board] snapshot at %.0f s: %s"), Since, *Snap.Left(1200));
+		TArray<FFpsSquadRow> Rows;                           // (and the squads as the Captain's screen shows them)
+		SquadRows(Rows);
+		for (const FFpsSquadRow& R : Rows)
+		{
+			UE_LOG(LogASTRA, Log, TEXT("[Board] squads at %.0f s: %s %d/%d%s - %s"), Since, *R.Name, R.Able, R.Total, R.bContact ? TEXT(" IN CONTACT") : TEXT(""), *R.Text);
+		}
 		return;
 	}
 	FString D;
@@ -857,6 +863,10 @@ void UAstraBoardSubsystem::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 	if (Phase == EPhase::Loading)
 	{
+		if (IsRunningCommandlet() && MapFuture.IsValid())
+		{
+			MapFuture.Wait();                                    // (a bench has no frame to keep up: the plan is read before the war runs on, whatever else the machine is busy with, so that the same fight is fought every time)
+		}
 		TryFinishLoading();
 		return;
 	}

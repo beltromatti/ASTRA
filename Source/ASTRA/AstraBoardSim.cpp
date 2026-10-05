@@ -80,6 +80,7 @@ void FAstraBoardSim::Init(TSharedRef<const FAstraBoardMap> InMap, int32 Seed)
 	People.Reset();
 	Teams.Reset();
 	Events.Reset();
+	DeadAboard.Reset();
 	Pending.Reset();
 	OpenNow.Reset();
 	Doors.Init(Map->NumDoors());

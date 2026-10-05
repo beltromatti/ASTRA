@@ -17,6 +17,7 @@
 #include "AstraBoardDress.h"
 #include "AstraBoardMap.h"
 #include "AstraBoardPlans.h"
+#include "AstraBoardScene.h"
 #include "AstraBoardSim.h"
 #include "AstraDamageMap.h"
 #include "Dom/JsonObject.h"
@@ -31,6 +32,7 @@ class APawn;
 class UAstraBattleSubsystem;
 class UAstraCombatFx;
 class UAstraFpsComponent;
+struct FFpsSquadRow;
 class UAstraLifeSubsystem;
 class UAstraShipSubsystem;
 
@@ -179,6 +181,8 @@ public:
 	float LastHurtAmount() const { return CapHurtAmount; }
 	/** The nearest able enemy that sees the Captain, distance (cm), or a negative number. */
 	float NearestThreatCm() const { return ThreatCm; }
+	/** The marines' squads for the Captain's screen (UAstraFpsComponent): each with how many are on their feet of how many it has, what it is doing and whether it is in contact. Empty when no fight is on. */
+	void SquadRows(TArray<FFpsSquadRow>& Out) const;
 	/** What the minds read of the Captain's body in the fight (ship_state.boarding.captain and the marines' picture): how he stands (standing, crouched, lying), whether he leans, how many of the boarders have him in sight. */
 	void AddCaptainBody(FJsonObject& O) const;
 
@@ -364,6 +368,11 @@ private:
 		TMap<int32, FBoardRoomMood> Moods;           // (a fight on a ship the war has shot at) how her rooms are: no power, fire, no air
 		TArray<AstraBoardDress::FFallen> Fallen;     // the crew she has lost, where they fell (her decks show them: AstraBoardDress)
 		bool bFromWar = false;                       // her people and bulkheads are the war's picture of her inside
+		// a piece of a broken ship (ABBORDAGGI-4: SPAZIO-VIVO's wreck contacts): nobody is alive aboard, nothing is to be fought for or taken; the marines go through her
+		bool bWreck = false;
+		uint8 WreckSection = 255;                    // which part of the ship she was (0 bow, 1 middle, 2 stern, 255 the whole hull): the plan is the part's
+		FVector WreckPivotM = FVector::ZeroVector;   // what the piece turns about, in the hull's frame (m): the boats' hatches are measured from the hull's origin
+		AstraBoardScene::FWreckAboard Wreck;         // what the record says was left aboard her (copied when the order is given)
 	};
 	FAssault Assault;
 	mutable float MusterCacheS = -1.f;               // the marines' muster as BoatsJson told it (it is worked out every few seconds, not at every state)

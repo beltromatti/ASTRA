@@ -56,10 +56,21 @@ struct ASTRA_API FBoardShipPlan
 	TArray<FPost> Garrison;
 	TMap<FName, int32> Objectives;                  // bridge, engineering, captain, armory, medbay, brig, comms, hangar -> a compartment
 	int32 Crew = 0;                                 // the people of the class aboard when she is whole
+	// --- a piece of her (ABBORDAGGI-4: a wreck's section is boarded): the rooms of one part of the hull, cut off from the rest at the war's cut planes
+	float CutBowCm = 0.f, CutSternCm = 0.f;         // the class's two cut planes in the plan's frame (cm): the war's bow is beyond the first, her stern beyond the second (both zero: thirds of the hull)
+	uint8 Section = 255;                            // 0 the bow, 1 the middle, 2 the stern, 255 the whole ship
+	TArray<uint8> Present;                          // (a piece) by room: 1 when it is part of the piece; empty: every room is
+	bool Has(int32 Comp) const { return Present.IsEmpty() || (Present.IsValidIndex(Comp) && Present[Comp] != 0); }
+	/** The war's section of a room (FLOTTA-VIVA's rule: the middle of its box against the cut planes; with no cuts, the hull's thirds). */
+	uint8 SectionOf(int32 Comp) const;
 
 	bool IsReady() const { return Map.IsValid() && Map->IsReady(); }
-	/** A named place: the plan's objective of that name, else the first room of that kind (a plan without hints still has a bridge and an engineering hall). INDEX_NONE if there is none. */
+	/** A named place: the plan's objective of that name, else the first room of that kind (a plan without hints still has a bridge and an engineering hall); of a piece, only the rooms she has. INDEX_NONE if there is none. */
 	int32 Objective(const TCHAR* Name, const TCHAR* Kind = nullptr) const;
+	/** The number of rooms of the piece (of the whole ship: all). */
+	int32 NumRooms() const;
+	/** A room of a piece whose end wall stands at one of her torn ends (within MarginCm of a cut plane): open to space. False for the whole ship. */
+	bool AtTornEnd(int32 Comp, float MarginCm) const;
 	/** Between the plan's frame (cm) and the hull's (m): the damage map says where the plan's origin stands in the hull. */
 	FVector OriginInHullM() const { return Dmg.IsValid() ? Dmg->OriginInHullM : FVector::ZeroVector; }
 	FVector PlanToHullM(const FVector& PlanCm) const { return PlanCm / 100.0 + OriginInHullM(); }
@@ -81,4 +92,12 @@ namespace AstraBoardPlans
 	ASTRA_API TSharedPtr<FBoardShipPlan> LoadFile(const FString& Path, FName ClassKey, FString& OutWhy);
 	/** The classes that have a plan (the file names in the plan directory). */
 	ASTRA_API void ClassesWithPlans(TArray<FName>& Out);
+	/** The key a piece of a class is kept under ("vigilant#2": the stern section); the whole ship's is her class. */
+	ASTRA_API FName KeyOfPiece(FName ClassKey, uint8 Section);
+	/** The plan of one piece of a class (a section of a wreck, 0 bow, 1 middle, 2 stern; 255 or more is the whole ship, the class's own plan): her rooms on the one side of the cuts and no way across them, the hatches
+	 *  she still has and a torn end for each cut face (a boat latches at the torn end, the boarders cut in at its wall), the places of the plan she still has. Kept, like the whole ship's. Safe on a worker thread. */
+	ASTRA_API TSharedPtr<FBoardShipPlan> LoadPiece(FName ClassKey, uint8 Section, FString& OutWhy);
+	/** Where the marines go in a piece that has no commander to seize: her bridge if she still has it, else her engineering hall, else the commander's quarters, else the room furthest from where they cut in (a walk through
+	 *  all of her). INDEX_NONE for a plan with no room. */
+	ASTRA_API int32 PieceObjective(const FBoardShipPlan& Plan, int32 CutInComp);
 }

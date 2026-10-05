@@ -1250,6 +1250,22 @@ void UAstraFpsComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAc
 		}
 	}
 	KeysAlpha = FMath::FInterpConstantTo(KeysAlpha, (KeysT > 0.f && !bLockedNow) ? 1.f : 0.f, Dt, 1.2f);
+	// the marines' squads on his screen while a boarding is on (twice a second: who, how many on their feet, what they do)
+	{
+		const UAstraBoardSubsystem* Board = GetWorld() ? GetWorld()->GetSubsystem<UAstraBoardSubsystem>() : nullptr;
+		const AASTRAPlayerController* PCtl = Cast<AASTRAPlayerController>(C->GetController());
+		const bool bOn = Board && Board->IsActive() && !(PCtl && PCtl->IsPadUp());
+		if (bOn && GetWorld()->GetTimeSeconds() - SquadsAt > 0.5)
+		{
+			SquadsAt = GetWorld()->GetTimeSeconds();
+			Board->SquadRows(SquadRows);
+		}
+		else if (!bOn && !SquadRows.IsEmpty() && SquadsAlpha <= 0.f)
+		{
+			SquadRows.Reset();
+		}
+		SquadsAlpha = FMath::FInterpConstantTo(SquadsAlpha, (bOn && !SquadRows.IsEmpty()) ? 1.f : 0.f, Dt, 1.5f);
+	}
 	if (bTestWatch)
 	{
 		FFpsWatcher Fake;
@@ -1288,7 +1304,7 @@ void UAstraFpsComponent::TickHud(float Dt)
 	const float Strength = Board ? Board->CaptainStrength() : 1.f;
 	const bool bArmed = IsArmed() && !Locked();
 	const bool bShowStrength = bBoarding || Strength < 0.995f;
-	const bool bShow = bArmed || HurtAlpha > 0.01f || PromptT > 0.f || bShowStrength || !Arcs.IsEmpty() || !Watch.IsEmpty() || KeysAlpha > 0.01f;
+	const bool bShow = bArmed || HurtAlpha > 0.01f || PromptT > 0.f || bShowStrength || !Arcs.IsEmpty() || !Watch.IsEmpty() || KeysAlpha > 0.01f || SquadsAlpha > 0.01f;
 	if (!bShow)
 	{
 		RemoveHud();
@@ -1357,6 +1373,18 @@ void UAstraFpsComponent::TickHud(float Dt)
 	S.PromptAlpha = FMath::Clamp(PromptT / 0.4f, 0.f, 1.f);
 	S.KeysAlpha = KeysAlpha;
 	S.bCarries = bHasKit;
+	S.SquadsAlpha = SquadsAlpha;
+	S.Squads.Reset();
+	for (const FFpsSquadRow& Row : SquadRows)
+	{
+		FAstraFpsHudState::FSquadRow X;
+		X.Name = Row.Name;
+		X.Text = Row.Text;
+		X.Able = Row.Able;
+		X.Total = Row.Total;
+		X.bContact = Row.bContact;
+		S.Squads.Add(X);
+	}
 	S.bLowHint = bArmed && State == EState::Ready && A.Mag <= FMath::Max(2, D.Mag / 6) && A.Reserve > 0 && FMath::Frac(GetWorld()->GetTimeSeconds() * 1.6) < 0.7;
 }
 

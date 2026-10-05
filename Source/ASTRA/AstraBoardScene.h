@@ -57,6 +57,34 @@ namespace AstraBoardScene
 
 	/** Fills a sim (made with Init on the plan's map) with the holders at their posts and the attackers at the dock. */
 	ASTRA_API FResult Build(FAstraBoardSim& Sim, const FBoardShipPlan& Plan, const FSpec& Spec);
+	/** A place of the plan by a name the minds and the commands use (bridge, engineering, captain, armory, medbay, brig, comms, hangar, or a room's id): the room, and what it is called in a report (INDEX_NONE: the plan has none; a
+	 *  piece of a ship has only the places she still has). */
+	ASTRA_API int32 ObjectiveOf(const FBoardShipPlan& Plan, const FString& Name, FString& OutLabel);
+
+	/** What was left aboard a piece of a broken ship (ABBORDAGGI-4), as the boarding wants it: SPAZIO-VIVO's record of her (AstraWrecks.h FAboard) copied when the order is given, so that nothing of the living space is held
+	 *  while the marines are aboard. */
+	struct FWreckAboard
+	{
+		FString Name;                                               // what she was ("ASN Vigilant")
+		int32 Complement = 0;                                       // the people her class carries
+		int32 Killed = 0;                                           // who died of the blows before she went (where they fell)
+		int32 Lost = 0;                                             // who was alive and was lost with her
+		int32 Escaped = 0;                                          // who got away in the lifepods
+		float Share = 1.f;                                          // the share of her people who lie in this piece (her structure's share: the war's table)
+		struct FRoom
+		{
+			int32 Comp = INDEX_NONE;
+			float Air = 1.f, Hole = 0.f, Fire = 0.f, Smoke = 0.f, Heat = 0.f, Power = 1.f, Wreck = 0.f;
+			bool bGutted = false, bLocked = false;
+		};
+		TArray<FRoom> Rooms;                                        // the rooms as they were a moment after the loss (a room not listed is as built)
+		TArray<FName> SealedDoors;                                  // the pressure bulkheads that were shut
+		/** The dead in this piece: of those who died before she went and of those lost with her, her share. */
+		int32 DeadHere() const { return FMath::Clamp(FMath::RoundToInt(Share * (float)(Killed + Lost)), 0, 60); }
+	};
+	/** The inside of a wreck's piece as the scene builder takes the war's picture of a ship: her rooms as the record has them (the ones of the piece), her shut bulkheads, nobody alive, and her dead laid where people are
+	 *  (the rooms that hold her crew at work, deterministic for the seed). */
+	ASTRA_API void WreckInside(const FBoardShipPlan& Plan, const FWreckAboard& Aboard, int32 Seed, FFleetSnapshot& Out);
 	/** A ship that has lost her power (and her fight): her marines and the guard of her hatches stand to (half of them), a few of the rest take up arms; the people at dead consoles in the dark have nothing left to
 	 *  fight for. bFromWar: the war's own picture of her inside is the scene (her people are where the war left them); without it she is a derelict nobody fought through (no record of her crew: a post may be left
 	 *  empty, nobody roams). The host and the bench come to this one place for the numbers, so that what the bench measures is what the game does. */

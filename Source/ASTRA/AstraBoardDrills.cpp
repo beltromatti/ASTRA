@@ -743,7 +743,8 @@ void FAstraBoardSim::DrillRoom(FSquad& S, const TArray<int32>& Able)
 		{
 			S.Cleared.Add(S.RoomTo);
 			++Stats.DrillRooms;
-			Announce(S, FString::Printf(TEXT("%s has cleared %s"), *S.Name, *Map->Describe(S.RoomTo)));
+			const int32 Dead = DeadAt(S.RoomTo);
+			Announce(S, FString::Printf(TEXT("%s has cleared %s%s"), *S.Name, *Map->Describe(S.RoomTo), Dead > 1 ? *FString::Printf(TEXT(": %d of her dead lie here"), Dead) : (Dead == 1 ? TEXT(": one of her dead lies here") : TEXT(""))));
 			if (S.Task == ETask::Sweep)
 			{
 				DrillSweepNext(S);

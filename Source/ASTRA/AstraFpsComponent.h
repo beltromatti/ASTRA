@@ -32,6 +32,14 @@ struct FFpsWatcher
 	float DistCm = 0.f;
 };
 
+/** One squad of the marines as the Captain's screen shows it (UAstraBoardSubsystem::SquadRows): its name, how many are on their feet of how many it has, and what it is doing. */
+struct FFpsSquadRow
+{
+	FString Name, Text;
+	int32 Able = 0, Total = 0;
+	bool bContact = false;                   // in contact with the enemy
+};
+
 UCLASS(ClassGroup = (ASTRA))
 class ASTRA_API UAstraFpsComponent : public UActorComponent
 {
@@ -148,6 +156,9 @@ private:
 	TArray<FWatch> Watch;                        // the boarders who have him in sight (the amber arcs), fading in and out
 	double WatchAt = -1000.0;                    // when the fight last told who sees him
 	bool bWatchTold = false;                     // the amber arc's meaning was told once
+	TArray<FFpsSquadRow> SquadRows;              // the marines' squads while a boarding is on (read twice a second)
+	double SquadsAt = -1000.0;
+	float SquadsAlpha = 0.f;
 	bool bTestWatch = false;                     // the console's: a watcher that stands where it was put (astra.fps.watch), to see the arcs without a fight
 	FVector TestWatchAt = FVector::ZeroVector;
 	FString PromptText;

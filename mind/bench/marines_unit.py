@@ -523,6 +523,20 @@ class Prompts(unittest.IsolatedAsyncioTestCase):
             self.assertIn("standing", captain)
             self.assertNotIn("in sight", captain)                                          # (nobody has him in sight: nothing to say of it)
 
+    def test_a_wreck_is_said_to_be_one_on_the_board(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            bed = Bed(tmp)
+            st = ship_state()
+            st["_marines"] = json.loads(json.dumps(ATTACK_PICTURE))
+            st["boarding"] = json.loads(json.dumps(ATTACK_BOARDING))
+            st["_marines"].update({"ship": "stern section of ASN Vigilant", "ship_class": "wreck", "wreck": True, "wreck_part": "the stern section", "dead_aboard_this_piece": 31})
+            bed.m.feed(st)
+            board = bed.m._board(st)
+            self.assertIn("is a WRECK (the stern section): nobody is alive aboard her and nothing defends her; about 31 of her dead lie in this piece", board)
+            st["_marines"].pop("wreck")
+            bed.m.feed(st)
+            self.assertNotIn("WRECK", bed.m._board(st))
+
     def test_what_is_the_bridges_news_says_so(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             bed = Bed(tmp)

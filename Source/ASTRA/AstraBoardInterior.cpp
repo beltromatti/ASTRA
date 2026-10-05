@@ -563,9 +563,9 @@ bool AAstraBoardInterior::EnsureAround(const FVector& PlanCm, int32 MaxRooms)
 	TArray<FWant> Want;
 	for (int32 i = 0; i < Map.GetComps().Num(); ++i)
 	{
-		if (Built.Contains(i))
+		if (Built.Contains(i) || !Plan->Has(i))
 		{
-			continue;
+			continue;                                                    // (built already, or a room of the part of the ship that is not here: a wreck's piece)
 		}
 		const FBox& B = Map.GetComps()[i].Box;
 		if (FMath::Abs(B.Min.Z - PlanCm.Z) > 250.0)
