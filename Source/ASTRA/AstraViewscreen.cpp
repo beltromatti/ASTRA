@@ -544,6 +544,22 @@ void AAstraViewscreen::Direct(float Dt)
 		Cut(EShot::Ship, FString(), TEXT("ASN Aquila"), TEXT("EXTERNAL"), 9, 1.0);
 		return;
 	}
+	if (Mode == TEXT("external"))
+	{
+		// the Aquila herself from outside (the Captain's «show us from outside»): while her guns fire, the line of fire from off her quarter on what
+		// they fire at, held through the pause between volleys; otherwise the slow orbit around her
+		const UAstraBattleSubsystem::FPlayerFireState PF = B->GetPlayerFireState();
+		const FContact* T = PF.ShotAgeS < 8.f ? FindC(Cs, PF.ShotTarget) : nullptr;
+		if (T)
+		{
+			Cut(EShot::Broadside, T->ContactId, T->Label, TEXT("EXTERNAL"), 9, 1.0);
+		}
+		else
+		{
+			Cut(EShot::Ship, FString(), TEXT("ASN Aquila"), TEXT("EXTERNAL"), 9, 1.0);
+		}
+		return;
+	}
 	if (Mode == TEXT("target") || Mode == TEXT("comms"))
 	{
 		if (const FContact* C = FindC(Cs, Target))

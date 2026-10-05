@@ -196,6 +196,9 @@ def _build() -> dict[str, Station]:
         m("ops", "viewscreen", "viewscreen_comms", "the open channel's party on screen",
           (P("party", STR, "contact id or 'fleet' (default: the open channel)"),), "order", native="comms"),
         m("ops", "viewscreen", "viewscreen_damage", "the damage board", (), "order", native="damage"),
+        m("ops", "viewscreen", "viewscreen_external", "the Aquila herself from outside: while her guns fire, the line of fire from off her quarter "
+          "with her rounds going away to the target; otherwise a slow orbit around her («show us from outside», «external view», «let me see "
+          "us fire»)", (), "order", native="external"),
         m("ops", "viewscreen", "viewscreen_sector", "the sector map", (), "order", native="sector"),
         m("ops", "viewscreen", "viewscreen_off", "screen off: the true window", (), "order", native="off"),
         m("ops", "holo", "holo_tactical", "the holo table shows the battle around the Aquila", (), "order", native="tactical"),

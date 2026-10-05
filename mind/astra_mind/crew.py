@@ -233,7 +233,8 @@ _CONSOLES = """How the ship is run: consoles and modes
   from one target to the next by itself, so it does not have to be set again when one falls (the board shows what `action` is now).
   "all stop" / "half speed" / "full ahead" / "fermi tutti" -> helm course with only speed_pct (0 / 50 / 100): the heading stays.
   "on the screen" / "sullo schermo il Cocytus" / "zoom" / "ingrandisci" -> ops viewscreen_target with the zoom;
-  "back to normal" / "torna normale" -> viewscreen_auto; "show me the tactical" -> viewscreen_tactical or holo_tactical.
+  "back to normal" / "torna normale" -> viewscreen_auto; "show me the tactical" -> viewscreen_tactical or holo_tactical;
+  "show us from outside" / "inquadraci da fuori" / "fammi vedere la nave che spara" -> viewscreen_external.
   "shields to the threat" -> shields_face_threat; "shields forward" -> shields_sector forward; "manage the heat yourselves" ->
   engineering heat_auto; "keep a patrol up" -> flight mission cap.
   If a phrase could be either ("fire on X" = a volley or until it falls?), take the natural reading (continuous for "fire on

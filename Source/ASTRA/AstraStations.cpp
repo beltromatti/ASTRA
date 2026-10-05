@@ -75,7 +75,7 @@ namespace
 			Add(TEXT("sensors"), TEXT("emcon"), {TEXT("silent"), TEXT("restricted"), TEXT("limited"), TEXT("full")});
 			Add(TEXT("sensors"), TEXT("scan"), {TEXT("passive"), TEXT("sweep"), TEXT("focus")});
 			Add(TEXT("ops"), TEXT("viewscreen"), {TEXT("auto"), TEXT("forward"), TEXT("target"), TEXT("tactical"), TEXT("fleet"), TEXT("comms"),
-			                                      TEXT("damage"), TEXT("sector"), TEXT("off")});
+			                                      TEXT("damage"), TEXT("external"), TEXT("sector"), TEXT("off")});
 			Add(TEXT("ops"), TEXT("holo"), {TEXT("ship")});
 			Add(TEXT("ops"), TEXT("datapad"), {TEXT("push")});
 			Add(TEXT("ops"), TEXT("damage_control"), {TEXT("priority")});
@@ -159,7 +159,7 @@ const TArray<FString>& UAstraStationsSubsystem::ModeChoices(const FString& Stati
 		{TEXT("sensors.emcon"), {TEXT("silent"), TEXT("restricted"), TEXT("limited"), TEXT("full")}},
 		{TEXT("sensors.scan"), {TEXT("passive"), TEXT("sweep"), TEXT("focus")}},
 		{TEXT("ops.viewscreen"), {TEXT("auto"), TEXT("forward"), TEXT("target"), TEXT("tactical"), TEXT("fleet"), TEXT("sector"), TEXT("comms"),
-		                          TEXT("damage"), TEXT("off")}},
+		                          TEXT("damage"), TEXT("external"), TEXT("off")}},
 		{TEXT("ops.holo"), {TEXT("tactical"), TEXT("sector"), TEXT("ship")}},
 		{TEXT("ops.datapad"), {TEXT("push")}},
 		{TEXT("ops.damage_control"), {TEXT("auto"), TEXT("priority")}},

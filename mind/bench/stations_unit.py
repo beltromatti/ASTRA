@@ -565,7 +565,7 @@ GAME_MODES = {
     "shields": {"balanced", "face_threat", "sector", "forward", "aft", "port", "starboard", "dorsal", "ventral", "shields_off"},
     "point_defense": {"protect", "pd_auto", "pd_off"}, "missiles": {"conserve", "normal", "saturate"},
     "emcon": {"silent", "restricted", "limited", "full"}, "scan": {"passive", "sweep", "focus"},
-    "viewscreen": {"auto", "forward", "target", "tactical", "fleet", "comms", "damage", "sector", "off"},
+    "viewscreen": {"auto", "forward", "target", "tactical", "fleet", "comms", "damage", "external", "sector", "off"},
     "holo": {"tactical", "sector", "ship"}, "datapad": {"push"}, "damage_control": {"auto", "priority"},
     "power": {"balanced", "combat", "evasive", "silent", "shields", "weapons", "engines", "custom"},
     "heat": {"auto", "extended", "retracted", "radiators_extended", "radiators_retracted"}, "reactor": {"normal", "battle_short"},
