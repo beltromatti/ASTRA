@@ -12,11 +12,19 @@
 //   astra.fx.swatch [seconds 40]                    a lineup of every kind of effect 1.2 km ahead of the bridge, in both sides' colours: the material check
 //                                                   (needs no ships; if one of these looks wrong, the material is what is wrong, not the war)
 //   astra.fx.stats                                  what the effects hold and what they cost
+//   astra.fx.series <prefix> [n 8] [every_s 0.25] [vs] [do <command>]   n pictures of the game's view (no UI), every_s apart on the effects' own clock, from the frame the
+//                                                   command ran (with "vs" the main viewscreen's feed too: Saved/Play/<prefix>_NN.png, <prefix>_NN_vs.png); the command
+//                                                   after "do" runs first (astra.fx.series b4 12 0.1 vs do fire rail 3 aquila T): a blast or a volley in steps, the way
+//                                                   the bench of the war cannot show it
 
 #include "AstraWarFX.h"
 #include "AstraBattleSubsystem.h"
 #include "ASTRA.h"
+#include "Engine/Engine.h"
 #include "Engine/StaticMeshActor.h"
+#include "Engine/World.h"
+#include "Misc/Paths.h"
+#include "UnrealClient.h"
 
 struct FAstraWarFXTest
 {
@@ -26,11 +34,28 @@ struct FAstraWarFXTest
 	static TArray<int32> SceneIds;
 	static float SwatchT;                  // seconds the lineup has left (0: none)
 	static float SwatchRespawn;            // until the particles that live and die are thrown again
+	static int32 SeriesLeft, SeriesIdx;    // astra.fx.series: pictures still to take, and the number of the next
+	static float SeriesGap, SeriesNext;
+	static FString SeriesPrefix;
+	static bool bSeriesVs;
 
 	static FVector Polar(double RangeM, double BearingDeg, double MarkDeg)
 	{
 		const double B = FMath::DegreesToRadians(BearingDeg), M = FMath::DegreesToRadians(MarkDeg);
 		return FVector(RangeM * FMath::Cos(M) * FMath::Cos(B), RangeM * FMath::Cos(M) * FMath::Sin(B), RangeM * FMath::Sin(M));
+	}
+
+	/** The living ship with that contact id (a scene made again leaves the old one's dead ship in the list under the same id: FindByContact would find that). */
+	static FAstraBattleShip* Living(UAstraBattleSubsystem* B, const TCHAR* Contact)
+	{
+		for (FAstraBattleShip& S : B->Ships)
+		{
+			if (S.bAlive && S.ContactId.Equals(Contact, ESearchCase::IgnoreCase))
+			{
+				return &S;
+			}
+		}
+		return nullptr;
 	}
 
 	static FAstraBattleShip* Pick(UAstraWarFX& Fx, const FString& Key)
@@ -43,17 +68,17 @@ struct FAstraWarFXTest
 		}
 		if (K == TEXT("a"))
 		{
-			return B->FindByContact(TEXT("FX-A"));
+			return Living(B, TEXT("FX-A"));
 		}
 		if (K == TEXT("s"))
 		{
-			return B->FindByContact(TEXT("FX-S"));
+			return Living(B, TEXT("FX-S"));
 		}
 		if (K == TEXT("t") || K.IsEmpty())
 		{
-			return B->FindByContact(TEXT("FX-T"));
+			return Living(B, TEXT("FX-T"));
 		}
-		return B->FindByContact(Key.ToUpper());
+		return Living(B, *Key.ToUpper());
 	}
 
 	static void Hold(FAstraBattleShip& S)
@@ -296,6 +321,28 @@ struct FAstraWarFXTest
 				                               "hot chunk, two fireballs, a dark and a pale smoke (thrown every 3.4 s)"), SwatchT);
 			}
 		}
+		else if (Name == TEXT("series"))
+		{
+			SeriesPrefix = Arg(0, TEXT("series"));
+			SeriesLeft = FMath::Clamp(FCString::Atoi(*Arg(1, TEXT("8"))), 1, 400);
+			SeriesGap = FMath::Clamp(FCString::Atof(*Arg(2, TEXT("0.25"))), 0.02f, 10.f);
+			SeriesIdx = 0;
+			SeriesNext = 0.f;
+			bSeriesVs = false;
+			for (int32 i = 3; i < A.Num(); ++i)
+			{
+				if (A[i] == TEXT("vs"))
+				{
+					bSeriesVs = true;
+				}
+				else if (A[i] == TEXT("do"))
+				{
+					// what the series is about, run on the frame after the first picture is asked for
+					Queue.Add(FString::Join(TArrayView<const FString>(A).Mid(i + 1), TEXT(" ")));
+					break;
+				}
+			}
+		}
 		else if (Name == TEXT("burn"))
 		{
 			if (FAstraBattleShip* T = Pick(Fx, Arg(0, TEXT("T"))))
@@ -456,6 +503,37 @@ struct FAstraWarFXTest
 		}
 	}
 
+	/** One step of astra.fx.series: a picture of the game's view (and of the main viewscreen's feed) every SeriesGap seconds of the effects' clock. */
+	static void Series(UAstraWarFX& Fx)
+	{
+		if (SeriesLeft <= 0)
+		{
+			return;
+		}
+		if (!FApp::CanEverRender() || !Fx.Owner || !Fx.Owner->GetWorld())
+		{
+			SeriesLeft = 0;
+			return;
+		}
+		SeriesNext -= Fx.Dt;
+		if (SeriesNext > 0.f)
+		{
+			return;
+		}
+		SeriesNext = SeriesGap;                // (a frame longer than the gap does not catch up)
+		const FString Base = FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir() / TEXT("Play") / FString::Printf(TEXT("%s_%02d"), *SeriesPrefix, SeriesIdx));
+		FScreenshotRequest::RequestScreenshot(Base + TEXT(".png"), false, false);
+		if (bSeriesVs)
+		{
+			GEngine->Exec(Fx.Owner->GetWorld(), *FString::Printf(TEXT("astra.viewscreen.dump %s_vs.png"), *Base));
+		}
+		++SeriesIdx;
+		if (--SeriesLeft == 0)
+		{
+			UE_LOG(LogASTRA, Display, TEXT("[WarFX] series %s: %d pictures in Saved/Play"), *SeriesPrefix, SeriesIdx);
+		}
+	}
+
 	static void Pump(UAstraWarFX& Fx, float Dt)
 	{
 		TArray<FString> Lines = MoveTemp(Queue);
@@ -488,11 +566,18 @@ TArray<FAstraWarFXTest::FPending> FAstraWarFXTest::Pending;
 TArray<int32> FAstraWarFXTest::SceneIds;
 float FAstraWarFXTest::SwatchT = 0.f;
 float FAstraWarFXTest::SwatchRespawn = 0.f;
+int32 FAstraWarFXTest::SeriesLeft = 0;
+int32 FAstraWarFXTest::SeriesIdx = 0;
+float FAstraWarFXTest::SeriesGap = 0.25f;
+float FAstraWarFXTest::SeriesNext = 0.f;
+FString FAstraWarFXTest::SeriesPrefix;
+bool FAstraWarFXTest::bSeriesVs = false;
 
 void UAstraWarFX::RunTests()
 {
 	FAstraWarFXTest::Pump(*this, Dt);
 	FAstraWarFXTest::DrawSwatch(*this);
+	FAstraWarFXTest::Series(*this);
 }
 
 namespace
@@ -515,3 +600,4 @@ ASTRA_FX_COMMAND(burn, "Fires and venting in every section of a test ship: astra
 ASTRA_FX_COMMAND(break, "End a test ship: astra.fx.break <bow|mid|stern|reactor|disable> [on T|A|S]");
 ASTRA_FX_COMMAND(swatch, "A lineup of every kind of effect 1.2 km ahead of the bridge, in both sides' colours (the material check): astra.fx.swatch [seconds 40]; 0 puts it away");
 ASTRA_FX_COMMAND(stats, "What the war's effects hold and what they cost");
+ASTRA_FX_COMMAND(series, "Pictures of the game's view in steps: astra.fx.series <prefix> [n 8] [every_s 0.25] [vs] [do <astra.fx command>] (Saved/Play/<prefix>_NN.png; vs: the main viewscreen's feed too)");
