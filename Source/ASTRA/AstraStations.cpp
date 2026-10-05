@@ -473,17 +473,25 @@ bool UAstraStationsSubsystem::Enter(const FString& Station, const FString& Aspec
 			{
 				return true;              // "the action" and no fight on yet: the executor starts the intercept when there is one
 			}
-			TSharedPtr<FJsonObject> C = Obj({{TEXT("contact_id"), Target}});
-			C->SetNumberField(TEXT("standoff_km"), Num(A.Params, TEXT("standoff_km"), 6.0));
-			// the throttle first: the intercept's report says the speed the ship will run at (it said the old one, 60 %, to a helm told "full ahead")
+			const FContact* C = FindContact(Cs, Target);
+			if (!C || C->RangeKm < 0.0)
+			{
+				Detail = FString::Printf(TEXT("%s is only a bearing (no range): the helm can steer down it, not hold a distance"), *Target);
+				return false;
+			}
+			// the executor flies it: a lead course to where the target will be, the bow on it, and the range held by the throttle (TickHelm); with no standoff
+			// given she settles at about half the reach of her guns
+			if (!A.Params->HasField(TEXT("standoff_km")))
+			{
+				A.Params->SetNumberField(TEXT("standoff_km"), FMath::RoundToDouble(FMath::Clamp(0.45 * (double)B->GetWeaponRanges().RailKm, 8.0, 22.0)));
+			}
+			const double Standoff = Num(A.Params, TEXT("standoff_km"), 12.0);
+			// the throttle first: the report says the speed the ship will run at (it said the old one, 60 %, to a helm told "full ahead")
 			const float WasThrottle = Sh->GetThrottlePct();
 			Sh->SetThrottle((float)Num(A.Params, TEXT("speed_pct"), FMath::Max(WasThrottle, 80.f)));
-			const bool bOk = Command(TEXT("intercept"), C, Detail);
-			if (!bOk)
-			{
-				Sh->SetThrottle(WasThrottle);
-			}
-			return bOk;
+			Detail = FString::Printf(TEXT("intercepting %s: %.1f km off, closing on a lead course at %.0f%% throttle, bow on it, to hold %.0f km"), *C->Label, C->RangeKm,
+			                         Sh->GetThrottlePct(), Standoff);
+			return true;
 		}
 		if (M == TEXT("keep_on_bow") || M == TEXT("follow") || M == TEXT("orbit") || M == TEXT("broadside") || M == TEXT("formation"))
 		{
@@ -601,7 +609,7 @@ bool UAstraStationsSubsystem::Enter(const FString& Station, const FString& Aspec
 				                                        : FString::Printf(TEXT("engaging %s until %s"), *FString::Join(Ids, TEXT(", ")), Ids.Num() > 1 ? TEXT("they are down") : TEXT("it is down"));
 				return true;
 			}
-			Detail = M == TEXT("weapons_free") ? FString::Printf(TEXT("weapons free inside %.0f km"), Num(A.Params, TEXT("range_km"), 25.0))
+			Detail = M == TEXT("weapons_free") ? FString::Printf(TEXT("weapons free inside %.0f km"), Num(A.Params, TEXT("range_km"), (double)B->GetWeaponRanges().RailKm))
 			                                   : TEXT("returning fire on whoever fires on us");
 			return true;
 		}
@@ -1056,6 +1064,90 @@ void UAstraStationsSubsystem::Expire(const FString& Station, const FString& Aspe
 	Act(Station, FString::Printf(TEXT("%s ended (%s): back to %s"), *Was.Replace(TEXT("_"), TEXT(" ")), *Why, *Fallback.Replace(TEXT("_"), TEXT(" "))), true);
 }
 
+namespace
+{
+	/** The speed the drive gives at full throttle now (m/s): 4.8 a percent, by the engines' power and what the war has left of them. */
+	double HelmMaxSpeed(const UAstraShipSubsystem* Sh, const UAstraBattleSubsystem* B)
+	{
+		return 480.0 * (0.6 + 0.4 * (double)Sh->PowerFactor(TEXT("engines"))) * FMath::Max(0.05, (double)B->PlayerEngineFactor()) * (Sh->GetHeatPct() > 90.f ? 0.85 : 1.0);
+	}
+
+	/** Where a pursuer going at Speed meets a target that holds its velocity (the point to steer for); false when it cannot (the target is faster along the line). */
+	bool HelmIntercept(const FVector& P, const FVector& TPos, const FVector& TVel, double Speed, FVector& OutPoint)
+	{
+		const FVector Rel = TPos - P;
+		const double A = Speed * Speed - TVel.SizeSquared();
+		const double Bq = 2.0 * FVector::DotProduct(Rel, TVel);
+		const double C = Rel.SizeSquared();
+		if (A < 1.0)
+		{
+			return false;
+		}
+		const double T = (Bq + FMath::Sqrt(Bq * Bq + 4.0 * A * C)) / (2.0 * A);
+		OutPoint = TPos + TVel * T;
+		return true;
+	}
+
+	/** What keeping clear of the ships about asks of a course. The Aquila turns a degree and a half a second, so the helm looks half a minute ahead: a ship (the
+	 *  target's included) that her present course takes within its own clearance of another is passed on the side that opens the gap; head on, she slows. */
+	struct FHelmAvoid
+	{
+		double TurnDeg = 0.0;        // + to starboard
+		double Speed = 1.0;          // a factor on the speed asked
+		double Severity = 0.0;       // 0 clear .. 1 at the hull
+		FString Who;
+	};
+
+	FHelmAvoid HelmAvoid(const FVector& P, const FVector& V, double OwnRadiusM, const TArray<FContact>& Cs, const FString& Target, double TargetBeyondM)
+	{
+		FHelmAvoid R;
+		if (V.SizeSquared() < 100.0)
+		{
+			return R;                                              // at rest: nothing is run into
+		}
+		const FVector Fwd = V.GetSafeNormal();
+		const FVector Right = FVector::CrossProduct(FVector::UpVector, FVector(Fwd.X, Fwd.Y, 0.0)).GetSafeNormal();
+		double Turn = 0.0;
+		for (const FContact& C : Cs)
+		{
+			if (C.bCraft || C.Track < 2 || C.RangeKm < 0.0 || C.RangeKm > 16.0)
+			{
+				continue;                                              // (what is more than sixteen kilometres off is not a danger yet)
+			}
+			if (C.ContactId == Target && C.RangeKm * 1000.0 > TargetBeyondM)
+			{
+				continue;                                              // (the ship she is closing on or holding the range of: the throttle's law brings her to its standoff, not onto it)
+			}
+			const FVector Q = C.Pos - P, W = C.Vel - V;
+			const double W2 = W.SizeSquared();
+			const double Tc = W2 > 1.0 ? FMath::Clamp(-FVector::DotProduct(Q, W) / W2, 0.0, 30.0) : 0.0;
+			const FVector AtCpa = Q + W * Tc;
+			const double Clear = (OwnRadiusM + (double)C.RadiusM) * 1.4 + 300.0;
+			const double D = AtCpa.Size();
+			if (D >= Clear)
+			{
+				continue;
+			}
+			const double Sev = 1.0 - D / Clear;
+			const double Soon = FMath::Clamp(1.0 - Tc / 45.0, 0.25, 1.0);           // the nearer in time, the harder the bend
+			const double Side = FVector::DotProduct(AtCpa, Right);                  // + : it passes on her starboard hand, so she bends to port
+			const double Bend = (Side >= 0.0 ? -1.0 : 1.0) * 38.0 * Sev * Soon;
+			Turn += Bend;
+			if (Sev > R.Severity)
+			{
+				R.Severity = Sev;
+				R.Who = C.Label;
+			}
+			if (Tc < 14.0 && Sev > 0.45 && FVector::DotProduct(W.GetSafeNormal(), Fwd) < -0.5)
+			{
+				R.Speed = FMath::Min(R.Speed, 0.55);               // head on and close: she slows
+			}
+		}
+		R.TurnDeg = FMath::Clamp(Turn, -50.0, 50.0);
+		return R;
+	}
+}
+
 void UAstraStationsSubsystem::TickHelm()
 {
 	FAstraStationAspect* A = Aspect(TEXT("helm"), TEXT("course"));
@@ -1083,29 +1175,34 @@ void UAstraStationsSubsystem::TickHelm()
 		Expire(TEXT("helm"), TEXT("course"), TEXT("hold"), FString::Printf(TEXT("%s is no longer on the plot"), *Target));
 		return;
 	}
-	if (M == TEXT("intercept"))
-	{
-		// the ship's own intercept flies it; if someone else took the helm, the mode follows
-		if (Sh->GetInterceptId().IsEmpty())
-		{
-			Expire(TEXT("helm"), TEXT("course"), TEXT("hold"), TEXT("the intercept was broken off"));
-		}
-		return;
-	}
 	if (Now < A->Due)
 	{
 		return;
 	}
 	A->Due = Now + 0.5;
-	const FVector P = B->PlayerPos();
-	auto Steer = [&](const FVector& Point)
+	const FVector P = B->PlayerPos(), Vp = B->PlayerVel();
+	const double Vmax = HelmMaxSpeed(Sh, B);
+	// keeping clear of the ships about: a bend on every course, and a slower speed when she is going head on at one
+	const FHelmAvoid Av = HelmAvoid(P, Vp, 407.0, Cs, T ? T->ContactId : FString(), 3500.0);
+	if (Av.Severity > 0.5 && Now - HelmAvoidTold > 20.0)
 	{
-		Sh->SteerTo((float)B->BearingTo(Point), (float)B->MarkTo(Point));
+		HelmAvoidTold = Now;
+		Act(TEXT("helm"), FString::Printf(TEXT("bending the course %s to keep clear of %s"), Av.TurnDeg < 0.0 ? TEXT("to port") : TEXT("to starboard"), *Av.Who), false);
+	}
+	auto SteerAt = [&](const FVector& Point)
+	{
+		double H = B->BearingTo(Point), Mk = B->MarkTo(Point);
+		if (Av.Severity > 0.15)
+		{
+			H = WrapDeg(H + Av.TurnDeg);
+		}
+		Sh->SteerTo((float)H, (float)Mk);
 	};
 	auto SpeedFor = [&](double Mps)
 	{
 		// (below zero the drive backs her off: retro-thrust, up to UAstraShipSubsystem::ReverseThrottlePct)
-		Sh->SetThrottle((float)FMath::Clamp(Mps / 4.8, -(double)UAstraShipSubsystem::ReverseThrottlePct, 100.0));
+		const double Asked = Mps > 0.0 && Av.Severity > 0.15 ? Mps * Av.Speed : Mps;
+		Sh->SetThrottle((float)FMath::Clamp(Asked / 4.8, -(double)UAstraShipSubsystem::ReverseThrottlePct, 100.0));
 	};
 	if (M == TEXT("hold"))
 	{
@@ -1130,22 +1227,45 @@ void UAstraStationsSubsystem::TickHelm()
 				A->Step = 0;
 			}
 		}
+		if (Av.Severity > 0.5)
+		{
+			Sh->SteerTo((float)WrapDeg(Sh->GetHeadingDeg() + Av.TurnDeg), Sh->GetMarkDeg());   // (holding the heading is not holding it into a ship)
+		}
 		return;
 	}
-	if (M == TEXT("keep_on_bow"))
+	if (M == TEXT("keep_on_bow") || M == TEXT("intercept"))
 	{
-		Steer(T->Pos + T->Vel * 2.0);
+		// One law for both: the bow on the target (the Captain sees it through the window, and the strong face and the small cross-section meet the guns), and the
+		// range held by the throttle. keep_on_bow turns the ship and leaves her speed unless a standoff or a speed is given; an intercept closes at speed on a
+		// lead course (where the target will be, not where it is) and settles at the standoff.
+		const bool bIntercept = M == TEXT("intercept");
+		const double Range = (double)FVector::Dist(P, T->Pos);
 		const double Hold = Num(A->Params, TEXT("standoff_km"), -1.0) * 1000.0;
-		if (Hold > 0.0)
+		FVector Aim = T->Pos + T->Vel * 2.0;
+		if (bIntercept && Range > FMath::Max(Hold, 8000.0) * 1.4)
 		{
-			// the console holds the range: closes no faster than she can still stop in (the drive answers in ~5 s), matches
-			// the target's run once there, and backs off on retro-thrust if the target closes inside it (a third of her speed:
-			// one that comes on faster still gets in, and then it is the helm's call)
+			// closing: steer for the point where she meets it at the speed she can make (a target that outruns her is followed on a lead of a few seconds)
+			FVector Meet;
+			Aim = HelmIntercept(P, T->Pos, T->Vel, FMath::Max(Vmax * 0.95, 100.0), Meet) ? Meet : T->Pos + T->Vel * FMath::Min(Range / FMath::Max(Vmax, 100.0), 30.0);
+		}
+		SteerAt(Aim);
+		if (Hold > 0.0 || bIntercept)
+		{
+			// the range held: she closes no faster than she can still stop in (the drive answers in about five seconds: the speed to shed is the error over
+			// that), matches the target's run once there, and backs off on retro-thrust if the target closes inside it
+			const double H = Hold > 0.0 ? Hold : FMath::Clamp(0.45 * (double)B->GetWeaponRanges().RailKm, 8.0, 22.0) * 1000.0;     // (an intercept with no standoff given settles at about half the guns' reach)
 			const FVector Los = (T->Pos - P).GetSafeNormal();
 			const double Away = FVector::DotProduct(T->Vel, Los);
-			const double Err = FVector::Dist(P, T->Pos) - Hold;
-			const double Close = Err > 0.0 ? FMath::Min(480.0, FMath::Sqrt(2.0 * 40.0 * Err)) : Err * 0.05;
-			SpeedFor(Away + Close);
+			const double Err = Range - H;
+			double Close = Err > 0.0 ? FMath::Min(Vmax, Err / 4.5) : Err * 0.05;
+			if (bIntercept && A->Params->HasField(TEXT("speed_pct")))
+			{
+				Close = FMath::Min(Close, Num(A->Params, TEXT("speed_pct"), 100.0) * 4.8);
+			}
+			// turning to bring the bow on costs her speed along the line: she does not rush at a target she is not yet pointing at
+			const double Off = FMath::DegreesToRadians(AngleDeg(Sh->GetHeadingDeg(), Sh->GetMarkDeg(), B->BearingTo(T->Pos), B->MarkTo(T->Pos)));
+			const double Face = Err > 0.0 ? FMath::Clamp(FMath::Cos(Off), 0.25, 1.0) : 1.0;
+			SpeedFor((Away + Close) * Face);
 		}
 		return;
 	}
@@ -1162,11 +1282,11 @@ void UAstraStationsSubsystem::TickHelm()
 		const double Gap = FVector::Dist(P, Goal);
 		if (Gap > 400.0)
 		{
-			Steer(Goal + T->Vel * 4.0);
+			SteerAt(Goal + T->Vel * 4.0);
 		}
 		else
 		{
-			Steer(P + Fwd * 10000.0);                   // on station: the leader's heading
+			SteerAt(P + Fwd * 10000.0);                   // on station: the leader's heading
 		}
 		SpeedFor(T->Vel.Size() + FMath::Clamp(Gap / 12.0, -150.0, 220.0) * (FVector::DotProduct(Goal - P, Fwd) >= 0.0 ? 1.0 : -1.0));
 		return;
@@ -1183,7 +1303,7 @@ void UAstraStationsSubsystem::TickHelm()
 			Tangent = -Tangent;
 		}
 		const double Corr = FMath::Clamp((Dist - R) / FMath::Max(R, 1.0), -1.0, 1.0);
-		Steer(P + (Tangent - Rn * Corr * 1.5).GetSafeNormal() * 10000.0);
+		SteerAt(P + (Tangent - Rn * Corr * 1.5).GetSafeNormal() * 10000.0);
 		return;
 	}
 	if (M == TEXT("broadside"))
@@ -1207,6 +1327,10 @@ void UAstraStationsSubsystem::TickHelm()
 		{
 			H = WrapDeg(H + (Side == TEXT("port") ? 35.0 : -35.0));     // open the range
 		}
+		if (Av.Severity > 0.15)
+		{
+			H = WrapDeg(H + Av.TurnDeg);
+		}
 		Sh->SteerTo((float)H, 0.f);
 		return;
 	}
@@ -1216,7 +1340,7 @@ void UAstraStationsSubsystem::TickHelm()
 		if (Now - A->Since >= A->Step * 6.5)
 		{
 			const double Jink = (A->Step % 2 == 0 ? 1.0 : -1.0) * FMath::FRandRange(28.0, 48.0);
-			Sh->SteerTo((float)WrapDeg(Sh->GetHeadingDeg() + Jink), (float)FMath::FRandRange(-6.0, 6.0));
+			Sh->SteerTo((float)WrapDeg(Sh->GetHeadingDeg() + Jink + (Av.Severity > 0.15 ? Av.TurnDeg : 0.0)), (float)FMath::FRandRange(-6.0, 6.0));
 			++A->Step;
 		}
 		return;
@@ -1235,7 +1359,7 @@ void UAstraStationsSubsystem::TickHelm()
 		}
 		if (N > 0)
 		{
-			Steer(P + (P - Threat / N).GetSafeNormal() * 10000.0);
+			SteerAt(P + (P - Threat / N).GetSafeNormal() * 10000.0);
 		}
 		A->Due = Now + 2.0;
 	}
@@ -1272,29 +1396,12 @@ void UAstraStationsSubsystem::TickTactical()
 				const FString Id = V->AsString().ToUpper();
 				if (Id == TEXT("HOSTILES"))
 				{
-					// every hostile warship: stay on the one we fight while it is inside missile range, else the best one in
-					// reach — whoever is firing on us first, then the nearest (the plot is nearest first) — never a chase
-					const FContact* Cur = EngagedId.IsEmpty() ? nullptr : FindContact(Cs, EngagedId);
-					if (Cur && Cur->Side == EAstraSide::Mandate && !Cur->bDerelict && Cur->RangeKm >= 0.0 && Cur->RangeKm < 25.0)
+					// every hostile warship: the best of them for her guns now (what it is worth, how battered it is, what her rails land on it from here, whether
+					// it has her in its sights, whether the fleet beside her is on it), kept until another is clearly better — never a chase of what the guns do not reach
+					const FString Pick = B->AdviseTarget(EngagedId);
+					if (!Pick.IsEmpty())
 					{
-						Want = Cur->ContactId;
-						break;
-					}
-					const FContact* Best = nullptr;
-					for (const FContact& C : Cs)
-					{
-						if (C.Side != EAstraSide::Mandate || C.bCraft || C.Track < 2 || C.bDerelict)
-						{
-							continue;
-						}
-						if (!Best || (C.bFiringAtUs && !Best->bFiringAtUs && C.RangeKm < 30.0))
-						{
-							Best = &C;
-						}
-					}
-					if (Best)
-					{
-						Want = Best->ContactId;
+						Want = Pick;
 						break;
 					}
 					continue;
@@ -1335,27 +1442,29 @@ void UAstraStationsSubsystem::TickTactical()
 	}
 	else if (Eng.Mode == TEXT("return_fire") || Eng.Mode == TEXT("weapons_free"))
 	{
-		const double Range = Eng.Mode == TEXT("weapons_free") ? Num(Eng.Params, TEXT("range_km"), 25.0) : 30.0;
-		double Best = -1e9;
-		for (const FContact& C : Cs)
+		const double Range = Eng.Mode == TEXT("weapons_free") ? Num(Eng.Params, TEXT("range_km"), (double)B->GetWeaponRanges().RailKm) : (double)B->GetWeaponRanges().RailKm;
+		// the best warship for her guns inside the range (return fire: only those that have her in their sights); a fighter close in is the guns' too, when no
+		// warship asks for them
+		Want = B->AdviseTarget(EngagedId, Eng.Mode == TEXT("return_fire"), Range);
+		if (Want.IsEmpty())
 		{
-			if (C.Side != EAstraSide::Mandate || C.Track < 2 || C.RangeKm > Range || C.bDerelict)
+			double Best = -1e9;
+			for (const FContact& C : Cs)
 			{
-				continue;                    // (a hulk with no power is no threat: weapons free does not mean firing on the dead)
-			}
-			if (Eng.Mode == TEXT("return_fire") && !C.bFiringAtUs)
-			{
-				continue;
-			}
-			if (C.bCraft && C.RangeKm > 6.0)
-			{
-				continue;                    // the guns do not chase fighters far out: that is point defence's
-			}
-			const double Score = (C.bFiringAtUs ? 3.0 : 0.0) + (C.bCapital ? 2.0 : 0.0) + (C.ContactId == EngagedId ? 1.5 : 0.0) - C.RangeKm / 20.0;
-			if (Score > Best)
-			{
-				Best = Score;
-				Want = C.ContactId;
+				if (!C.bCraft || C.Side != EAstraSide::Mandate || C.Track < 2 || C.RangeKm > 6.0 || C.bDerelict)
+				{
+					continue;                // (the guns do not chase fighters far out: that is point defence's)
+				}
+				if (Eng.Mode == TEXT("return_fire") && !C.bFiringAtUs)
+				{
+					continue;
+				}
+				const double Score = (C.bFiringAtUs ? 3.0 : 0.0) + (C.ContactId == EngagedId ? 1.5 : 0.0) - C.RangeKm / 20.0;
+				if (Score > Best)
+				{
+					Best = Score;
+					Want = C.ContactId;
+				}
 			}
 		}
 	}
@@ -1398,17 +1507,18 @@ void UAstraStationsSubsystem::TickTactical()
 			}
 			const FString Policy = ModeOf(TEXT("tactical"), TEXT("missiles"));
 			const FString Fire = Str(Eng.Params, TEXT("fire"), TEXT("sustained")).ToLower();
-			// the magazine is finite: a salvo every cycle only to saturate; normally four every 12 s, sparingly two every 20 s
+			// the magazine is finite, and a few missiles are only shot down: a salvo big enough to saturate the target's point defence every thirty seconds or so;
+			// saturate: one every cycle; sparingly: a small one, at a warship only, every forty-five seconds
 			const bool bSaturate = Policy == TEXT("saturate");
 			const bool bConserve = Policy == TEXT("conserve") || Fire == TEXT("conserve");
-			const double Interval = bSaturate ? 0.0 : bConserve ? 20.0 : 12.0;
+			const double Interval = bSaturate ? 0.0 : bConserve ? 45.0 : 30.0;
 			const bool bMissiles = (Weapons.Contains(TEXT("missiles")) || Weapons.Contains(TEXT("torpedoes")))
-			                    && FC.MissileCycle <= 0.f && FC.Missiles > 0 && C->RangeKm >= 0.0 && C->RangeKm <= 25.0
+			                    && FC.MissileCycle <= 0.f && FC.Missiles > 0 && C->RangeKm >= 0.0 && C->RangeKm <= (double)B->GetWeaponRanges().MissileKm
 			                    && Now - LastSalvoAt >= Interval
 			                    && !(Fire == TEXT("volley") && Eng.Step > 0) && (!bConserve || C->bCapital);
 			if (bMissiles && !C->bCraft)
 			{
-				const int32 N = bSaturate ? 8 : bConserve ? 2 : 4;
+				const int32 N = bSaturate ? 8 : bConserve ? 3 : B->MissilesToSaturate(EngagedId);
 				if (B->PlayerFire(TEXT("missiles"), EngagedId, FMath::Min(N, FC.Missiles), D))
 				{
 					LastSalvoAt = Now;
@@ -1542,8 +1652,11 @@ void UAstraStationsSubsystem::TickEngineering()
 	Heat->Due = Now + 2.0;
 	const float H = Sh->GetHeatPct();
 	const bool bSilent = Sh->GetEmcon().Equals(TEXT("silent"), ESearchCase::IgnoreCase);
+	const UAstraBattleSubsystem* B = Battle();
+	const bool bFight = B && B->IsEngaged();
 	FString D;
-	if (H > 65.f && !Sh->AreRadiatorsOut() && !bSilent)
+	// the radiators come out early in a fight (an enemy that is shooting has her already: what they show hardly matters, and what the guns put into the ship does), late otherwise
+	if (H > (bFight ? 40.f : 65.f) && !Sh->AreRadiatorsOut() && !bSilent)
 	{
 		if (Command(TEXT("set_radiators"), Obj({{TEXT("state"), TEXT("extended")}}), D))
 		{
