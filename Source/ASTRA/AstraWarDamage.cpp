@@ -504,7 +504,8 @@ void UAstraBattleSubsystem::ApplyHitModel(FAstraBattleShip& To, const FVector& F
 			F = R.Z >= 0.0 ? AstraWar::Dorsal : AstraWar::Ventral;
 		}
 		N = R.SizeSquared() > 1e-6 ? R.GetSafeNormal() : AstraWar::FacingVector(F);   // where on the hull, as a direction out of it
-		const double X = Lp.X + To.Box.Mid + FMath::FRandRange(-1.f, 1.f) * KScatter.Get() * 1.3 * To.Box.Hx;
+		const bool bPlaced = Ships.Num() && SourceId == Ships[0].Id && AimSectionOn(To) >= 0;     // a shot of the Aquila's under an aim order: placed, not sprayed along the hull
+		const double X = Lp.X + To.Box.Mid + FMath::FRandRange(-1.f, 1.f) * KScatter.Get() * 1.3 * To.Box.Hx * (bPlaced ? 0.25 : 1.0);
 		Sec = X > To.Box.CutBow ? AstraWar::SecBow : (X < To.Box.CutStern ? AstraWar::SecStern : AstraWar::SecMid);
 	}
 	else
@@ -560,6 +561,13 @@ void UAstraBattleSubsystem::ApplyHitModel(FAstraBattleShip& To, const FVector& F
 		StructTook = StructureDamage(To, Sec, Rem, Type, N, F);
 	}
 	SyncTotals(To);
+	if (To.bPlayer)
+	{
+		PlayerBooks.FaceDamage[F] += Damage;
+		++PlayerBooks.FaceHits[F];
+		PlayerBooks.SectionStruct[Sec] += StructTook;
+		PlayerBooks.SectionHits[Sec] += StructTook > 0.f ? 1 : 0;
+	}
 	// --- the books
 	{
 		const int32 T = (int32)Type;
@@ -1089,7 +1097,7 @@ void UAstraBattleSubsystem::TickDamageState(FAstraBattleShip& S, float Dt)
 				Threat = (T->Pos - S.Pos).GetSafeNormal();
 			}
 		}
-		SetShieldFocus(S, Threat.IsNearlyZero() ? -1 : AstraFacingOf(S.Att.UnrotateVector(Threat.GetSafeNormal())), 0.5f);
+		SetShieldFocus(S, Threat.IsNearlyZero() ? -1 : AstraWar::FacingOfLine(S.Box, S.Att.UnrotateVector(Threat.GetSafeNormal())), 0.5f);   // (the face the line enters by: the box's)
 	}
 	FleetTick(S, Dt);                          // the inside of a ship that is not the Aquila: its power, its fires and breaches, its crew (before the section flags are read below)
 	TickShields(S, Dt);
@@ -1381,6 +1389,35 @@ void UAstraBattleSubsystem::ConsumeFightEvents(TArray<FFightEvent>& Out)
 {
 	Out.Append(FightEvents);
 	FightEvents.Reset();
+}
+
+int32 UAstraBattleSubsystem::PlayerFaceToward(const FVector& SystemPos) const
+{
+	if (Ships.Num() == 0)
+	{
+		return AstraWar::Bow;
+	}
+	const FAstraBattleShip& P = Ships[0];
+	return AstraWar::FacingOfLine(P.Box, P.Att.UnrotateVector((SystemPos - P.Pos).GetSafeNormal()));
+}
+
+void UAstraBattleSubsystem::GetPlayerFaces(float (&OutShield)[6], float (&OutSection)[3]) const
+{
+	for (float& F : OutShield) { F = 1.f; }
+	for (float& F : OutSection) { F = 1.f; }
+	if (Ships.Num() == 0 || !Ships[0].Dmg.bModel)
+	{
+		return;
+	}
+	const FAstraShipDamage& D = Ships[0].Dmg;
+	for (int32 f = 0; f < AstraWar::NumFacings; ++f)
+	{
+		OutShield[f] = D.SectorMax[f] > 0.f ? FMath::Clamp(D.Sector[f] / D.SectorMax[f], 0.f, 1.f) : 0.f;
+	}
+	for (int32 k = 0; k < AstraWar::NumSections; ++k)
+	{
+		OutSection[k] = D.StructureMax[k] > 0.f ? FMath::Clamp(D.Structure[k] / D.StructureMax[k], 0.f, 1.f) : 0.f;
+	}
 }
 
 UAstraBattleSubsystem::FPlayerFireState UAstraBattleSubsystem::GetPlayerFireState() const

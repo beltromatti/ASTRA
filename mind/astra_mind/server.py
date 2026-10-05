@@ -97,7 +97,9 @@ class GameShip:
         self._waiting[cid] = fut
         await self._send({"type": "command", "id": cid, "name": name, "args": args, "by": by})
         try:
-            return await asyncio.wait_for(fut, timeout=2.5)
+            # (the game answers in milliseconds, but a force coming onto the plot loads for a few seconds: 5 Oct, at 2.5 s an order already in force
+            # came back as «no answer» and the officer told the Captain the command had failed)
+            return await asyncio.wait_for(fut, timeout=6.0)
         finally:
             self._waiting.pop(cid, None)
 

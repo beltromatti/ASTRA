@@ -101,6 +101,8 @@ private:
 	TMap<FString, float> RecentDamage; // hull lost in the last seconds (decays)
 	struct FDeath { FString Id; FString Name; FVector Pos; double At; };
 	TArray<FDeath> Deaths;             // destroyed since the last look, waiting for their moment on screen
+	struct FBlow { FString Id; FString Name; FString Why; int32 Pri; double At; };
+	TArray<FBlow> Blows;               // what the fight just did to a ship worth a look (BATTAGLIA-3's queue): a section gutted, a system out, a shield face down
 	struct FArrival { FString Id; bool bHostile; double At; };
 	TArray<FArrival> Arrivals;         // warships newly on the plot (a force through the gate, a relief): the screen goes to them once
 	double ArrivalShotAt[2] = {-100.0, -100.0};   // the last arrival shot, ASTRA and hostile (a force found two ships at a time is one story)

@@ -118,6 +118,34 @@ def app_saved_dir() -> Path:
     return Path.home() / "Library" / "Application Support" / "Epic" / "ASTRA" / "Saved"
 
 
+def front_app() -> str:
+    """The bundle path of the app in front on the Mac ("" elsewhere, or when it cannot be told)."""
+    if sys.platform != "darwin":
+        return ""
+    try:
+        import re
+        asn = subprocess.run(["lsappinfo", "front"], capture_output=True, text=True, timeout=3).stdout.strip()
+        out = subprocess.run(["lsappinfo", "info", "-only", "bundlepath", asn], capture_output=True, text=True, timeout=3).stdout
+        m = re.search(r'"LSBundlePath"="([^"]+)"', out)
+        return m.group(1) if m else ""
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def user_idle_s() -> float:
+    """Seconds since a person last touched the Mac's keyboard, mouse or trackpad (the harness's own keys do not count: they go through Slate)."""
+    if sys.platform != "darwin":
+        return 1e9
+    try:
+        out = subprocess.run(["ioreg", "-c", "IOHIDSystem"], capture_output=True, text=True, timeout=3).stdout
+        for line in out.splitlines():
+            if "HIDIdleTime" in line:
+                return int(line.split("=")[-1].strip()) / 1e9
+    except Exception:  # noqa: BLE001
+        pass
+    return 1e9
+
+
 def cmd_launch(a: argparse.Namespace) -> None:
     if alive():
         print("a harness game is already running; `tools/play.py quit` first")
@@ -163,6 +191,19 @@ def cmd_launch(a: argparse.Namespace) -> None:
                 "-astra_campaign=continue" if a.cont else "-astra_campaign=new"]
     if a.nomind:
         args.append("-astra_nomind")
+    elif sys.platform != "win32":
+        # the mind outlives the game (the next game connects to it): a mind started before the last change to its code would play the old code (5 Oct: a
+        # playtest of new prompts ran on a mind started half an hour before them); the game starts a fresh one
+        subprocess.run(["pkill", "-f", "astra-mind"], check=False)
+        time.sleep(1.0)
+    # someone may be using the Mac (5 Oct: the test window took the focus and the user's typing walked the Captain off the bridge): no splash (it brings
+    # the app to the front), the game ignores the Mac's keyboard and mouse (AstraHarness: -astra_harness_input lets them through), and the app in front
+    # is given the focus back once the game is up
+    args.append("-nosplash")
+    before = front_app()
+    idle = user_idle_s()
+    if idle < 120:
+        print(f"the Mac is in use (last touched {idle:.0f} s ago): the game starts behind, and ignores its keyboard and mouse")
     if not a.sound:
         args.append("-nosound")
     if a.args:
@@ -178,6 +219,10 @@ def cmd_launch(a: argparse.Namespace) -> None:
             st = call("/state")
             if st.get("pawn", {}).get("class"):
                 LAST.write_text(str(st.get("real", 0.0)))
+                now = front_app()
+                if before and now and now != before and not a.app:
+                    subprocess.run(["open", "-a", before], check=False)          # (the focus back to whoever was working: the game keeps running behind)
+                    print(f"focus given back to {Path(before).stem}")
                 print(f"game up in {time.time() - t0:.0f} s: {json.dumps(st)}")
                 return
     print("the game did not answer in 240 s (see Saved/Play/game_stdout.log)")

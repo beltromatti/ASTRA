@@ -37,7 +37,7 @@ abbordaggi contro l'Aquila, chiesto da ABBORDAGGI).
   tace da 4; la dottrina dell'iniziativa per entrambi); lo schermo principale che non cambia risoluzione a ogni sguardo. Uniti i rami finiti
   di ARTE-INTERNI-2, ABBORDAGGI-3 e SPAZIO-VIVO-2 (M7–M9: il Falcon raccoglie le capsule con R, i getti dei velivoli, convogli e pattuglie);
   in corso nell'editor la ricostruzione degli interni e l'importazione del kit dei ponti nemici.
-- **Credito OpenRouter: 3,30 $** (le partite del 5/10 ~1,8 $): segnalato in RICHIESTE.
+- **Credito OpenRouter: 13,27 $** (ricaricato dall'utente il 5/10) (le partite del 5/10 ~1,8 $): segnalato in RICHIESTE.
 - **Che cosa arriva dal Gate** (il lead, `AstraGateWatch.cpp`): il tavolo olografico mostra il Janus Gate e, per una forza annunciata (il transito
   visto da Keeper Station, i rinforzi di Fleet, le flotte della Marcia dirette qui), un anello che pulsa dove uscirà con quante navi e fra quanto;
   lo schermo principale lo mette in testa («GATE · 4 HOSTILE INBOUND · IN 1:32»); un'incursione oscura resta una sorpresa. Provato nel gioco
@@ -65,7 +65,7 @@ abbordaggi contro l'Aquila, chiesto da ABBORDAGGI).
 
   Nel gioco:
   - **duello con uno Styx**: distrutto in 64 s dal primo ordine (missili + rotaie da 49 km), Aquila intatta;
-  - **contro il gruppo d'attacco di 4 navi**: dopo ~5 min la sezione di PRUA dell'Aquila è sventrata (91 locali, 14 morti, la plancia è lì) e poi la vista dalla plancia mostra l'esterno. Da capire (riproduzione in corso) e da bilanciare: il timone che tiene la prua offre sempre la stessa faccia (richiesta a BATTAGLIA-3).
+  - **contro il gruppo d'attacco di 4 navi**: dopo ~5 min la sezione di PRUA dell'Aquila è sventrata (91 locali, 14 morti). Da bilanciare: il timone che tiene la prua offre sempre la stessa faccia (richiesta a BATTAGLIA-3).
 
   Il lead ha già adeguato a main:
   - le menti: dottrina con la fisica nuova, fascia dell'Aquila 18-30 km;
@@ -73,6 +73,31 @@ abbordaggi contro l'Aquila, chiesto da ABBORDAGGI).
   - lo schermo principale (GetPlayerFireState);
   - la ruota: ENGAGE alla distanza dell'Aquila, 24 km, e intercept a 16 km per chi fugge.
 - **I tre aiutanti erano fermi per il limite d'uso** (5/10 mattina): ripresi da dove erano.
+- **VOCI-3 chiuso** (c272ddf). Il modulo:
+  - reti con ascoltatori e una voce per il quadro con il suo ritmo;
+  - risposte al Capitano mai perse;
+  - delegazione che resta, canali che si chiudono da soli;
+  - ventaglio della flotta (si sveglia solo chi è chiamato);
+  - 14 capitani alleati;
+  - alias dei nomi storpiati dal riconoscitore.
+
+  Banco S3: 8,0 → 4,0 battute al minuto, risposte invariate. Costanti da tarare nella partita vera: PICTURE_GAP_S 20, REPORT_GAP_S 10 (server.py), se l'XO dice troppo poco. Aperto: gli hotword dentro il motore di Parakeet (Swift, FluidAudio).
+- **VFX-2 avviato** (al posto di VOCI-3): fuoco leggibile a ogni distanza, esplosioni con forma senza accecare la plancia, sezioni che si spezzano. Può usare il gioco di prova nel suo worktree, sulla porta 8771.
+- **Il banco di prova non disturba più chi usa il Mac.** Il gioco parte dietro (niente splash) e, se prende il fuoco, lo restituisce. Ignora tastiera e mouse del Mac (-astra_harness_input per giocarlo a mano). Il 5/10 i tasti dell'utente avevano portato il Capitano fuori dalla plancia: la «plancia sparita» era questo, non un difetto.
+- **Regia sui momenti forti**: lo schermo principale taglia su uno scudo che cade, un sistema fuori uso, una sezione sventrata («BOW SHIELD DOWN · ACHERON»).
+- **Tre partite di prova da Capitano sull'apertura** (pomeriggio): [PARTITE_LEAD_2026-10-05.md](PARTITE_LEAD_2026-10-05.md).
+
+  Corretto:
+  - l'apertura non aveva battaglia (il grosso tornava troppo presto, il Mandato arrivava a pezzi e si ritirava);
+  - la vittoria finale dell'arco dichiarata dopo 5 minuti;
+  - il tavolo senza la forza in arrivo;
+  - ordini «falliti» che erano in vigore;
+  - Rourke ripetuto;
+  - l'XO che ripropone;
+  - la mente vecchia nelle prove.
+
+  Nella terza prova la battaglia per il Gate c'è stata: 17 navi del Mandato, 4 distrutte in 90 s di fuoco pesante, l'Aquila al 67 %, ritirata del Mandato all'arrivo dei soccorsi.
+- **Uniti** BATTAGLIA-3 tappa 5 (la prua non più sventrata, la mira del Capitano) e ABBORDAGGI-4 tappa 2 (la fanteria si comanda: prendere, sfondare, rastrellare, imboscata, scortare il Capitano, chiudere dietro).
 - **Lo schermo principale racconta lo scontro a tagli** (il lead): il bersaglio, poi «ASN AQUILA · FIRING ON …» (l'Aquila da fuori che spara,
   `astra.viewscreen.broadside`), poi il bersaglio. Provato nel gioco. Brief pronti: **VFX-2**, **PRESTAZIONI-GPU** (oltre ad ARTE-SCAFI).
 - **Da indagare (PRESTAZIONI-GPU)**: nel gioco di prova (1600x900, 60 fps di obiettivo) la risoluzione dinamica sta al minimo (33–34 %) e

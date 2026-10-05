@@ -438,6 +438,40 @@ void AAstraViewscreen::Direct(float Dt)
 	}
 	Arrivals.RemoveAll([this](const FArrival& A) { return Now - A.At > 45.0; });
 	LastSeen = MoveTemp(Seen);
+	// what the fight did that is worth a look (BATTAGLIA-3, ConsumeFightEvents): a ship's section gutted (ours or theirs), a system or a battery knocked out or a
+	// shield face down on the ship the fight is about — on a firm track (the fog holds: a picture of what the sensors cannot see would be a lie)
+	if (UAstraBattleSubsystem* BM = W ? W->GetSubsystem<UAstraBattleSubsystem>() : nullptr)
+	{
+		TArray<UAstraBattleSubsystem::FFightEvent> Ev;
+		BM->ConsumeFightEvents(Ev);
+		static const TCHAR* Sections[3] = {TEXT("BOW"), TEXT("MID"), TEXT("STERN")};
+		static const TCHAR* Faces[6] = {TEXT("BOW"), TEXT("STERN"), TEXT("PORT"), TEXT("STARBOARD"), TEXT("DORSAL"), TEXT("VENTRAL")};
+		static const TCHAR* Systems[6] = {TEXT("ENGINES OUT"), TEXT("SENSORS OUT"), TEXT("HANGAR OUT"), TEXT("BRIDGE HIT"), TEXT("REACTOR FAILING"), TEXT("POINT DEFENCE DOWN")};
+		for (const UAstraBattleSubsystem::FFightEvent& E : Ev)
+		{
+			using EKind = UAstraBattleSubsystem::FFightEvent::EKind;
+			if (!E.bKnown || E.ContactId.IsEmpty() || E.ContactId == TEXT("AQUILA"))
+			{
+				continue;
+			}
+			const bool bOnAction = E.ContactId == Engaged;
+			FString Why;
+			int32 Pri = 4;
+			switch (E.Kind)
+			{
+			case EKind::SectionGutted: Why = FString::Printf(TEXT("%s SECTION GUTTED"), Sections[FMath::Min<int32>(E.Section, 2)]); Pri = 5; break;
+			case EKind::SystemOut: if (bOnAction && E.System >= 0 && E.System < 6) { Why = Systems[E.System]; } break;
+			case EKind::MountOut: if (bOnAction) { Why = TEXT("A BATTERY SILENCED"); } break;
+			case EKind::ShieldFell: if (bOnAction && !E.bAstra) { Why = FString::Printf(TEXT("%s SHIELD DOWN"), Faces[FMath::Min<int32>(E.Face, 5)]); } break;
+			default: break;
+			}
+			if (!Why.IsEmpty())
+			{
+				Blows.Add({E.ContactId, E.Name.IsEmpty() ? E.ContactId : E.Name, Why, Pri, Now});
+			}
+		}
+		Blows.RemoveAll([this](const FBlow& X) { return Now - X.At > 3.0; });
+	}
 	Deaths.RemoveAll([this](const FDeath& D) { return Now - D.At > 4.0; });
 
 	// ops' order
@@ -567,6 +601,12 @@ void AAstraViewscreen::Direct(float Dt)
 			SwarmShotAt = Now;
 		}
 		Best = {EShot::Swarm, TEXT("salvo"), FString::Printf(TEXT("%d missiles"), In.Num()), TEXT("INCOMING"), 5, 3.0, FVector::ZeroVector, {}};
+	}
+	else if (const FBlow* Bl = Blows.Num() ? &Blows.Last() : nullptr; Bl && FindC(Cs, Bl->Id))
+	{
+		// the fight's turning points, as they happen: the ship and what it lost (held a few seconds, then the fight goes on)
+		Best = {EShot::Contact, Bl->Id, Bl->Name, Bl->Why, Bl->Pri, 4.5, FVector::ZeroVector, {}};
+		Blows.Reset();
 	}
 	else if (!HitId.IsEmpty())
 	{
@@ -742,7 +782,7 @@ void AAstraViewscreen::Aim(float DeltaSeconds)
 	FVector WantPos = CamPos;
 	FovWant = Fov;
 	bool bOrbit = false;
-	TArray<FVector> Subject;                         // where what is shown is (world): nothing in the first three quarters of the way to it is drawn
+	TArray<FVector> Subject;                         // where what is shown is (world): nothing in the first half of the way to it is drawn
 	// the zoom that makes a set of points fill about 60% of the frame, seen from 1 km out along Dir
 	auto FitFov = [&](const FVector& Dir, const TArray<FVector>& Pts, double Margin) -> float
 	{
@@ -912,7 +952,7 @@ void AAstraViewscreen::Aim(float DeltaSeconds)
 			}
 		}
 	}
-	// the screen is a composite of the sensors, not a lens anything can cross: zoomed on a subject, whatever is in the first three quarters of
+	// the screen is a composite of the sensors, not a lens anything can cross: zoomed on a subject, whatever is in the first half (once three quarters) of
 	// the way to it is left out of the picture by the camera's near plane, of either side, hull, lamp, shot or station alike (3 Oct: at x130 an
 	// escort, a fighter or a salvo of our own rounds a few kilometres out filled the frame as a huge blurred plane; 4 Oct, at half the way: the
 	// Janus Gate's segments still hid a destroyer 24 km out). The subject itself never is, nor what flies right beside it.
@@ -922,9 +962,11 @@ void AAstraViewscreen::Aim(float DeltaSeconds)
 		const double D = FVector::Dist(P, CamPos);
 		Nearest = Nearest > 0.0 ? FMath::Min(Nearest, D) : D;
 	}
+	// (half the way, not three quarters: the rounds of a fight fly for seconds, and at three quarters the screen showed only the last 7.5 km of a 30 km
+	// flight, 0.6 s of 2.5, VFX-2's measure, 5 Oct; what flies close to us, an escort, a fighter, a salvo, is still left out)
 	const bool bClip = !bOrbit && Fov < 12.f && Nearest > 2000.0;
 	Capture->bOverride_CustomNearClippingPlane = bClip;
-	Capture->CustomNearClippingPlane = bClip ? (float)(0.75 * Nearest) : 0.f;
+	Capture->CustomNearClippingPlane = bClip ? (float)(0.5 * Nearest) : 0.f;
 }
 
 bool AAstraViewscreen::Project(const FVector& World, int32 W, int32 H, FVector2D& Out) const

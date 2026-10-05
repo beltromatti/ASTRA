@@ -67,6 +67,26 @@ namespace AstraWar
 		float CutBow = 0.f, CutStern = 0.f;
 		bool Valid() const { return Hx > 0.f && Hy > 0.f && Hz > 0.f; }
 	};
+	/** The face a line of fire enters a hull through, for a direction that points out of the ship towards the shooter (ship frame): the plane of the box that a ray from the middle of the hull crosses
+	 *  first. The dominant axis (AstraFacingOf) is the same only for a hull as long as it is wide: a shot twenty degrees off the bow of an eight-hundred-metre ship with a hundred and forty across
+	 *  strikes its flank, and the shield sector that must be reinforced for it is the flank's (BATTAGLIA-3: the Aquila's tactical reinforced the bow while her port face took the blows). */
+	inline int32 FacingOfLine(const FHullBox& B, const FVector& LocalOut)
+	{
+		FVector A = LocalOut.GetAbs();
+		if (B.Valid())
+		{
+			A = FVector(A.X / B.Hx, A.Y / B.Hy, A.Z / B.Hz);
+		}
+		if (A.X >= A.Y && A.X >= A.Z)
+		{
+			return LocalOut.X >= 0.0 ? Bow : Stern;
+		}
+		if (A.Y >= A.Z)
+		{
+			return LocalOut.Y >= 0.0 ? Starboard : Port;
+		}
+		return LocalOut.Z >= 0.0 ? Dorsal : Ventral;
+	}
 	/** The tuning table of the war (astra.war.tune <name> <value>: from the console or the bench's --exec): a change bumps
 	 *  the version, and every FTuneVar reads its value again. For A/B runs without a build. */
 	ASTRA_API int32& TuneVersion();

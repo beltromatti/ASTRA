@@ -455,8 +455,10 @@ class Voice:
         self._overflow()
         # the answer goes first; a report of danger does not wait for a chat
         cur = self._cur
+        # (the admiral or a captain calling the Captain over the net is let finish by an officer's answer: the bridge does not talk over him, and a long call
+        # cut at a few per cent and said again from the start was heard as the same thing twice, 5 Oct; a warning of danger and the Captain's own words still stop him)
         if cur is not None and cur.state == "playing":
-            if line.prio == Prio.ANSWER and cur.prio != Prio.ANSWER:
+            if line.prio == Prio.ANSWER and cur.prio != Prio.ANSWER and not (cur.addressed and not cur.crew):
                 self._request_cut(cur, "answer_first")
             elif line.prio == Prio.URGENT and cur.prio >= Prio.NORMAL and self._remaining(cur) > 1.5:
                 self._request_cut(cur, "urgent_first")

@@ -170,7 +170,10 @@ ORBAT: list[dict[str, Any]] = [
          commander=dict(name="Rear Admiral Odile Marchetti", rank="Rear Admiral", voice="alba", gender="f",
                         bio="Commands the 7th Fleet's main body under Rourke; thirty years of carrier work, a clipped manner, and a habit of asking a captain what he would do "
                             "before she says what she would."),
-         order=dict(kind="hold", target="Cassia", stance="steady", reason="answered a distress call from the Cassia Yards that was false: it has found nothing", position="gate")),
+         # (on the far side of Cassia, its wings out over the approaches: called back, it needs the crossing, the recovery of its craft and the jump, about four and a half minutes;
+         # at the Gate it came back in two, with the strike group, and the opening's battle was never fought, 5 Oct: Solm turned away from twelve fresh hulls)
+         order=dict(kind="hold", target="Cassia", stance="steady", reason="answered a distress call from the Cassia Yards that was false: its wings are still out over the far side of "
+                                                                            "the system, searching the approaches for a ship that was never there", position="world")),
     dict(id="F-A2", side="astra", name="Aurelia Picket", where="Aurelia", supply=1.0, morale=0.85, tactical_command="captain",
          ships=[("praetorian", "ASN Praetorian"), ("vigilant", "ASN Vigilant")], wings=[(0, "fighter", 8)], contacts=["T-01", "T-02"],
          commander=dict(key="castellan"),
@@ -189,7 +192,8 @@ ORBAT: list[dict[str, Any]] = [
          order=dict(kind="defend", target="Concordia", stance="cautious", reason="the Senate's fleet: it guards the capital until the Senate says otherwise", position="world")),
     # ---- the Mandate: the Interdiction Fleet and the homeland
     dict(id="F-M1", side="mandate", name="Strike Group Solm", where="Thule", supply=0.95, morale=0.85, scripted="opening", arrives_s=170, dark=True,
-         ships=[("acheron", "Acheron"), ("styx", "Styx"), ("styx", "Cocytus"), ("styx", "Phlegethon")], wings=[(0, "fighter", 4)],
+         # (two cruisers: with one the picket and the Aquila broke it in three minutes without a loss, BATTAGLIA-3's bench, 5 Oct; the opening is a fight that costs)
+         ships=[("acheron", "Acheron"), ("styx", "Styx"), ("styx", "Cocytus"), ("styx", "Phlegethon"), ("acheron", "Hecate")], wings=[(0, "fighter", 4), (4, "fighter", 4)],
          contacts=["T-21", "T-22", "T-23", "T-24"], commander=dict(key="solm"),
          order=dict(kind="assault", target="Aurelia", stance="bold", reason="seize Janus Gate Aurelia and Keeper Station; test the picket")),
     dict(id="F-M2", side="mandate", name="Lethe Hale", where="Aurelia", supply=0.9, morale=0.8, dark=True,
@@ -235,8 +239,13 @@ MARCH_OPENING: dict[str, Any] = dict(
                      order=dict(kind="hold", target="Meridian", stance="steady", reason="Battle Group Constance musters at Meridian, one Gate from the Aurelia picket: it comes on the Admiral's word")),
     },
     # (at 90 s: the Gate's warning comes at about two and a half minutes and the strike group at under four; at 150 s the first shot came eight minutes in, 5 Oct)
+    # The vanguard follows the strike group through the Gate a minute behind it: the Interdiction Fleet comes in strength, thirteen hulls against the picket,
+    # and the battle for the Gate is fought until the relief and the main body turn it (the lead's games of 5 Oct: alone, the strike group met the picket and
+    # Battle Group Constance, judged the odds and turned away, and the vanguard came after it and did the same: no battle, only a pursuit)
     plan=[dict(at_s=90.0, side="mandate", fleet="F-M1", kind="assault", target="Aurelia", stance="bold", dark=False,
-               reason="seize Janus Gate Aurelia and Keeper Station; test the picket")],
+               reason="seize Janus Gate Aurelia and Keeper Station; the vanguard follows a minute behind: together we outnumber the picket"),
+          dict(at_s=150.0, side="mandate", fleet="F-M3", kind="assault", target="Aurelia", stance="bold", dark=False,
+               reason="follow the strike group through the Gate a minute behind it and finish what it begins: the picket's relief is minutes away, strike before it")],
 )
 
 # ------------------------------------------------------------------------------------------------ the war's pace (the bench tunes these)

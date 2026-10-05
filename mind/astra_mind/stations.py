@@ -106,12 +106,15 @@ def _build() -> dict[str, Station]:
         m("helm", "course", "intercept", "close on a contact and hold the standoff range, broadside inside it; the course follows the target",
           (_target(), P("standoff_km", NUM, "range to hold: the Aquila's band is 18-30 km (her railguns reach 45 km, a Styx's 28, lasers 6.5-9); 15-20 to cut off a ship that runs", lo=0.5, hi=45, default=22), _speed()),
           "target_lost", "engaged"),
-        m("helm", "course", "keep_on_bow", "keep the bow on the target: the Captain sees it through the window; with target `action` the bow "
-          "follows the fight from one target to the next by itself, and waits when there is none. It turns the ship; with standoff_km the "
-          "console also holds that range by itself (closes, slows in time, matches the target's run, stops if it closes inside); "
-          "otherwise her speed stays as it is unless speed_pct is given in the same order (pointing at an enemy at cruise speed "
-          "closes on it and runs past)",
-          (_action_target(), _speed(), P("standoff_km", NUM, "range to hold: the Aquila's band is 18-30 km (her railguns reach 45 km, a Styx's 28, lasers 6.5-9)", lo=0.5, hi=45)),
+        m("helm", "course", "keep_on_bow", "keep the target on the bow (or on a quarter, under fire): the Captain sees it through the window; "
+          "with target `action` the bow follows the fight from one target to the next by itself, and waits when there is none. It turns "
+          "the ship; with standoff_km the console also holds that range by itself (closes, slows in time, matches the target's run, stops "
+          "if it closes inside); otherwise her speed stays as it is unless speed_pct is given in the same order (pointing at an enemy at "
+          "cruise speed closes on it and runs past). Under fire the helm by itself shows the enemy the fullest face of three — the bow, "
+          "the port quarter, the starboard quarter (28 degrees off the line) — and turns to the next when the one it shows gives: every "
+          "turret bears all the same; `posture` bow holds the bow exactly on the target",
+          (_action_target(), _speed(), P("standoff_km", NUM, "range to hold: the Aquila's band is 18-30 km (her railguns reach 45 km, a Styx's 28, lasers 6.5-9)", lo=0.5, hi=45),
+           P("posture", STR, "bow: the bow exactly on the target, never the quarter (the default lets the helm turn the quarter to the fire)", enum=("bow",))),
           "target_lost"),
         m("helm", "course", "follow", "shadow a ship at a distance and on a side of it",
           (_target(), P("distance_km", NUM, "distance to keep", lo=0.3, hi=40, default=2),
@@ -144,7 +147,11 @@ def _build() -> dict[str, Station]:
              "in reach (whoever fires on us first, else the nearest), new contacts included, it waits when there is none", required=True),
            P("weapons", STRS, "subset of railguns, lasers, missiles, torpedoes (default: railguns, lasers, missiles)"),
            P("fire", STR, "sustained = keep firing; volley = one missile salvo then hold; conserve = fewer missiles, only sure hits",
-             enum=("sustained", "volley", "conserve"), default="sustained")),
+             enum=("sustained", "volley", "conserve"), default="sustained"),
+           P("aim", STR, "where the gunners aim on the target (default: the middle of the hull): a system or a section. Geometry decides "
+             "what can be reached: a ship that faces us bow-on takes every round in her bow whatever the aim (her sensors and her bow go "
+             "first); her engines need her quarter, her side or her stern — a ship that runs. Engines out leaves her adrift, a hulk the "
+             "marines can board", enum=("engines", "sensors", "hangar", "bridge", "reactor", "weapons", "bow", "midships", "stern"))),
           "target_lost", "engaged"),
         m("tactical", "shields", "shields_balanced", "shields even on every sector", (), "order", native="balanced"),
         m("tactical", "shields", "shields_face_threat", "turn the strongest sector towards the incoming fire, continuously (the default)",

@@ -565,7 +565,18 @@ bool UAstraStationsSubsystem::Enter(const FString& Station, const FString& Aspec
 			}
 			if (M == TEXT("engage"))
 			{
-				// {targets: [ids]} or {target: id}; weapons: [railguns, lasers, missiles, torpedoes]; fire: sustained|volley|conserve
+				// {targets: [ids]} or {target: id}; weapons: [railguns, lasers, missiles, torpedoes]; fire: sustained|volley|conserve;
+				// aim: engines|sensors|weapons|hangar|bridge|reactor|bow|midships|stern (the system to hit: BATTAGLIA-3)
+				if (const FString AimWord = Str(A.Params, TEXT("aim")); !AimWord.IsEmpty())
+				{
+					FString AimDetail;
+					if (UAstraBattleSubsystem* Bt = Battle(); Bt && !Bt->SetPlayerAim(AimWord, AimDetail))
+					{
+						Detail = AimDetail;
+						return false;
+					}
+					AimSet = AimWord;
+				}
 				const TArray<TSharedPtr<FJsonValue>>* List = nullptr;
 				TArray<FString> Ids;
 				if (A.Params->TryGetArrayField(TEXT("targets"), List))
@@ -1189,14 +1200,58 @@ void UAstraStationsSubsystem::TickHelm()
 		HelmAvoidTold = Now;
 		Act(TEXT("helm"), FString::Printf(TEXT("bending the course %s to keep clear of %s"), Av.TurnDeg < 0.0 ? TEXT("to port") : TEXT("to starboard"), *Av.Who), false);
 	}
-	auto SteerAt = [&](const FVector& Point)
+	// The posture she holds while somebody can hit her (BATTAGLIA-3: the Aquila's bow section carries the bridge, the sensors and the hangar, and a helm that keeps the bow on the enemy gives the guns that
+	// section, and nothing else, for as long as the fight lasts: on 5 Oct, five minutes against a strike group gutted it, and the bridge with it). Her mounts are dorsal and ventral turrets with a field of 120
+	// degrees round their axes: every gun bears at any angle to the target, so a quarter costs her no fire, and what the enemy strikes is the face she gives it. She gives the fullest of the three the
+	// enemy can be given (the bow, weighed down for what sits behind it; the port quarter; the starboard quarter), and turns to the next when the one she shows has given, no sooner than every 40 s (the
+	// shield's capacity takes time to move, and she turns at a degree and a half a second). `posture: bow` in the order keeps the bow exactly on the target. Returns the yaw off the line of sight, in degrees,
+	// positive to bring the bow to the right of the target (the port quarter to the enemy); zero when nobody can reach her.
+	auto Posture = [&](const FContact* Focus) -> double
 	{
-		double H = B->BearingTo(Point), Mk = B->MarkTo(Point);
+		const double QuarterDeg = FMath::Clamp(Num(A->Params, TEXT("quarter_deg"), 28.0), 10.0, 60.0);
+		const double LockS = FMath::Clamp(Num(A->Params, TEXT("posture_s"), 40.0), 10.0, 120.0);
+		bool bUnderFire = false;
+		for (const FContact& C : Cs)
+		{
+			bUnderFire |= C.Side == EAstraSide::Mandate && !C.bCraft && !C.bDerelict && C.Track >= 2 && C.RangeKm >= 0.0 && C.RangeKm < 38.0 && (C.bFiringAtUs || C.RangeKm < 22.0);
+		}
+		if (!bUnderFire || !Focus || Focus->bFleeing || Str(A->Params, TEXT("posture")).Equals(TEXT("bow"), ESearchCase::IgnoreCase))
+		{                                                       // (a ship that is running shows her its stern and what it fires aft: she goes after it bow on, and the closing speed is hers)
+			HelmQuarter = 0;
+			return 0.0;
+		}
+		float Faces[6], Sections[3];
+		B->GetPlayerFaces(Faces, Sections);
+		auto Worth = [&](int32 Face, int32 Section, double Weight) { return Weight * (double)Faces[Face] * (0.4 + 0.6 * (double)Sections[Section]); };
+		// (with the faces equal she turns the way her bow already points off the line of sight: no turn through the bow to the other quarter)
+		const double Lean = FMath::FindDeltaAngleDegrees(B->BearingTo(Focus->Pos), Sh->GetHeadingDeg());
+		const double Score[3] = {Worth(AstraWar::Bow, AstraWar::SecBow, 0.75), Worth(AstraWar::Port, AstraWar::SecMid, 1.0) + (Lean > 0.0 ? 0.02 : 0.0),
+		                         Worth(AstraWar::Starboard, AstraWar::SecMid, 1.0) + (Lean <= 0.0 ? 0.02 : 0.0)};
+		const int32 Cur = HelmQuarter == 0 ? 0 : (HelmQuarter > 0 ? 1 : 2);
+		int32 Best = Cur;
+		for (int32 i = 0; i < 3; ++i)
+		{
+			Best = Score[i] > Score[Best] + (i == Cur ? 0.0 : 0.10) ? i : Best;
+		}
+		if (Best != Cur && Now - HelmQuarterAt >= (Score[Cur] < 0.25 ? 0.3 * LockS : LockS))
+		{
+			HelmQuarter = Best == 0 ? 0 : (Best == 1 ? 1 : -1);
+			HelmQuarterAt = Now;
+			Act(TEXT("helm"), HelmQuarter == 0 ? FString::Printf(TEXT("the bow to the enemy again: the %s face is the fullest (%.0f%%)"), TEXT("bow"), 100.0 * Faces[AstraWar::Bow])
+			                                   : FString::Printf(TEXT("turning the %s quarter to the enemy: the %s shield is at %.0f%%, the bow's at %.0f%% (her guns bear all the same)"),
+			                                                     HelmQuarter > 0 ? TEXT("port") : TEXT("starboard"), HelmQuarter > 0 ? TEXT("port") : TEXT("starboard"),
+			                                                     100.0 * Faces[HelmQuarter > 0 ? AstraWar::Port : AstraWar::Starboard], 100.0 * Faces[AstraWar::Bow]), false);
+		}
+		return HelmQuarter * QuarterDeg;
+	};
+	auto SteerAt = [&](const FVector& Point, double YawOff = 0.0)
+	{
+		double H = B->BearingTo(Point) + YawOff, Mk = B->MarkTo(Point);
 		if (Av.Severity > 0.15)
 		{
-			H = WrapDeg(H + Av.TurnDeg);
+			H += Av.TurnDeg;
 		}
-		Sh->SteerTo((float)H, (float)Mk);
+		Sh->SteerTo((float)WrapDeg(H), (float)Mk);
 	};
 	auto SpeedFor = [&](double Mps)
 	{
@@ -1211,11 +1266,13 @@ void UAstraStationsSubsystem::TickHelm()
 		const FContact* Act_ = ActionTargetId.IsEmpty() ? nullptr : FindContact(Cs, ActionTargetId);
 		if (bFace && Act_ && B->IsEngaged())
 		{
-			const double Off = AngleDeg(Sh->GetHeadingDeg(), Sh->GetMarkDeg(), Act_->BearingDeg, FMath::Clamp(Act_->MarkDeg, -60.0, 60.0));
+			const double HoldYaw = Posture(Act_);
+			const double HoldBrg = WrapDeg(Act_->BearingDeg + HoldYaw);
+			const double Off = AngleDeg(Sh->GetHeadingDeg(), Sh->GetMarkDeg(), HoldBrg, FMath::Clamp(Act_->MarkDeg, -60.0, 60.0));
 			const bool bFacing = A->Step == 1;
 			if (Off > (bFacing ? 3.0 : 12.0))
 			{
-				Sh->SteerTo((float)Act_->BearingDeg, (float)FMath::Clamp(Act_->MarkDeg, -60.0, 60.0));
+				Sh->SteerTo((float)HoldBrg, (float)FMath::Clamp(Act_->MarkDeg, -60.0, 60.0));
 				if (!bFacing)
 				{
 					A->Step = 1;
@@ -1248,7 +1305,8 @@ void UAstraStationsSubsystem::TickHelm()
 			FVector Meet;
 			Aim = HelmIntercept(P, T->Pos, T->Vel, FMath::Max(Vmax * 0.95, 100.0), Meet) ? Meet : T->Pos + T->Vel * FMath::Min(Range / FMath::Max(Vmax, 100.0), 30.0);
 		}
-		SteerAt(Aim);
+		const double Yaw = Posture(T);
+		SteerAt(Aim, Yaw);
 		if (Hold > 0.0 || bIntercept)
 		{
 			// the range held: she closes no faster than she can still stop in (the drive answers in about five seconds: the speed to shed is the error over
@@ -1262,10 +1320,11 @@ void UAstraStationsSubsystem::TickHelm()
 			{
 				Close = FMath::Min(Close, Num(A->Params, TEXT("speed_pct"), 100.0) * 4.8);
 			}
-			// turning to bring the bow on costs her speed along the line: she does not rush at a target she is not yet pointing at
-			const double Off = FMath::DegreesToRadians(AngleDeg(Sh->GetHeadingDeg(), Sh->GetMarkDeg(), B->BearingTo(T->Pos), B->MarkTo(T->Pos)));
+			// turning to bring the bow on costs her speed along the line: she does not rush at a target she is not yet pointing at (the posture's quarter is where she means to point, and the speed
+			// she asks is the one that makes the closing speed she wants along the line of sight with her heading off it)
+			const double Off = FMath::DegreesToRadians(AngleDeg(Sh->GetHeadingDeg(), Sh->GetMarkDeg(), WrapDeg(B->BearingTo(T->Pos) + Yaw), B->MarkTo(T->Pos)));
 			const double Face = Err > 0.0 ? FMath::Clamp(FMath::Cos(Off), 0.25, 1.0) : 1.0;
-			SpeedFor((Away + Close) * Face);
+			SpeedFor((Away + Close) * Face / FMath::Max(0.6, FMath::Cos(FMath::DegreesToRadians(Yaw))));
 		}
 		return;
 	}
@@ -1480,6 +1539,26 @@ void UAstraStationsSubsystem::TickTactical()
 		EngagedId = Want;
 		Eng.Step = 0;                     // a new target: a new volley, a new "no solution" report if it comes to that
 	}
+	// --- what the gunners aim at (the Captain's choice of the system to hit): `aim` in the engagement's params, kept while she engages and put back on the middle of the hull when she stops
+	{
+		const bool bFiringMode = Eng.Mode == TEXT("engage") || Eng.Mode == TEXT("weapons_free") || Eng.Mode == TEXT("return_fire");
+		const FString Aim = bFiringMode ? Str(Eng.Params, TEXT("aim")) : FString();
+		if (!Aim.Equals(AimSet, ESearchCase::IgnoreCase))
+		{
+			AimSet = Aim;
+			FString AimDetail;
+			if (B->SetPlayerAim(Aim, AimDetail))
+			{
+				Act(TEXT("tactical"), Aim.IsEmpty() ? FString(TEXT("gunners back on the middle of the hull")) : FString::Printf(TEXT("gunners aiming at the target's %s"), *Aim), false);
+			}
+			else
+			{
+				Eng.Params->RemoveField(TEXT("aim"));                       // (not a place the gunners know: said once, not every second)
+				AimSet.Empty();
+				Act(TEXT("tactical"), AimDetail, true);
+			}
+		}
+	}
 	// --- keep the guns and the cells on it (the battle opens fire by itself once inside each weapon's range)
 	if (!EngagedId.IsEmpty() && Eng.Mode != TEXT("hold_fire"))
 	{
@@ -1573,10 +1652,9 @@ void UAstraStationsSubsystem::TickTactical()
 		FString Sector = TEXT("balanced");
 		if (!Threat.IsZero())
 		{
-			const FVector L = B->PlayerAtt().Inverse().RotateVector((Threat - B->PlayerPos()).GetSafeNormal());
-			const FVector Ab = L.GetAbs();
-			Sector = Ab.X >= Ab.Y && Ab.X >= Ab.Z ? (L.X > 0 ? TEXT("forward") : TEXT("aft"))
-			       : Ab.Y >= Ab.Z ? (L.Y > 0 ? TEXT("starboard") : TEXT("port")) : (L.Z > 0 ? TEXT("dorsal") : TEXT("ventral"));
+			// the face the line of fire enters by, which for a hull eight times as long as wide is the flank from twenty degrees off the bow (the box's, not the dominant axis's)
+			static const TCHAR* const SectorOf[6] = {TEXT("forward"), TEXT("aft"), TEXT("port"), TEXT("starboard"), TEXT("dorsal"), TEXT("ventral")};
+			Sector = SectorOf[FMath::Clamp(B->PlayerFaceToward(Threat), 0, 5)];
 		}
 		if (Sector != LastShieldSector)
 		{

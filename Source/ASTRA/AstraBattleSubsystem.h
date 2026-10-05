@@ -588,6 +588,10 @@ public:
 	/** Where the Aquila's heat came from, in points of her heat gauge since the battle began (the bench reads them: what a fight put into her, and by what). */
 	struct FHeatBooks { float Rail = 0.f, Laser = 0.f, Cells = 0.f, Soak = 0.f, Recharge = 0.f; };
 	FHeatBooks HeatBooks;
+	/** Where the blows on the Aquila fell since the battle began (the bench's reading, to judge what the helm's posture does): by face (bow, stern, port, starboard, dorsal, ventral) the damage of the blows and
+	 *  how many; by section (bow, middle, stern) what the structure took and how many blows reached it. */
+	struct FPlayerBooks { float FaceDamage[6] = {}; int32 FaceHits[6] = {}; float SectionStruct[3] = {}; int32 SectionHits[3] = {}; };
+	FPlayerBooks PlayerBooks;
 	/** Weapon reach as the plot may show it (km; 0 = none or unknown). */
 	struct FWeaponRanges
 	{
@@ -618,6 +622,12 @@ public:
 	FString AdviseTarget(const FString& Current, bool bOnlyFiringAtUs = false, double MaxKm = 0.0) const;
 	/** How many missiles make a salvo that point defence cannot stop (about 2 plus 1.6 for each channel the target still has), 3 to 8; 6 when its class is not known. */
 	int32 MissilesToSaturate(const FString& ContactId) const;
+	/** What the Aquila's gunners aim at on a target, the Captain's choice of the system to hit: "" (or "hull") the middle of the hull; "bow", "midships" or "stern"; or a system ("engines", "sensors",
+	 *  "hangar", "bridge", "reactor", "weapons"), found in the section of that target that holds it. A shot placed so lands where it is aimed within a gunner's scatter (a sprayed one is spread
+	 *  along the whole hull); the geometry still decides the rest: a slug from ahead enters at the bow whatever the aim along the hull, so the stern is reached from the quarter, abeam or from
+	 *  behind (a ship that runs from her shows her engines). False, and why, when it is none of those. (AstraWarGunnery.cpp) */
+	bool SetPlayerAim(const FString& What, FString& OutDetail);
+	const FString& GetPlayerAim() const { return PlayerAim; }
 	/** One ship as the Aquila knows it now (fog of war applied): what the stations' executors and the main viewscreen use.
 	 *  (AstraBattleQueries.cpp) */
 	struct FContactView
@@ -822,6 +832,10 @@ public:
 	/** The Aquila's flight groups at a glance ("ALPHA 6 UP · CAP   BRAVO 7 ON DECK   DRONES REARMING"). */
 	FString FlightLine() const;
 	float PlayerShieldFraction() const { return Ships.Num() ? Ships[0].Shield / Ships[0].ShieldMax : 1.f; }
+	/** How the Aquila's shield faces and hull sections stand, as fractions of what they hold (faces: bow, stern, port, starboard, dorsal, ventral; sections: bow, middle, stern). All 1 when the model is not up. */
+	void GetPlayerFaces(float (&OutShield)[6], float (&OutSection)[3]) const;
+	/** The face of the Aquila's hull a shot from a point (system frame) would enter through (AstraWar::EFacing): the box's, not the dominant axis's. */
+	int32 PlayerFaceToward(const FVector& SystemPos) const;
 	bool IsScenarioOver() const { return bScenarioOver; }
 
 	/** The campaign: nothing moves until the Captain chooses (new campaign, or continue a saved one). */
@@ -1199,6 +1213,9 @@ private:
 	void FireMounts(FAstraBattleShip& S, FAstraBattleShip& T, double Dist, FFireBudget* Budget = nullptr);
 	TArray<FAstraDeathEvent> DeathEvents;
 	TArray<FFightEvent> FightEvents;
+	FString PlayerAim;                                               // what the Aquila's gunners aim at ("" the middle of the hull), as the Captain said it
+	int32 PlayerAimKind = -1;                                        // -1 the middle of the hull; 0 bow, 1 midships, 2 stern; 10 + a system (AstraWar::ESystem); 20 the section with most of the target's guns
+	int32 AimSectionOn(const FAstraBattleShip& To) const;            // the section of that target they aim at (-1: none)
 	void NoteFightEvent(const FAstraBattleShip& S, FFightEvent::EKind Kind, uint8 Section, uint8 Face, int32 System, const FVector& Pos, float Damage = 0.f, float Through = 0.f);
 	float PlayerShotAt = -1e9f, PlayerHitAt = -1e9f;                 // the battle clock when her guns last fired and when a shot of hers last struck
 	FString PlayerShotTarget, PlayerHitTarget;

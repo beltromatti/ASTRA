@@ -73,8 +73,18 @@ void UAstraBattleSubsystem::FireSolutionOf(const FAstraBattleShip& From, const F
 			OutVel = To.SeenVel[Me];
 		}
 	}
-	// the gunner aims at the middle of the hull: the box's centre, which is not quite the mesh's origin
+	// the gunner aims at the middle of the hull: the box's centre, which is not quite the mesh's origin; at the section the Captain asked for, the middle of that section
 	OutPos = To.Box.Valid() ? Centre + To.Att.RotateVector(FVector(To.Box.Mid, 0.0, 0.0)) : Centre;
+	if (From.bPlayer && To.Box.Valid())
+	{
+		const int32 Sec = AimSectionOn(To);
+		if (Sec >= 0)
+		{
+			const double Bow = (double)To.Box.Mid + To.Box.Hx, Stern = (double)To.Box.Mid - To.Box.Hx;
+			const double X = Sec == AstraWar::SecBow ? 0.5 * (To.Box.CutBow + Bow) : (Sec == AstraWar::SecStern ? 0.5 * (Stern + To.Box.CutStern) : 0.5 * (double)(To.Box.CutBow + To.Box.CutStern));
+			OutPos = Centre + To.Att.RotateVector(FVector(X, 0.0, 0.0));
+		}
+	}
 }
 
 float UAstraBattleSubsystem::TrackSigmaM(const FAstraBattleShip& From, double RangeM) const
@@ -224,6 +234,113 @@ bool UAstraBattleSubsystem::LineOfFireFouled(const FAstraBattleShip& From, const
 	return false;
 }
 
+int32 UAstraBattleSubsystem::AimSectionOn(const FAstraBattleShip& To) const
+{
+	if (PlayerAimKind < 0 || !To.Dmg.bModel)
+	{
+		return -1;
+	}
+	if (PlayerAimKind < 3)
+	{
+		return PlayerAimKind;
+	}
+	if (PlayerAimKind == 20)
+	{
+		float W[AstraWar::NumSections] = {};
+		for (const FAstraMount& M : To.Mounts)
+		{
+			if (M.Section < AstraWar::NumSections)
+			{
+				W[M.Section] += M.Fit();
+			}
+		}
+		int32 Best = AstraWar::SecMid;
+		for (int32 i = 0; i < AstraWar::NumSections; ++i)
+		{
+			Best = W[i] > W[Best] + 0.01f ? i : Best;
+		}
+		return W[Best] > 0.05f ? Best : -1;
+	}
+	const int32 K = PlayerAimKind - 10;
+	if (K < 0 || K >= AstraWar::NumSystems)
+	{
+		return -1;
+	}
+	const int32 Sec = To.Dmg.SysSection[K];
+	return Sec >= 0 && Sec < AstraWar::NumSections ? Sec : -1;                // (the point defence is all over the ship: no section holds it)
+}
+
+bool UAstraBattleSubsystem::SetPlayerAim(const FString& What, FString& OutDetail)
+{
+	const FString W = What.ToLower().TrimStartAndEnd().Replace(TEXT("_"), TEXT(" "));
+	int32 Kind = -1;
+	FString Name;
+	if (W.IsEmpty() || W == TEXT("hull") || W == TEXT("auto") || W == TEXT("none") || W == TEXT("centre") || W == TEXT("center") || W == TEXT("middle of the hull"))
+	{
+		Kind = -1;
+	}
+	else if (W == TEXT("bow") || W == TEXT("forward") || W == TEXT("fore") || W == TEXT("bow section"))
+	{
+		Kind = AstraWar::SecBow;
+		Name = TEXT("bow");
+	}
+	else if (W == TEXT("midships") || W == TEXT("mid") || W == TEXT("middle") || W == TEXT("mid section") || W == TEXT("midship"))
+	{
+		Kind = AstraWar::SecMid;
+		Name = TEXT("midships");
+	}
+	else if (W == TEXT("stern") || W == TEXT("aft") || W == TEXT("rear") || W == TEXT("stern section"))
+	{
+		Kind = AstraWar::SecStern;
+		Name = TEXT("stern");
+	}
+	else if (W == TEXT("engines") || W == TEXT("engine") || W == TEXT("drive") || W == TEXT("drives") || W == TEXT("thrusters"))
+	{
+		Kind = 10 + AstraWar::SysEngines;
+		Name = TEXT("engines");
+	}
+	else if (W == TEXT("sensors") || W == TEXT("sensor") || W == TEXT("radar") || W == TEXT("sensor suite"))
+	{
+		Kind = 10 + AstraWar::SysSensors;
+		Name = TEXT("sensors");
+	}
+	else if (W == TEXT("hangar") || W == TEXT("flight deck") || W == TEXT("hangars"))
+	{
+		Kind = 10 + AstraWar::SysHangar;
+		Name = TEXT("hangar");
+	}
+	else if (W == TEXT("bridge") || W == TEXT("command") || W == TEXT("command deck"))
+	{
+		Kind = 10 + AstraWar::SysBridge;
+		Name = TEXT("bridge");
+	}
+	else if (W == TEXT("reactor") || W == TEXT("power") || W == TEXT("core") || W == TEXT("reactors"))
+	{
+		Kind = 10 + AstraWar::SysReactor;
+		Name = TEXT("reactor");
+	}
+	else if (W == TEXT("weapons") || W == TEXT("guns") || W == TEXT("turrets") || W == TEXT("batteries") || W == TEXT("railguns"))
+	{
+		Kind = 20;
+		Name = TEXT("weapons");
+	}
+	else if (W.Contains(TEXT("point")))
+	{
+		OutDetail = TEXT("the point defence is spread over the whole ship: there is no one place to aim at; name the engines, the sensors, the hangar, the bridge, the reactor, the weapons, or the bow, midships or stern");
+		return false;
+	}
+	else
+	{
+		OutDetail = FString::Printf(TEXT("cannot aim at '%s': the gunners know the engines, the sensors, the hangar, the bridge, the reactor, the weapons, the bow, midships or the stern (or the middle of the hull)"), *What);
+		return false;
+	}
+	PlayerAimKind = Kind;
+	PlayerAim = Kind < 0 ? FString() : Name;
+	OutDetail = Kind < 0 ? FString(TEXT("the gunners aim at the middle of the hull again"))
+	                     : FString::Printf(TEXT("the gunners aim at the target's %s: from the quarter, abeam or from behind the shots land there; from dead ahead a slug still enters at the bow"), *Name);
+	return true;
+}
+
 FString UAstraBattleSubsystem::AdviseTarget(const FString& Current, bool bOnlyFiringAtUs, double MaxKm) const
 {
 	if (Ships.Num() == 0 || !Ships[0].bAlive)
@@ -270,7 +387,7 @@ FString UAstraBattleSubsystem::AdviseTarget(const FString& Current, bool bOnlyFi
 		float ShieldF = 0.5f;
 		if (X.Dmg.bModel && X.Dmg.Pool > 0.f)
 		{
-			const int32 Face = AstraFacingOf(X.Att.UnrotateVector((P.Pos - X.Pos).GetSafeNormal()));      // the face it shows her
+			const int32 Face = AstraWar::FacingOfLine(X.Box, X.Att.UnrotateVector((P.Pos - X.Pos).GetSafeNormal()));      // the face it shows her
 			ShieldF = X.Dmg.SectorMax[Face] > 0.f ? X.Dmg.Sector[Face] / X.Dmg.SectorMax[Face] : 0.f;
 		}
 		const double Vuln = FMath::Clamp(1.15 - 0.55 * HullF - 0.35 * ShieldF, 0.2, 1.3);
