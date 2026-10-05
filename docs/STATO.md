@@ -38,6 +38,14 @@ abbordaggi contro l'Aquila, chiesto da ABBORDAGGI).
   di ARTE-INTERNI-2, ABBORDAGGI-3 e SPAZIO-VIVO-2 (M7–M9: il Falcon raccoglie le capsule con R, i getti dei velivoli, convogli e pattuglie);
   in corso nell'editor la ricostruzione degli interni e l'importazione del kit dei ponti nemici.
 - **Credito OpenRouter: 3,84 $** (le partite del 5/10 ~1,8 $): segnalato in RICHIESTE.
+- **La ruota degli ordini** (il lead, `AstraCommandWheel.*`): G tenuto, punta e lascia (o un numero; Esc niente): fuoco libero / cessate il fuoco,
+  ingaggia ciò che guardi (dal finestrone, sullo schermo principale, altrimenti il bersaglio del tattico o il più vicino), salva di missili, caccia
+  all'attacco / a casa, scudi, allarme, schermo. Gli stessi comandi degli strumenti degli ufficiali a nome del Capitano; la plancia ne riceve
+  l'evento e l'ufficiale ne risponde (VOCI-3 cura la risposta breve). Provata nel gioco (ENGAGE su T-24 dal suo posto in plancia).
+- **Uniti e provati nel gioco**: gli interni di ARTE-INTERNI-2 (giardino, biblioteche, dormitori, infermeria; 95 stanze reimportate, i ponti
+  ricostruiti), il kit dei ponti nemici di ABBORDAGGI-3 (l'abbordaggio con il Capitano a bordo sui ponti vestiti del Mandato funziona), ABBORDAGGI-4
+  tappa 1 (Kestrel tre volte più veloci: 20 km in 1 min 52 s dall'ordine al taglio; i Kestrel non si perdono più; «vengo anch'io»). Le righe di
+  debug del motore sullo schermo spente nel gioco del giocatore.
 
 **4/10 notte — le console vere e la luce della plancia (il lead):**
 - **Perché le console sembravano finte**: gli schermi vivi erano a ~22 nit contro l'esposizione fissa della plancia (EV100 6,6), un decimo di un
