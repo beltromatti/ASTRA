@@ -85,6 +85,8 @@
 
 ## 9. Suono
 - Meccanico e concreto. Nel vuoto si sente solo ciò che passa attraverso lo scafo o la tuta; ronzio del reattore diverso per zona.
+- Ciò che succede fuori in battaglia la plancia lo sente dalle sue console: la morte di una nave da guerra vista dai sensori è un'onda grave nelle
+  casse (`SW_Sensor_Kill`, tools/art/battle_cues.py). È una sonificazione, non il suono dell'esplosione: quello non esiste.
 - Radio con filtro, scatto di trasmissione e fruscio.
 - Allarmi distinti per pericolo: incendio, decompressione, impatto imminente, collisione.
 - Colonna sonora orchestrale-elettronica generata con ACE-Step 1.5, dinamica secondo la tensione del Regista.
