@@ -202,7 +202,7 @@ void UAstraWarFX::ShieldHit(const FAstraBattleShip& To, const FAstraFxHit& H)
 	for (int32 i = Beams.Num() - 1; i >= 0 && i >= Beams.Num() - 6; --i)
 	{
 		FBeam& B = Beams[i];
-		if (B.ToId == To.Id && B.Age < 0.02f && FVector::DistSquared(To.Pos + To.Att.RotateVector(B.ToLoc), H.Pos) < 4.0)
+		if (B.ToId == To.Id && B.Age < 0.02f && FVector::DistSquared(To.Pos + To.Att.RotateVector(B.RawToLoc), H.Pos) < 4.0)
 		{
 			B.ToLoc = Dir * Axes + FVector(To.Box.Valid() ? To.Box.Mid : 0.f, 0.f, 0.f);
 			break;

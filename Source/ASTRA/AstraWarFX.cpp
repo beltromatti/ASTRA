@@ -1018,7 +1018,18 @@ void UAstraWarFX::OnBeam(EAstraFxShot Kind, const FVector& A, const FVector& B, 
 	}
 	if (Dst)
 	{
-		Bm.ToLoc = Dst->Att.UnrotateVector(B - Dst->Pos);
+		FVector Local = Dst->Att.UnrotateVector(B - Dst->Pos);
+		Bm.RawToLoc = Local;
+		if (Dst->Dmg.bModel && Dst->Box.Valid())
+		{
+			// the simulation ends it on the face of the target's box: it ends on the hull's skin (a beam that meets a shield is put on the shell by ShieldHit)
+			const FVector O = Local - FVector(Dst->Box.Mid, 0.f, 0.f);                                  // (the face of the box it lies on: the axis it is nearest the wall along)
+			const FVector Rel(FMath::Abs(O.X) / Dst->Box.Hx, FMath::Abs(O.Y) / Dst->Box.Hy, FMath::Abs(O.Z) / Dst->Box.Hz);
+			const int32 Face = Rel.X >= Rel.Y && Rel.X >= Rel.Z ? (O.X >= 0.f ? AstraWar::Bow : AstraWar::Stern)
+			                                                       : (Rel.Y >= Rel.Z ? (O.Y >= 0.f ? AstraWar::Starboard : AstraWar::Port) : (O.Z >= 0.f ? AstraWar::Dorsal : AstraWar::Ventral));
+			SnapToHull(*Dst, Face, Local);
+		}
+		Bm.ToLoc = Local;
 	}
 	else
 	{
