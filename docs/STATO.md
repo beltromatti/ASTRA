@@ -22,6 +22,23 @@ pezzi della pianta), **TELETRASPORTO**, **ARTE-PLANCIA-2** (plancia, abitacolo d
 livello di un film; avviato). Pronti: CAMPAGNA (lo strato strategico), FLOTTA-VIVA, F5.2 (abbordare le navi nemiche; con la guerra che lancia gli
 abbordaggi contro l'Aquila, chiesto da ABBORDAGGI).
 
+**5/10 notte — le partite dell'utente, la v0.7 del piano e i moduli che rifanno il cuore del gioco (il lead):**
+- **Le partite dell'utente** (00:16–01:26, tre sessioni, voce in italiano) lette riga per riga: [PARTITE_2026-10-05.md](PARTITE_2026-10-05.md).
+  In breve: ~480 battute in 70 minuti con più di 150 mai dette (alleati e rete di volo sull'altoparlante della plancia, le stesse cose da più
+  bocche), quattro risposte dell'ammiraglio perse per traboccamento, iniziative non chieste (la CAP), il timone che insegue un nemico più
+  veloce e lo perde, scontri di secondi dentro i 10 km e silenzio fuori, calore al 105 %, 20–32 incendi con 4 squadre, i Kestrel persi con
+  24 marine (il volo di rientro rinunciava dopo 300 s: lo corregge ABBORDAGGI-4), dieci minuti per andare dai Kestrel col teletrasporto.
+- **Piano v0.7** ([PIANO.md §0bis](PIANO.md)): il cuore del gioco prima di tutto — chiarezza, controllo, battaglie epiche e continue, niente
+  attriti. **Aiutanti al lavoro**: VOCI-3 (reti con chi le ascolta, palco senza traboccare, registro silenzioso, dottrina, iniziativa dentro
+  l'autorità data), BATTAGLIA-3 (armi lontane con la precisione che cala, navi che muoiono a pezzi in minuti, timone e tiro bravi, nemico che
+  si batte, calore e squadre), ABBORDAGGI-4 (ritmo, il Capitano con i marine, la fanteria comandata, la prima persona). Brief in `docs/brief/`.
+- **Il lead**: LUOGHI (il teletrasporto capisce i luoghi come li dice l'equipaggio, con i nomi più vicini e la stanza aperta più vicina a una
+  schermata; banco 134/134); il ritmo della guerra (gli alti comandi guardano ogni ~3,5 minuti e anche quando la mappa è ferma ma la guerra
+  tace da 4; la dottrina dell'iniziativa per entrambi); lo schermo principale che non cambia risoluzione a ogni sguardo. Uniti i rami finiti
+  di ARTE-INTERNI-2, ABBORDAGGI-3 e SPAZIO-VIVO-2 (M7–M9: il Falcon raccoglie le capsule con R, i getti dei velivoli, convogli e pattuglie);
+  in corso nell'editor la ricostruzione degli interni e l'importazione del kit dei ponti nemici.
+- **Credito OpenRouter: 3,84 $** (le partite del 5/10 ~1,8 $): segnalato in RICHIESTE.
+
 **4/10 notte — le console vere e la luce della plancia (il lead):**
 - **Perché le console sembravano finte**: gli schermi vivi erano a ~22 nit contro l'esposizione fissa della plancia (EV100 6,6), un decimo di un
   monitor vero, e il sole dal finestrone rendeva una console bianca ~25 volte più luminosa di uno schermo: i pannelli sospesi sparivano, il touch
