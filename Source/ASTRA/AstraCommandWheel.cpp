@@ -294,31 +294,7 @@ void FAstraCommandWheel::Build(APlayerController* PC)
 		I.Told = FString::Printf(TEXT("missiles on %s, saturating its point defence"), *T);
 		Items.Add(I);
 	}
-	// 4 — the fighters: every squadron on deck or flying, a strike on the target
-	{
-		FItem I;
-		I.Label = TEXT("FIGHTERS: STRIKE");
-		I.Sub = bT ? FString::Printf(TEXT("Alpha, Bravo, drones on %s"), *T) : TEXT("no target");
-		I.bEnabled = bT;
-		I.bOn = Mode(TEXT("flight"), TEXT("alpha")) == TEXT("strike") || Mode(TEXT("flight"), TEXT("bravo")) == TEXT("strike");
-		I.Run = [W, T](FString& D)
-		{
-			bool bAny = false;
-			for (const TCHAR* Sq : {TEXT("alpha"), TEXT("bravo"), TEXT("drones")})
-			{
-				FString D1;
-				if (Run(W, TEXT("station"), StationArgs(TEXT("flight"), Sq, TEXT("strike"), T), D1))
-				{
-					bAny = true;
-					D += (D.IsEmpty() ? TEXT("") : TEXT("; ")) + D1;
-				}
-			}
-			return bAny;
-		};
-		I.Told = FString::Printf(TEXT("all squadrons on a strike on %s"), *T);
-		Items.Add(I);
-	}
-	// 5 — recall the fighters
+	// 4 — the fighters: a strike on the target while they are aboard, home when they are out (one item: the wheel has room for the aim)
 	{
 		FItem I;
 		int32 Out = 0;
@@ -326,24 +302,64 @@ void FAstraCommandWheel::Build(APlayerController* PC)
 		{
 			Out += InFlight(Mode(TEXT("flight"), Sq)) ? 1 : 0;
 		}
-		I.Label = TEXT("RECALL FIGHTERS");
-		I.Sub = Out ? FString::Printf(TEXT("%d squadron%s out"), Out, Out > 1 ? TEXT("s") : TEXT("")) : TEXT("all on deck");
-		I.bEnabled = Out > 0;
-		I.Run = [W](FString& D)
+		if (Out > 0)
 		{
-			bool bAny = false;
-			for (const TCHAR* Sq : {TEXT("alpha"), TEXT("bravo"), TEXT("drones")})
+			I.Label = TEXT("RECALL FIGHTERS");
+			I.Sub = FString::Printf(TEXT("%d squadron%s out"), Out, Out > 1 ? TEXT("s") : TEXT(""));
+			I.bOn = true;
+			I.Run = [W](FString& D)
 			{
-				FString D1;
-				if (Run(W, TEXT("station"), StationArgs(TEXT("flight"), Sq, TEXT("recall")), D1))
+				bool bAny = false;
+				for (const TCHAR* Sq : {TEXT("alpha"), TEXT("bravo"), TEXT("drones")})
 				{
-					bAny = true;
-					D += (D.IsEmpty() ? TEXT("") : TEXT("; ")) + D1;
+					FString D1;
+					if (Run(W, TEXT("station"), StationArgs(TEXT("flight"), Sq, TEXT("recall")), D1))
+					{
+						bAny = true;
+						D += (D.IsEmpty() ? TEXT("") : TEXT("; ")) + D1;
+					}
 				}
-			}
-			return bAny;
+				return bAny;
+			};
+			I.Told = TEXT("every squadron back aboard");
+		}
+		else
+		{
+			I.Label = TEXT("FIGHTERS: STRIKE");
+			I.Sub = bT ? FString::Printf(TEXT("Alpha, Bravo, drones on %s"), *T) : TEXT("no target");
+			I.bEnabled = bT;
+			I.Run = [W, T](FString& D)
+			{
+				bool bAny = false;
+				for (const TCHAR* Sq : {TEXT("alpha"), TEXT("bravo"), TEXT("drones")})
+				{
+					FString D1;
+					if (Run(W, TEXT("station"), StationArgs(TEXT("flight"), Sq, TEXT("strike"), T), D1))
+					{
+						bAny = true;
+						D += (D.IsEmpty() ? TEXT("") : TEXT("; ")) + D1;
+					}
+				}
+				return bAny;
+			};
+			I.Told = FString::Printf(TEXT("all squadrons on a strike on %s"), *T);
+		}
+		Items.Add(I);
+	}
+	// 5 — disable, not destroy: the gunners aim at her engines (BATTAGLIA-3's aim: reachable on her quarter, her side or her stern, a ship that runs);
+	// a ship left adrift is a hulk the marines can board
+	{
+		FItem I;
+		I.Label = TEXT("DISABLE");
+		I.Sub = bT ? T + TEXT(": guns on her engines") : TEXT("no target");
+		I.bEnabled = bT;
+		I.Run = [W, T](FString& D)
+		{
+			const TSharedPtr<FJsonObject> A = StationArgs(TEXT("tactical"), TEXT("engagement"), TEXT("engage"), T);
+			A->GetObjectField(TEXT("params"))->SetStringField(TEXT("aim"), TEXT("engines"));
+			return Run(W, TEXT("station"), A, D);
 		};
-		I.Told = TEXT("every squadron back aboard");
+		I.Told = FString::Printf(TEXT("disable %s: tactical's guns on her engines, to leave her adrift (a prize for the marines), not to destroy her"), *T);
 		Items.Add(I);
 	}
 	// 6 — the shields
