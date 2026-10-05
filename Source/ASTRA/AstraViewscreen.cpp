@@ -1397,6 +1397,8 @@ void AAstraViewscreen::DrawOverlay(UCanvas* Canvas, int32 Width, int32 Height)
 	D.Text(Width * 0.5f, (Top - PxName) * 0.5f, Caption, false, PxName, ShotPri >= 5 ? ColAlarm : ColText, 1);
 	D.Text(Width - 16.f * S, Ty, FString::Printf(TEXT("x%.0f   FOV %.1f°"), 58.f / FMath::Max(Fov, 0.05f), Fov), true, PxData, ColDim, 2);
 	const float By = Bottom + (Height - Bottom - PxData) * 0.5f;
+	const FString Status = Ship ? FString::Printf(TEXT("AQUILA  HULL %.0f%%   SHIELDS %.0f%% %s   HEAT %.0f%%"), 100.f * B->PlayerHullFraction(),
+	                                              100.f * B->PlayerShieldFraction(), *Ship->GetShieldMode().ToUpper(), Ship->GetHeatPct()) : FString();
 	if (Missiles.Num())
 	{
 		D.Text(16.f * S, By, FString::Printf(TEXT(">> %d MISSILE%s INBOUND"), Missiles.Num(), Missiles.Num() > 1 ? TEXT("S") : TEXT("")), true, PxData, ColAlarm);
@@ -1423,19 +1425,22 @@ void AAstraViewscreen::DrawOverlay(UCanvas* Canvas, int32 Width, int32 Height)
 		}
 		else
 		{
-			FString Line = FString::Printf(TEXT("PLOT  %d HOSTILE  ·  %d FRIENDLY  ·  %d CONTACTS"), Hostile, Friendly, Plot().Num());
+			const FString Head = FString::Printf(TEXT("PLOT  %d HOSTILE  ·  %d FRIENDLY"), Hostile, Friendly);
+			const FString Contacts = FString::Printf(TEXT("  ·  %d CONTACTS"), Plot().Num());
+			FString Line = Head + Contacts;
 			if (bGate && Gate.Friendly > 0 && Gate.FriendlyEtaS >= 0.f)
 			{
-				Line += FString::Printf(TEXT("  ·  GATE: %d ASTRA INBOUND %s"), Gate.Friendly, *Eta(Gate.FriendlyEtaS));
+				// (the line shares the bar with the Aquila's own: a friendly force on its way in takes the contacts' place when both do not fit)
+				const FString In = FString::Printf(TEXT("  ·  GATE: %d ASTRA %s"), Gate.Friendly, *Eta(Gate.FriendlyEtaS));
+				const float Room = Width - 48.f * S - (Ship ? D.Width(Status, true, PxData) : 0.f);
+				Line = D.Width(Head + Contacts + In, true, PxData) <= Room ? Head + Contacts + In : Head + In;
 			}
 			D.Text(16.f * S, By, Line, true, PxData, ColDim);
 		}
 	}
 	if (Ship)
 	{
-		D.Text(Width - 16.f * S, By, FString::Printf(TEXT("AQUILA  HULL %.0f%%   SHIELDS %.0f%% %s   HEAT %.0f%%"), 100.f * B->PlayerHullFraction(),
-		                                              100.f * B->PlayerShieldFraction(), *Ship->GetShieldMode().ToUpper(), Ship->GetHeatPct()),
-		       true, PxData, ColDim, 2);
+		D.Text(Width - 16.f * S, By, Status, true, PxData, ColDim, 2);
 	}
 	D.Flush();
 }
