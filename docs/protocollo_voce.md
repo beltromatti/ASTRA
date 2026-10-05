@@ -227,6 +227,8 @@ Il 5/10 due risposte al Capitano e un avviso sono andati perduti (`synth_timeout
 
 Chi mette `addressed`: `_say_external` (comandanti del Mandato sul canale, la chiamata di Fleet command, il controllo del porto: tutto ciò che è detto *a lui*), `_ally_say(..., to="aquila")` e `_rourke_say(direct=True)` quando la riga è una chiamata a lui nella voce di chi parla, e una riga di rete che chiama il Capitano (sezione 5ter, la dice il suo ascoltatore).
 
+**Un avviso di pericolo, o una chiamata a lui su una rete, non si perde nemmeno se il Capitano parla subito.** Il turno di rapporto aspetta fino a 3 s che la riga in corso finisca e 0,6 s che arrivi ciò che accompagna l'avviso: se in quel lasco arrivano le parole del Capitano, prima rispondono a lui (il rapporto era in attesa), ma l'avviso (`_URGENT_EVENT`) e il traffico di rete che lo chiama (`nets.CALL_MARK`) tornano in coda e si dicono dopo il suo ordine (l'ufficiale tace se l'ordine li copriva già). Prima di VOCI-3 le notizie raccolte in quel lasco sparivano tutte (`bench.voice_replay` r5 falliva); le notizie semplici restano nello stato della nave e nella cronologia, come sempre.
+
 ## 5ter. Le reti radio, i registri delle console e chi ascolta (VOCI-3)
 
 Il 5/10 la flotta, il volo e i marines parlavano tutti sull'unico altoparlante del ponte: ~480 righe in 70 minuti, un terzo mai ascoltato, le stesse notizie da tre bocche e gli ordini del Capitano perduti dietro. Ora una **rete** (`astra_mind/nets.py`) ha un **ascoltatore**, l'ufficiale che ha il turno su quel canale, e il Capitano sente il ponte come un ponte vero: l'XO per il quadro, gli altri ufficiali per la loro console solo quando serve, il resto sul registro.
@@ -250,6 +252,10 @@ Il 5/10 la flotta, il volo e i marines parlavano tutti sull'unico altoparlante d
 **Il gioco** (C++, `AstraMindSubsystem` / `AstraScreensSubsystem`): `net_traffic` e `console_log` finiscono in `NetLines` (160 righe) e nel cronometro (`FAstraTimeline`, «net»/«log»); la console Comunicazioni mostra il traffico della rete della flotta, la console Volo quello della rete del volo; il taccuino ha una pagina **LOG** (Tab, ruota delle pagine) con tutto, anche i marine: le righe già ascoltate in grigio, quelle da notare in ambra, quelle urgenti in rosso; `net_speaker` fa dire alla testata della pagina quali reti sono sull'altoparlante. (Il C++ di VOCI-3 non è stato compilato dall'aiutante: lo compila il capo.)
 
 **Interruttore**: `ASTRA_NETS=0` rimette il vecchio instradamento (ogni rete parla sull'altoparlante, nessun ascoltatore: sono le stesse linee di prima e il banco `bench.voci3_games` lo usa come termine di confronto, `OLD`). Si cambia al prossimo avvio della mente.
+
+## 5quater. Gli ordini dati senza parole: il quadrante dei comandi (VOCI-3)
+
+Il Capitano può dare un ordine senza dire nulla (tasto G tenuto premuto: modi delle stazioni tactical/helm/flight/ops, `set_alert`): il gioco lo esegue (`ApplyCommand`, `by=captain`) e manda alla mente `event{text:"bridge: the Captain gave an order from his command wheel, without a word: <cosa> (<dettaglio del comando>)", report:true}` (`crew.WHEEL_EVENT`). Per la mente **è un suo ordine come uno detto a voce**: `Mind._wheel_turn` lo prende subito, in un turno suo (non aspetta un ponte silenzioso, non si unisce alle altre notizie), dentro `captain_turn_begin` (la riga è una **risposta**: passa prima di tutto e non si perde), con il solo strumento `speak` (la console ha già fatto ciò che è stato ordinato: nessuno lo ripete) e senza gli ordini permanenti. L'ufficiale della stazione (l'XO per l'allarme) conferma in una parola o due, nessun altro parla (`agent.WHEEL_ASK` e la regola «The command wheel» in `crew._RULE_BASE`), senza domande né spiegazioni né ripetere ciò che il quadrante mostra; una riga sola solo se il comando non è passato o fa male alla nave in un modo che il Capitano può non vedere. L'ordine resta nella conversazione (l'osservatore di iniziativa lo legge tra gli ultimi ordini, `initiative.recent_orders`) e non è una notizia per l'osservatore (`Watch.note`). Più ordini in pochi secondi sono più turni, ciascuno confermato dal suo ufficiale. Il gioco manda `report:true` solo se vuole la conferma a voce; con `report:false` la mente non dice nulla.
 
 ## 6. Regolazioni (variabili d'ambiente)
 
@@ -277,7 +283,7 @@ Il 5/10 la flotta, il volo e i marines parlavano tutti sull'unico altoparlante d
 uv run python -m bench.voice_units            # 84 controlli veloci (audio, nomi, lingua, riconoscitore con motori finti, regole del testo tagliato)
 uv run python -m bench.voice_floor -v         # 30 scenari del palco con orologio virtuale (-v: la cronologia vista dal gioco)
 uv run python -m bench.voice_replay -v        # 5 rifacimenti del test dal vivo del capo attraverso il server vero (agente, router, palco), modello e voci finti
-uv run python -m unittest bench.voci3_unit    # le reti, il registro, lo strumento `console_log`, l'altoparlante, le righe rivolte al Capitano (27 controlli, nessuna rete)
+uv run python -m unittest bench.voci3_unit    # le reti, il registro, lo strumento `console_log`, l'altoparlante, le righe rivolte al Capitano, il quadrante dei comandi (37 controlli, nessuna rete)
 uv run python -m bench.voci3_floor -v         # 8 scenari del palco e delle reti con orologio virtuale (una risposta mai persa, la voce rifatta e poi `notice`, ...)
 uv run python -m bench.voci3_games s2 s3      # le partite del 5/10 (bench/data/games_2026-10-05, ricavate dai log con bench/games_extract.py) rimesse nel server vero: REAL / OLD / NEW
 uv run python -m bench.voice_pipeline stt --backends parakeet-ultra,whisperkit-baseline   # riconoscimento: WER e latenza, motori alternati clip per clip

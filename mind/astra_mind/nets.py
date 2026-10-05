@@ -43,6 +43,7 @@ LOG_MAX_CHARS = 500           # (a sanity bound for the protocol: a console line
 CONSOLES = ("xo", "helm", "ops", "tactical", "comms", "sensors", "engineering", "flight")
 NET_EVENT = "net: "           # what the events of a listener's turn begin with (the server's turn worker reads it)
 URGENT_MARK = "[URGENT]"      # in that event: the sender said it is danger now (the server's urgent-event test looks for it)
+CALL_MARK = " and calls the Captain"      # ... and this, after a sender's name: the line is meant for the Captain (the turn worker keeps such an event when his words take the floor)
 
 
 @dataclass(frozen=True)
@@ -199,7 +200,7 @@ class Nets:
         urgent = any(r.urgent for r in rows)
         lines = []
         for r in rows:
-            call = " and calls the Captain" if r.addressed else ""
+            call = CALL_MARK if r.addressed else ""
             lines.append(f" - {max(0.0, now - r.t):.0f} s ago · {r.who}{call}: «{r.text}»" + (" [the sender says: danger now]" if r.urgent else ""))
         who = CREW[n.listener].title if n.listener in CREW else n.listener
         text = (f"traffic on {n.name}{(' ' + URGENT_MARK) if urgent else ''} — {len(rows)} line{'s' if len(rows) != 1 else ''} the Captain has NOT heard (not on the bridge's "

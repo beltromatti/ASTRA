@@ -272,7 +272,7 @@ class BridgeAgent:
         sysmsg = {"role": "system", "content": system} if system else self._system(lang, state)
         msgs: list[dict[str, Any]] = [sysmsg] + hist
         now = "" if system else self._now(state) + "\n\n"            # (a role with a prompt of its own carries its own view of the ship)
-        msgs.append({"role": "user", "content": now + user + "\n" + (ask or EVENT_ASK) + (STANDING_ASK if self.standing else "")})
+        msgs.append({"role": "user", "content": now + user + "\n" + (ask or EVENT_ASK) + (STANDING_ASK if self.standing and not speak_only else "")})   # (a turn that can only speak carries nothing out)
         on_call = self._on_call(turn, lang, t0, pending, ts, state, fired, captain=False, allowed=allowed)
         tools = [t for t in ts.tools if t["function"]["name"] in (allowed | {"speak"} | (set() if speak_only else {"console_log"}))]   # (the log is silent: nobody's authority is needed)
         self._active.add(turn)
@@ -548,6 +548,13 @@ NET_ASK = (" NET TRAFFIC (the «net:» events above): radio on a net that the Ca
            "Everything else is routine: write it on the console's log with console_log (one telegraphic line, in English) and say nothing aloud. What the Captain has already heard "
            "(«Said aloud», in any words), what his own order just produced, and what the boards show are not told again: the log, or nothing. When lines are already waiting to be "
            "said, only what outweighs them is worth adding. Most net traffic is for the log.")
+WHEEL_ASK = ("THE COMMAND WHEEL: the Captain has just given an order WITHOUT A WORD, from his command wheel (the event above). It is HIS ORDER, exactly as if he had spoken it, and the "
+             "console has already carried it out: do not carry it out again (you only have `speak`). The officer whose station it is for acknowledges it at once, in a word or two, in the "
+             "Captain's language and in character — «Aye, helm.», «Weapons free, aye.», «Falcons launching.», «Red alert.» (Helm for course and speed, Tactical for targets, weapons, shields "
+             "and decoys, Flight Control for the flight deck and the squadrons, Operations for power, damage control and the transporter, the XO for the alert level) — and that is all: no "
+             "question about whether he meant it, no explanation of what it does or why, no repeating what the wheel shows (the heading, the target, the range), nothing from any other "
+             "officer, the XO included. Only if the order did not go through (the detail says it failed or was refused) or it will hurt the ship in a way the Captain may not see (it "
+             "turns her broadside to a missile salvo, it cuts the shields with a torpedo in the water), the officer says so in one short line, after the acknowledgement or instead of it.")
 STANDING_ASK = (" Standing orders in force (see them in the rules) are the Captain's orders given in advance: when this "
                 "event is what one is about, that officer carries it out now, fully (weapons free means firing: fire_weapons or "
                 "an engage mode, not just a target), with the tool calls in this same turn, and says what was done.")

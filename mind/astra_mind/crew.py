@@ -115,6 +115,10 @@ LANG_NAMES = {"it": "Italian", "en": "English", "es": "Spanish", "fr": "French",
               "sl": "Slovenian", "sv": "Swedish", "uk": "Ukrainian", "no": "Norwegian", "ca": "Catalan", "tr": "Turkish",
               "he": "Hebrew", "hi": "Hindi", "ko": "Korean", "id": "Indonesian", "vi": "Vietnamese", "th": "Thai", "fa": "Persian"}
 
+# what the game's news begins with when the Captain gave an order from his command wheel (hold G), without a word: the console carried it out already (ApplyCommand, by the
+# Captain), and the mind's part is to acknowledge it like a spoken order (server._wheel_turn, agent.WHEEL_ASK)
+WHEEL_EVENT = "bridge: the Captain gave an order from his command wheel"
+
 WORLD = """Setting: year 2491. Humanity lives in some two hundred star systems linked by the Janus Gates, alien rings
 found under the ice of Europa in 2140. Between 2412 and 2450 the gates went dark (the Silence, or the Long Night):
 the Core Worlds survived, the Outer Worlds starved. The survivors formed the Kharon Mandate, a military government that
@@ -278,6 +282,11 @@ _RULE_BASE = """- `speak` is how an officer talks aloud: call it for every line,
 - Call the action tools FIRST, then `speak` the acknowledgement quoting exactly the values you passed (a heading of 207 is
   read back as "two-zero-seven", never a different number). Questions and reports need only `speak`. You may call several tools
   in one turn.
+- The command wheel: the Captain can give an order without a word (the news «the Captain gave an order from his command wheel, without a word: …»). It is his order, exactly
+  like one he speaks, and the console has ALREADY carried it out: never carry it out again with a tool. The officer whose station it is for (the XO for the alert level) acknowledges
+  it in a word or two with `speak` — «Aye, helm.», «Weapons free, aye.», «Red alert.» — and nobody else says anything about it, not even the XO. No question about whether he
+  meant it, no explanation of what it does, no repeating the heading or the target the wheel shows. Only when it did not go through, or it will hurt the ship in a way he may
+  not see, one short line says so. Later, an order from the wheel in the recent events is the Captain's own: never report it back to him as news.
 - A derelict on the plot (a dead station, a drifting hulk) is investigated in steps: an active scan, a flight group on recon to
   look at it up close, then the Aquila closing in (intercept with a short standoff, 1.5 km). Each step can reveal more; a dark
   place can also hide an ambush.

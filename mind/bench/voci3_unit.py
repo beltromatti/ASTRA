@@ -10,17 +10,23 @@ through the real server in `voci3_games`."""
 from __future__ import annotations
 
 import asyncio
+import json
+import re
 import unittest
 
+from astra_mind import agent as agent_mod
 from astra_mind import context as context_model
 from astra_mind import crew as crew_mod
+from astra_mind import initiative as initiative_mod
 from astra_mind import models
 from astra_mind import nets as nets_mod
 from astra_mind.local_ship import LocalShip
+from astra_mind.openrouter import Completion, ToolCall
 from astra_mind.tools import tools_for
 
 from .stations_unit import Crew, Script, speak
-from .voice_floor import run
+from .voice_floor import LONG, run
+from .voice_replay import Replay
 
 models.LEDGER.write_file = False
 
@@ -332,6 +338,212 @@ class TestCrewTools(unittest.TestCase):
         self.assertIn("On the nets and the consoles' logs, NOT said aloud", last)
         self.assertIn("ops log: Fire out deck 6 C", last)
         self.assertIn("fleet net · Castellan: «Aquila, Praetorian: holding at 4.5 km.»", last)
+
+
+WHEEL = crew_mod.WHEEL_EVENT + ", without a word: "
+
+
+def event_line(request: dict) -> str:
+    """The news a crew turn was asked about (the line after «[Ship systems event, not the Captain speaking]» in its last message)."""
+    m = re.search(r"\[Ship systems event, not the Captain speaking\] (.*)", str(request["messages"][-1]["content"]))
+    return m.group(1) if m else ""
+
+
+def wheel_model(r: Replay, acks: dict[str, tuple[float, str, str]]) -> list[dict]:
+    """The replay's model with the command wheel's officers added: for an event of the wheel that has one of `acks`' markers in it the officer says the line after the delay; any
+    other call goes to the replay's own script. Returns the requests the model was given."""
+    seen: list[dict] = []
+    chat = r._chat
+
+    async def model(**kw):  # noqa: ANN003, ANN202
+        seen.append(kw)
+        event = event_line(kw)
+        again = re.search(r"\[Before speaking\] \d+ seconds ago .*?«(.*?)»", str(kw["messages"][-1]["content"]), re.S)
+        if again:                                                    # (an officer thinks again about a line that waited: the sensible one says it as it stands)
+            await asyncio.sleep(0.4)
+            comp = Completion(provider="script", model="script")
+            call = ToolCall(name="speak", arguments_raw=json.dumps({"speaker": "xo", "text": again.group(1), "tone": "focused"}))
+            comp.tool_calls.append(call)
+            if kw.get("on_tool_call") is not None:
+                res = kw["on_tool_call"](call)
+                if hasattr(res, "__await__"):
+                    await res
+            return comp
+        if event.startswith(crew_mod.WHEEL_EVENT):
+            for marker, (delay, who, text) in acks.items():
+                if marker in event:
+                    await asyncio.sleep(delay)
+                    comp = Completion(provider="script", model="script")
+                    call = ToolCall(name="speak", arguments_raw=json.dumps({"speaker": who, "text": text, "tone": "focused"}))
+                    comp.tool_calls.append(call)
+                    if kw.get("on_tool_call") is not None:
+                        res = kw["on_tool_call"](call)
+                        if hasattr(res, "__await__"):
+                            await res
+                    return comp
+        return await chat(**kw)
+    r.mind.llm.chat = model
+    return seen
+
+
+class TestWhatTheCaptainsWordsDoNotLose(unittest.TestCase):
+    """When the Captain's words take the floor, the news waiting for a quiet bridge stays in the ship's state; a warning of danger, and a call to him on a net, are not lost to
+    the gap between the news and the turn: they are told after his order (5 October: the 0.6 s to 3 s the turn worker waits for a warning to gather what comes with it)."""
+
+    CALL = (f"{nets_mod.NET_EVENT}traffic on the fleet net — 1 line the Captain has NOT heard. Comms has the watch on this net:\n"
+            f" - 1 s ago · Rourke{nets_mod.CALL_MARK}: «Aquila, report your status.»")
+    ROUTINE = (f"{nets_mod.NET_EVENT}traffic on the flight net — 1 line the Captain has NOT heard. Price has the watch on this net:\n"
+               " - 1 s ago · Hex: «Alpha rearmed.»")
+
+    def test_a_call_to_him_on_a_net_and_a_warning_are_told_after_his_order_and_routine_news_is_not(self) -> None:
+        async def go() -> None:
+            async with Replay() as r:
+                seen = wheel_model(r, {})
+                m = r.mind
+                await m.voice.say("engineering", LONG, "it", "calm")                           # (the bridge is busy: the news waits for it to fall quiet)
+                await m.turns.put(("\x00event:" + self.CALL, "it"))
+                await m.turns.put(("\x00event:" + self.ROUTINE, "it"))
+                await m.turns.put(("\x00event:tactical: missiles inbound, bearing 270", "it"))
+                await m.turns.put(("\x00event:sensors: second contact detected, bearing 180, range 60 km", "it"))
+                await asyncio.sleep(0.5)
+                r.game.push({"type": "player_text", "text": "Timoniere, prua sul Cocytus e tienila lì", "lang": "it"})
+                await asyncio.sleep(0.3)
+                await r.settle(3.0, limit=120.0)
+                asked = [str(k["messages"][-1]["content"]) for k in seen]
+                told = [a for a in asked if "Rourke and calls the Captain" in a]
+                self.assertTrue(told, "the call to the Captain was lost to his order")
+                self.assertTrue(any("missiles inbound" in a.split("[Ship systems event")[-1] for a in asked), "the warning of danger was lost to his order")
+                self.assertFalse(any("Alpha rearmed" in a.split("[Ship systems event")[-1] for a in asked if "[Ship systems event" in a), "routine traffic is on the logs, not a turn")
+                self.assertFalse(any("second contact" in a.split("[Ship systems event")[-1] for a in asked if "[Ship systems event" in a), "plain news stays in the state")
+                tr = r.trace()
+                ack = [i for i in tr.order() if tr.line[i]["priority"] == "answer"]
+                self.assertTrue(ack, "the order was never answered")
+                first = next(a for a in asked if "Captain: Timoniere" in a or "[Ship systems event" in a)
+                self.assertIn("Captain: Timoniere", first, "his order is the first turn: the news waits behind it")
+        run(go())
+
+
+class TestCommandWheel(unittest.TestCase):
+    """The lead's request (command wheel, hold G): an order the Captain gives without a word reaches the minds as a news item «bridge: the Captain gave an order from his command
+    wheel, without a word: …». It IS his order: the officer at that station acknowledges it in a word or two, at once and first, nobody else speaks about it, and nobody carries it
+    out again (the console did)."""
+
+    def test_the_doctrine_teaches_it_in_the_rules_and_in_the_turns_ask(self) -> None:
+        prompt = crew_mod.system_prompt("en", {"stations": {}}, [])
+        self.assertIn("The command wheel", prompt)
+        self.assertIn(crew_mod.WHEEL_EVENT.split(":", 1)[1].strip(), prompt)
+        self.assertIn("ALREADY carried it out", prompt)
+        self.assertIn("nobody else says anything about it", prompt)
+        for needle in ("HIS ORDER", "in a word or two", "no question about whether he meant it", "nothing from any other officer", "did not go through"):
+            self.assertIn(needle, agent_mod.WHEEL_ASK)
+
+    def test_the_turn_can_only_speak_and_carries_no_standing_orders(self) -> None:
+        c = Crew(Script(calls=[speak("Aye, helm.", "helm")]))
+        c.agent.standing = [{"department": "tactical", "order": "weapons free on hostiles inside 40 km"}]
+        asyncio.run(c.agent.handle_event(WHEEL + "Helm: come to heading 090 (heading 090 set)", "en", ask=agent_mod.WHEEL_ASK, speak_only=True))
+        req = c.llm.requests[0]
+        self.assertEqual({t["function"]["name"] for t in req["tools"]}, {"speak"})
+        ask = req["messages"][-1]["content"]
+        self.assertIn("THE COMMAND WHEEL", ask)
+        self.assertNotIn("Standing orders in force", ask)
+        self.assertEqual(c.said, [("helm", "Aye, helm.")])
+
+    def test_it_is_kept_in_the_talk_as_the_captains_own_order(self) -> None:
+        c = Crew(Script(calls=[speak("Aye, helm.", "helm")]))
+        asyncio.run(c.agent.handle_event(WHEEL + "Helm: come to heading 090 (heading 090 set)", "en", ask=agent_mod.WHEEL_ASK, speak_only=True))
+        said = "; ".join(m["content"] for m in c.agent.history if m.get("role") == "user")
+        self.assertIn("command wheel", said)
+        self.assertEqual(initiative_mod.recent_orders(c.agent.history), '"(from his command wheel, no words) Helm: come to heading 090 (heading 090 set)"')
+        self.assertEqual(initiative_mod.recent_orders([{"role": "user", "content": "Captain: fuoco sul Cocytus"}] + c.agent.history),
+                         '"fuoco sul Cocytus"; "(from his command wheel, no words) Helm: come to heading 090 (heading 090 set)"')
+
+    def test_the_watch_does_not_take_the_captains_own_order_for_news(self) -> None:
+        w = initiative_mod.Watch()
+        w.note(WHEEL + "Tactical: fire on T-22 (target lost, solution complete)")
+        self.assertEqual(w._events, [])
+        w.note("sensors: T-22 destroyed")
+        self.assertEqual(len(w._events), 1)
+
+    def test_the_other_nets_do_not_take_it_either(self) -> None:
+        from astra_mind import flight_minds, marines, transporter
+        text = WHEEL + "Flight: launch Alpha squadron (Alpha launching; marines and the Chief of the Deck standing by on the transporter pad)"
+        self.assertIsNone(flight_minds.classify(text))
+        self.assertIsNone(marines.classify(text))
+        self.assertFalse(transporter.is_news(text))
+
+    def test_an_order_from_the_wheel_is_acknowledged_first_and_alone_on_a_busy_bridge(self) -> None:
+        async def go() -> None:
+            async with Replay() as r:
+                seen = wheel_model(r, {"[A]": (0.9, "helm", "Timoniere: agli ordini.")})
+                v = r.mind.voice
+                await v.say("engineering", LONG + " " + LONG, "it", "calm")                  # (a long report is being said, and more waits behind it)
+                await v.say("sensors", "Sensori: secondo rapporto, in coda.", "it", "calm")
+                await asyncio.sleep(1.0)
+                t_order = asyncio.get_running_loop().time()
+                r.game.push({"type": "event", "text": WHEEL + "Helm: come to heading 090 (heading 090 set) [A]", "report": True})
+                await r.settle(2.0)
+                tr = r.trace()
+                acks = [i for i in tr.order() if tr.line[i]["speaker"] == "helm"]
+                self.assertEqual(len(acks), 1, "one acknowledgement, from the officer at the station")
+                a = acks[0]
+                self.assertEqual(tr.line[a]["priority"], "answer", "it is the answer to the Captain's order")
+                self.assertLess(tr.begin[a] - t_order, 2.6, "heard within the model's time and a breath")
+                self.assertTrue(all(tr.line[i]["speaker"] in ("engineering", "sensors", "helm") for i in tr.order()), [tr.line[i]["speaker"] for i in tr.order()])
+                waited = [i for i in tr.order() if tr.line[i]["speaker"] == "sensors"]
+                self.assertTrue(waited and tr.begin[waited[0]] > tr.begin[a], "what waited behind the busy bridge still comes after the acknowledgement")
+                turns = [k for k in seen if "[Ship systems event" in str(k["messages"][-1]["content"])]
+                self.assertEqual(len(turns), 1, "no other turn was made for the Captain's own order")
+                self.assertIn("THE COMMAND WHEEL", str(turns[0]["messages"][-1]["content"]))
+                self.assertEqual({x["function"]["name"] for x in turns[0]["tools"]}, {"speak"})
+        run(go())
+
+    def test_it_does_not_wait_for_the_bridge_to_fall_quiet_or_join_the_news(self) -> None:
+        async def go() -> None:
+            async with Replay() as r:
+                seen = wheel_model(r, {"[A]": (0.9, "tactical", "Tattico: fuoco libero.")})
+                v = r.mind.voice
+                await v.say("engineering", "Captain, all decks report ready. Engineering confirms the reactor is holding at ninety percent.", "it", "calm")   # (six seconds of speech)
+                r.game.push({"type": "event", "text": "sensors: hostile contact T-22 detected, bearing 090, range 90 km", "report": True})     # (the news waits for the bridge to fall quiet)
+                await asyncio.sleep(2.0)
+                t_order = asyncio.get_running_loop().time()
+                r.game.push({"type": "event", "text": WHEEL + "Tactical: weapons free (free to engage T-22) [A]", "report": True})
+                await r.settle(3.0, limit=120.0)
+                tr = r.trace()
+                tac = [i for i in tr.order() if tr.line[i]["speaker"] == "tactical"]
+                sen = [i for i in tr.order() if tr.line[i]["speaker"] == "sensors"]
+                self.assertTrue(tac, "the acknowledgement was never heard")
+                self.assertLess(tr.begin[tac[0]] - t_order, 2.6)
+                self.assertTrue(sen, "the news was lost behind the order")
+                events = [event_line(k) for k in seen if "[Ship systems event" in str(k["messages"][-1]["content"])]
+                self.assertEqual(len(events), 2, events)
+                self.assertTrue(any(e.startswith(crew_mod.WHEEL_EVENT) and "hostile contact" not in e and " | " not in e for e in events), "the order was joined to the news")
+        run(go())
+
+    def test_two_orders_in_a_moment_are_acknowledged_by_their_own_officers(self) -> None:
+        async def go() -> None:
+            async with Replay() as r:
+                seen = wheel_model(r, {"[A]": (0.8, "helm", "Timoniere: agli ordini."), "[B]": (0.9, "xo", "XO: allarme rosso.")})
+                r.game.push({"type": "event", "text": WHEEL + "Helm: come to heading 090 [A]", "report": True})
+                r.game.push({"type": "event", "text": WHEEL + "the alert: red [B]", "report": True})
+                await asyncio.sleep(0.2)
+                await r.settle(2.0)
+                tr = r.trace()
+                who = [tr.line[i]["speaker"] for i in tr.order()]
+                self.assertEqual(sorted(who), ["helm", "xo"], who)
+                self.assertTrue(all(tr.line[i]["priority"] == "answer" for i in tr.order()))
+                self.assertEqual(len([k for k in seen if "[Ship systems event" in str(k["messages"][-1]["content"])]), 2)
+        run(go())
+
+    def test_a_game_that_does_not_ask_for_a_report_gets_none(self) -> None:
+        async def go() -> None:
+            async with Replay() as r:
+                seen = wheel_model(r, {"[A]": (0.8, "helm", "Timoniere: agli ordini.")})
+                r.game.push({"type": "event", "text": WHEEL + "Helm: come to heading 090 [A]", "report": False})
+                await asyncio.sleep(0.2)
+                await r.settle(2.0)
+                self.assertEqual(r.trace().order(), [])
+                self.assertEqual([k for k in seen if "[Ship systems event" in str(k["messages"][-1]["content"])], [])
+        run(go())
 
 
 if __name__ == "__main__":

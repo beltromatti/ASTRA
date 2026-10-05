@@ -26,9 +26,9 @@ from typing import Any
 
 from lingua import Language, LanguageDetectorBuilder
 
-from .agent import EVENT_ASK, NET_ASK, BridgeAgent, ShipLink
+from .agent import EVENT_ASK, NET_ASK, WHEEL_ASK, BridgeAgent, ShipLink
 from .audio_in import PushToTalk
-from .crew import CREW
+from .crew import CREW, WHEEL_EVENT
 from .enemy import COMMANDERS, EnemyAgent
 from .style import StyleKeeper
 from . import router as router_mod
@@ -44,7 +44,7 @@ from .voice_lang import resolve_language
 from .speech import REPORT_LATE_S, Prio, Voice
 from .flight_minds import CAST as FLIGHT_CAST, PARTY as FLIGHT_PARTY, PARTY_ALIASES as FLIGHT_ALIASES, FlightMinds, flying as _flying, on_flight_deck as _on_flight_deck
 from .marines import PARTY as MARINES_PARTY, MarineMinds
-from .nets import NET_EVENT, URGENT_MARK, Nets
+from .nets import CALL_MARK, NET_EVENT, URGENT_MARK, Nets
 from .war_minds import ALLIES, WarMinds
 from .march import March
 from .march_glue import MarchGlue
@@ -152,6 +152,14 @@ ROUTINE_WAIT_S = 25.0          # routine news waits for a quiet bridge this long
 # events that are not news but a request to speak (the flight controller calls, the after-action report, the fleet net's news, a visitor
 # at the door): they are reported whenever the bridge is quiet, however long that took
 _NOT_PERISHABLE = _re.compile(r"^(flight: controller call|bridge: after-action|comms: fleet net news)|has come to the Captain's quarters in person", _re.I)
+
+
+def _outlives_the_captains_words(event: str) -> bool:
+    """News that is told after the Captain's order when his words take the floor, instead of being lost to it: a warning of danger, and net traffic that calls him (its listener
+    tells him: nothing addressed to him is lost). The rest of the news stays in the ship's state and the history."""
+    return bool(_URGENT_EVENT.search(event)) or (event.startswith(NET_EVENT) and CALL_MARK in event)
+
+
 _GM_ADDRESS = _re.compile(r"^\W*(regista|director|narrat\w*|game ?master|gm|réalisateur|directeur|director de juego|spielleiter|erzähler)\b[\s,:;.!-]*", _re.I)
 
 
@@ -881,7 +889,12 @@ class Mind:
                     for p in pending:
                         await self.turns.put(p)
                     if pending:
-                        continue          # the Captain spoke: answer first, the events stay in the state/history
+                        # the Captain spoke: answer first. The news stays in the state and the history; a warning of danger, or a call to him on a net, is told after his order
+                        # (its officer says nothing if the order covered it): it is not lost to the gap between the news and the turn (0.6 s to 3 s), however his words fall
+                        for e, w in zip(events, when):
+                            if _outlives_the_captains_words(e):
+                                await self.turns.put(("\x00event:" + e, self.lang, None, w))
+                        continue
                     transmissions = [e for e in events if e.startswith("transmission:")]
                     keep = [i for i, e in enumerate(events) if not e.startswith("transmission:")]
                     events, when = [events[i] for i in keep], [when[i] for i in keep]
@@ -933,7 +946,7 @@ class Mind:
                     if getattr(t, "cancelled", False) and not t.lines:
                         # the Captain took the floor while a warning of danger was being written: it is reported after his order (the crew
                         # says nothing if what he ordered already covered it)
-                        for e in [e for e in fresh_events if _URGENT_EVENT.search(e)]:
+                        for e in [e for e in fresh_events if _outlives_the_captains_words(e)]:
                             await self.turns.put(("\x00event:" + e, self.lang))
                     continue
                 self.voice.captain_turn_begin()               # what is said from here to the end of this turn answers the Captain
@@ -1169,6 +1182,20 @@ class Mind:
                 "in one short line, or nothing]") if busy > 12.0 else ""
         return await self.agent.handle_event(" | ".join(events) + note, self.lang, ask=ask)
 
+    async def _wheel_turn(self, event: str) -> None:
+        """An order the Captain gave from his command wheel, without a word (the game has carried it out): the officer at that station acknowledges it like a spoken one. It is not
+        news: it does not wait for a quiet bridge or for other news to join it, what is said in it is an answer to the Captain (it goes first and is never lost), and the turn can
+        only `speak` (the console did what was ordered: nobody orders it again). Several orders in a few seconds are several turns, each acknowledged by its own officer."""
+        try:
+            self.agent.ship = self.game if (self.game and self.game.state) else self.local
+            self.voice.captain_turn_begin()
+            t = await self.agent.handle_event(event, self.lang, ask=WHEEL_ASK, speak_only=True)
+            log.info("command wheel turn %.2fs: %s", t.t_end, " | ".join(f"{s}: {x}" for s, x in t.lines) or "(no acknowledgement)")
+        except Exception:  # noqa: BLE001
+            log.exception("an order from the command wheel could not be acknowledged")
+        finally:
+            self.voice.captain_turn_end()
+
     async def handle_client(self, ws) -> None:  # noqa: ANN001
         self.clients.add(ws)
         self.voice.muted = False
@@ -1314,7 +1341,12 @@ class Mind:
                             log.exception("the marine net could not take an event")
                     if msg.get("report") and not self.aftermath.muted and not taken:
                         self.last_activity = time.monotonic()
-                        await self.turns.put(("\x00event:" + text, self.lang))
+                        if text.startswith(WHEEL_EVENT):
+                            # an order the Captain gave without a word (his command wheel): it is acknowledged like a spoken one, at once, in a turn of its own
+                            self.captain_t = self.last_activity
+                            asyncio.create_task(self._wheel_turn(text))
+                        else:
+                            await self.turns.put(("\x00event:" + text, self.lang))
                 elif kind == "command_result":
                     self.game.resolve(msg)
                 elif kind == "voice_status":
