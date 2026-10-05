@@ -117,7 +117,7 @@ abbordaggi contro l'Aquila, chiesto da ABBORDAGGI).
   - il «reactor breached» di una nave nemica non è più un avviso urgente (tagliava le chiamate dei comandanti, che si ripetevano);
   - un avviso che la voce non fa in tempo a dire si legge come sottotitolo;
   - un ordine per qualcosa che non è ancora successo è un ordine permanente.
-- **Pacchetto dell'app in costruzione** (development, 5/10 pomeriggio) con tutto ciò che è stato unito oggi.
+- **Nuovo pacchetto dell'app pronto** (development, 5/10 16:13, `~/Applications/ASTRA.app`, 2,8 GB) con tutto ciò che è stato unito oggi: VOCI-3 completo, BATTAGLIA-3 tappe 1-5, ABBORDAGGI-4 tappe 1-3, VFX-2 tappe 1-2, le correzioni delle partite di prova del lead.
 - **Quinta prova dell'apertura** (dopo la dottrina che si batte). Il Mandato attacca davvero.
   - Da ~325 s a ~420 s scontro vero, con siluri dei bombardieri, esche e scudi che cedono: Acheron, Hecate, Hypnos, Phlegethon e Styx distrutti.
   - Poi il Mandato si ritira «dopo aver combattuto» (morale 0, 26 % della forza persa). Warden Thale chiede la resa, poi una tregua per recuperare i naufraghi.
