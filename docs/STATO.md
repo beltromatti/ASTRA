@@ -2,9 +2,86 @@
 
 *Questo file è la memoria operativa del progetto: lo aggiorno a ogni passo. Chi riprende il lavoro (io in una nuova sessione) parte da qui.*
 
-**Ultimo aggiornamento:** 2026-10-05 · **Traguardo corrente:** Piano v0.5 ([PIANO.md](PIANO.md)): la nave come una nave vera (NAVE-3,
-ASCENSORI), gli abbordaggi (F5.1), il lead che gioca partite intere da Capitano e rifinisce; **principio delle intelligenze**
-([ARCHITETTURA §1bis](ARCHITETTURA.md))
+**Ultimo aggiornamento:** 2026-10-05 sera · **Traguardo corrente:** **versione stabile chiusa** (sotto); poi Piano v0.7 ([PIANO.md §0bis](PIANO.md)):
+il cuore del gioco (chiarezza, controllo, battaglie epiche e continue, niente attriti); **principio delle intelligenze** ([ARCHITETTURA §1bis](ARCHITETTURA.md))
+
+## CHIUSURA DEL 5/10 SERA — la versione stabile (da qui si riprende)
+Richiesta dell'utente: «una versione stabile con tutti i moduli e i lavori fatti finora integrati, tutto funzionante, in poco tempo».
+**Nessun aiutante al lavoro**: i tre aiutanti hanno chiuso il loro modulo e consegnato solo il lavoro stabile e verificato.
+
+**Che cosa è dentro** (main @ `5f4c3e5` e seguenti; app `~/Applications/ASTRA.app`, development):
+- **VOCI-3** (chiuso il 5/10): reti con chi le ascolta, nessuna risposta al Capitano persa, ~4 battute al minuto invece di 8.
+- **BATTAGLIA-3** (chiuso, tappe 1-6; [GUERRA.md](GUERRA.md) §11.12):
+  - le armi: rotaie a 22-45 km con la precisione che cala, laser a 6,5-9 km;
+  - navi che muoiono a pezzi in minuti, timone e tattico che manovrano da soli;
+  - incendi che pesano senza diventare un muro (18 invece di 170 in 600 s, nessun morto per il fuoco);
+  - il testo vero della ritirata;
+  - le celle missilistiche del Mandato come la Bibbia, il secondo Acheron nell'apertura.
+- **ABBORDAGGI-4** (chiuso, M1-M4; [ABBORDAGGI.md](ABBORDAGGI.md) §15.5):
+  - il ritmo (dall'ordine al taglio 1 min 19 s a 3 km);
+  - gli ordini alla fanteria (sweep, breach, take, ambush, escort_captain, seal_behind, cover, sync);
+  - il Capitano in prima persona: Z/X per sporgersi, l'arco ambra di chi lo vede, la scheda dei tasti, la striscia delle squadre;
+  - i relitti come bersagli dei marine.
+- **VFX-2** (chiuso): il fuoco leggibile a ogni distanza, le esplosioni con forma, i segni sulla pelle dello scafo.
+- **ARTE-SCAFI** (chiuso con soli strumenti): le viste range e blueprint di shipgen3, ship3_form, il riferimento «prima» del Vigilant. **Nessuna nave cambiata.**
+- **Il lead, oggi:**
+  - il tavolo e lo schermo mostrano che cosa arriva dal Gate;
+  - la regia a tagli («ASN AQUILA · FIRING ON …») e la vista esterna a richiesta («inquadraci da fuori»);
+  - la ruota degli ordini G;
+  - il suono della morte di una nave;
+  - la prima guardia;
+  - l'apertura con la battaglia per il Gate;
+  - le trasmissioni nemiche ripensate da chi le dice (un comandante la cui nave è saltata non parla più);
+  - il banco di prova che non disturba chi usa il Mac.
+- **Due crash dell'app corretti** (dai rapporti di macOS delle partite dell'utente del 5/10):
+  - a metà partita (00:19 e 01:02): il garbage collector liberava i font dell'interfaccia sotto le etichette del finestrone. Ora i due font restano vivi (`AstraFonts.h`);
+  - all'uscita (01:26 e 03:30): la cache dei piani delle navi veniva distrutta dopo il motore (`AstraFleetPlan.cpp`).
+
+  Provato: la raccolta forzata (`obj gc`) in battaglia e l'uscita pulita, senza nessun rapporto di crash.
+
+**La prova finale (dev, mente vera, campagna nuova, 15 min da Capitano):**
+- briefing dell'XO, il Lethe, il Gate che cicla, gli ordini confermati in 1-5 s, l'ordine permanente di Price per Alpha;
+- la battaglia del Gate (Nyx, Tartarus ed Erinys distrutte, ritirata del Mandato), l'Aquila al 74 %;
+- una seconda e una terza ondata (Erebos e Avernus distrutte; la Constance persa);
+- la vista esterna dallo schermo;
+- 38-48 fps nel gioco di prova a 1280x720 (risoluzione dinamica al 34 %).
+
+**Che cosa manca (in ordine di valore per il giocatore):**
+1. **Prestazioni** (PRESTAZIONI-GPU, brief pronto, mai avviato):
+   - la risoluzione dinamica sta al minimo in battaglia;
+   - fotogrammi a blocchi con MetalFX;
+   - un timeout della GPU visto una volta in un gioco di prova di VFX-2 sotto carico.
+2. **Bilanciamento** (BATTAGLIA-3 §11.12, «Come riprendere»):
+   - la leva `prize` (il Mandato che cerca l'Aquila) più le portate Styx 30, Lethe 24, Acheron 38 km è la combinazione consigliata, ma manca la suite intera, per questo il default è 0;
+   - i tempi dell'apertura nella March: nel banco senza menti né Capitano l'Aquila muore in o13; nel gioco vero, con le menti, finisce al 70-75 %;
+   - i duelli fra uguali (Styx contro Styx) restano in stallo;
+   - il banco dell'inseguimento va rifatto.
+3. **Coerenza della guerra raccontata:**
+   - Rourke annuncia «F-M4 sta passando dal Gate» e poi «F-M4 è ancora a Thule»;
+   - due ufficiali chiedono insieme se aprire il canale con un comandante che ha già parlato;
+   - Price chiede «come da ordine permanente?» prima di eseguirlo.
+4. **Abbordaggi** (ABBORDAGGI.md §15.5):
+   - la prova a mano di un relitto vero in campagna;
+   - SPAZIO-VIVO che tiene sul piano il pezzo abbordato (`IsBoardingTarget`);
+   - gli ordini ai marine dalla ruota G;
+   - la dottrina del Mandato con le esercitazioni;
+   - tuta e vuoto.
+5. **Navi nuove** (ARTE-SCAFI, brief §«Stato alla chiusura»):
+   - il Vigilant v4 progettato, non costruito;
+   - prima tappa: `ship3_loft.slab` che legge le rotture delle fasce.
+
+   Attenzione: `data/war/classes.json` ha un affusto in più (la canna di prua) di quanti ne nominano le specifiche delle piante: non rigenerare le piante prima di aggiungere il ruolo `gun_bow` alle quattro specifiche.
+6. **Persone vere** (F3): ferme sull'autorizzazione Epic per i MetaHuman (RICHIESTE).
+7. **Resto del piano**: F6 teletrasporto (fatto in parte), F7 pianeta, F8 rete e Windows.
+
+**Come riprendere:**
+- leggere questa sezione;
+- poi PRESTAZIONI-GPU e il bilanciamento con la suite (BATTAGLIA-3 §11.12), poi la coerenza della guerra raccontata, sempre giocando da Capitano dopo ogni modulo.
+
+Strumenti:
+- `tools/play.py` è il gioco di prova sulla porta 8770. Se non risponde, un CrashReportClient rimasto da un crash può tenere la porta: va chiuso (vedi memoria);
+- `tools/ricompila.sh --no-launch` compila senza riaprire l'editor;
+- `tools/pacchetto.sh development` fa l'app.
 
 ## Piano v0.5 — dove siamo (aggiornato a ogni passo)
 | Fase | Stato |
@@ -17,7 +94,7 @@ ASCENSORI), gli abbordaggi (F5.1), il lead che gioca partite intere da Capitano 
 | **F5** Abbordaggi | **F5.1 unito** (ABBORDAGGI: prima persona, fucile e pistola, marine del ruolino con il Maggiore Reyes e i capisquadra come menti, la squadra del Mandato che cerca l'Ingegneria): da compilare e provare nel gioco |
 | **F6** Teletrasporto · **F7** Pianeta · **F8** Rete e Windows | **F6 in corso** (TELETRASPORTO: regole, banco, Capo della sala); poi FLOTTA-VIVA (gli interni delle altre navi simulati come l'Aquila) |
 
-**Aiutanti al lavoro (2/10 notte)** (worktree in `.claude/worktrees/`, rami `worktree-*`; brief in `docs/brief/`): **NAVE-3** (gli ultimi
+**Aiutanti al lavoro (2/10 notte; storico: oggi nessuno, vedi CHIUSURA)** (worktree in `.claude/worktrees/`, rami `worktree-*`; brief in `docs/brief/`): **NAVE-3** (gli ultimi
 pezzi della pianta), **TELETRASPORTO**, **ARTE-PLANCIA-2** (plancia, abitacolo del Falcon, corridoi del Ponte 1 e alloggi del Capitano al
 livello di un film; avviato). Pronti: CAMPAGNA (lo strato strategico), FLOTTA-VIVA, F5.2 (abbordare le navi nemiche; con la guerra che lancia gli
 abbordaggi contro l'Aquila, chiesto da ABBORDAGGI).
