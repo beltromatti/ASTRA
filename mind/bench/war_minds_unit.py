@@ -596,7 +596,7 @@ class AstraTests(Fixture):
         self.assertIn("hull 88% (100% at your last look", user)
         self.assertIn("shields 82% (100% then)", user)
         self.assertIn("Hostile ships nearest the Aquila: T-21 acheron 2.4 km (hull 90%); T-22 styx 3.3 km (hull 100%); T-23 styx 9.0 km", user)
-        self.assertIn("inside laser reach (4 km) of her: T-21, T-22", user)
+        self.assertIn(f"inside laser reach ({war_minds.LASER_KM:g} km) of her: T-21, T-22", user)
         await self.feed(self.aquila_at(2.5, 86, 80, near), 30)                            # the next look compares with this one: 2 points, nothing
         self.assertEqual(len(self.llm.calls), n + 1)
         await self.feed(self.aquila_at(2.5, 86, 45, near), 5)                             # 35 points of shield: wakes
@@ -924,10 +924,10 @@ class RenderTests(unittest.TestCase):
 
     def test_the_doctrine_quotes_the_measured_ranges_and_teaches_the_formation_lever_only_when_switched_on(self) -> None:
         plain, line = war_minds.doctrine(), war_minds.doctrine(True)
-        self.assertIn(f"does best at {war_minds.SMALL_GROUP_KM:g} km", plain)
+        self.assertIn("10-24 km out", plain)                                              # the physics of BATTAGLIA-3 (the old sweet spots were for 10 km rails)
+        self.assertIn("seven in ten at 15-30 km", plain)
         self.assertNotIn("LINE ABREAST", plain)
         self.assertIn("LINE ABREAST", line)
-        self.assertIn(f"closing to about {war_minds.LINE_KM:g} km", line)
         for text in (plain, line):
             self.assertIn("The first look at a fight is a partial picture", text)         # the rest of the doctrine is the same
             self.assertIn("Concentrate fire", text)
