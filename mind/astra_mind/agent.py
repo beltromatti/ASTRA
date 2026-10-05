@@ -435,9 +435,9 @@ class BridgeAgent:
         results: dict[int, dict[str, Any]] = {}
         for call, task in pending:
             try:
-                res = await asyncio.wait_for(task, timeout=3.0)
+                res = await asyncio.wait_for(task, timeout=7.0)
             except asyncio.TimeoutError:
-                res = {"ok": False, "detail": "no response from ship systems"}
+                res = dict(NO_ANSWER)
             except asyncio.CancelledError:
                 res = {"ok": False, "detail": "cancelled"}
             turn.actions.append((call.name, call.arguments() or {}, res))
@@ -449,9 +449,9 @@ class BridgeAgent:
         results: dict[int, dict[str, Any]] = {}
         for call, task in pending:
             try:
-                res = await asyncio.wait_for(task, timeout=3.0)
+                res = await asyncio.wait_for(task, timeout=7.0)
             except (asyncio.TimeoutError, asyncio.CancelledError):
-                res = {"ok": False, "detail": "no response from ship systems"}
+                res = dict(NO_ANSWER)
             turn.actions.append((call.name, call.arguments() or {}, res))
             results[id(call)] = res
         return results
@@ -506,7 +506,8 @@ class BridgeAgent:
         extra = turn.lines[main_lines:] if calls else turn.lines
         if calls:
             self._append_calls([(c.id or f"call_{i}", c.name, c.arguments_raw or "{}",
-                                 "spoken" if c.name == "speak" else (("ok: " if results.get(id(c), {}).get("ok") else "FAILED: ")
+                                 "spoken" if c.name == "speak" else (("ok: " if results.get(id(c), {}).get("ok")
+                                                                      else "NOT CONFIRMED YET: " if results.get(id(c), {}).get("ok", False) is None else "FAILED: ")
                                                                      + str(results.get(id(c), {}).get("detail", ""))))
                                 for i, c in enumerate(calls)])
         if extra:
@@ -601,13 +602,17 @@ STANDING_ASK = (" Standing orders in force (see them in the rules) are the Capta
 INITIATIVE = {"dispatch_damage_control", "set_shields", "set_point_defense", "set_radiators", "launch_decoys"}
 
 
+NO_ANSWER = {"ok": None, "detail": "sent to the console, no confirmation yet: the ship's systems were busy for a moment (a force coming into the plot loads for a "
+                                    "few seconds). It is most likely in force: the console will show it on the next turn. Do not tell the Captain it failed"}
+
+
 async def _safe_execute(ship: ShipLink, name: str, args: dict[str, Any], by: str) -> dict[str, Any]:
     try:
         return await ship.execute(name, args, by)
     except (KeyError, TypeError, ValueError) as exc:
         return {"ok": False, "detail": f"invalid arguments for {name}: {exc}"}
     except asyncio.TimeoutError:
-        return {"ok": False, "detail": "no response from ship systems"}
+        return dict(NO_ANSWER)          # (5 Oct: the order was in force and the officer told the Captain «the command did not answer»)
 
 
 async def _refuse(why: str) -> dict[str, Any]:
