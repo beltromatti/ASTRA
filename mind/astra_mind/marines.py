@@ -236,7 +236,7 @@ ORDER = _fn("order", "Give a squad (or several) an order: it takes effect at onc
     "task": {"type": "string", "enum": list(TASKS)},
     "place": {"type": "string", "description": "where: a place id from the board (where_id, the likely approach, the ways into Main Engineering, the default ambush), `captain` "
                                                "for wherever the Captain is now, a deck's section as «deck 7 section D» (sweep clears its rooms), or a room's name or kind when it is not on the board "
-                                               "(medbay, hangar: the game finds it or lists what fits); for breach also a door's id (the board's objective_doors and bulkheads); "
+                                               "(medbay, hangar: the game finds it or lists what fits); for take, breach and sweep the room or section to be cleared, not a way into it; for breach also a door's id (the board's objective_doors and bulkheads); "
                                                "leave it out for follow_captain, rescue_captain, escort_captain and stand_down"},
     "fire": {"type": "string", "enum": ["held", "free"], "description": "held: nobody fires until the squad is found or told (an ambush is held by itself); free is the default"},
     "seal_behind": {"type": "boolean", "description": "with fall_back, withdraw or advance: the last man of the squad shuts every pressure bulkhead behind them (four seconds at its console): the enemy must cut or override it"},
@@ -318,6 +318,8 @@ WHEN THE MARINES BOARD A SHIP (the board says `role: attacking`: the Aquila's ma
   the risks, when to get out; Reyes advises, the Captain decides.
 
 THE INFANTRY ORDERS (the game's simulation measured each one, with the order and without it, on the same rooms: these are its numbers; they are what a commander knows of his own men)
+- The place of take, breach and sweep is the room to be cleared (or a deck's section), never a way into it: the squads work out their doors themselves, each by a door of its own when there are several. The board's
+  «ways into» a place are for hold and ambush (the corners where the enemy must pass), not for take.
 - take: the squad stacks beside the room's door with the door held shut (nobody inside sees them), goes in a man every 0.7 s, each to his corner, and holds the room from inside. Six marines against
   six guards at their posts: the room was taken 21 times in 32 against 10 for a squad that walks in, for 3.2 marines lost against 4.9; against guards waiting at the door 29 in 32 against 16, 0.7
   lost against 4.1. Squads given one take go in at the same moment by doors of their own (sync): the room cannot cover both. It costs the wait (nine seconds more than each by itself) and wins
@@ -333,7 +335,7 @@ THE INFANTRY ORDERS (the game's simulation measured each one, with the order and
   24 against 6 for the same marines holding with their fire free, for 7.3 marines lost against 9.7; against eight it won as often and ended thirty seconds sooner. It waits three minutes at most;
   if nobody comes they hold the place with their fire free. It needs the enemy to come by the place (the board's likely approach and default ambush are where he does): an ambush on a room he does not use
   is a squad out of the fight.
-- escort_captain (only with the Captain in the fight): a man ahead of him who looks past every opening, two at his sides, the rest behind; they walk and shoot with him, and when he stands they take
+- escort_captain (only with the Captain in the fight): what he asks for when he wants to be escorted, covered or protected as he moves; follow_captain is for when he only wants them with him. A man ahead of him who looks past every opening, two at his sides, the rest behind; they walk and shoot with him, and when he stands they take
   the corners round him. On a walk from the hatch to a ship's bridge, where the guns of the ship lay on him before any other man, the Captain was hit 87 times with six marines escorting against 154
   alone; the squad kept within ten metres of him 83% of the way (one only told to follow him: 64%), and it cost 1.1 of the six on the way. He may still stand in a doorway and be shot; the escort
   is the best he can have, not a wall.
