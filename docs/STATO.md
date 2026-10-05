@@ -85,6 +85,19 @@ abbordaggi contro l'Aquila, chiesto da ABBORDAGGI).
 - **VFX-2 avviato** (al posto di VOCI-3): fuoco leggibile a ogni distanza, esplosioni con forma senza accecare la plancia, sezioni che si spezzano. Può usare il gioco di prova nel suo worktree, sulla porta 8771.
 - **Il banco di prova non disturba più chi usa il Mac.** Il gioco parte dietro (niente splash) e, se prende il fuoco, lo restituisce. Ignora tastiera e mouse del Mac (-astra_harness_input per giocarlo a mano). Il 5/10 i tasti dell'utente avevano portato il Capitano fuori dalla plancia: la «plancia sparita» era questo, non un difetto.
 - **Regia sui momenti forti**: lo schermo principale taglia su uno scudo che cade, un sistema fuori uso, una sezione sventrata («BOW SHIELD DOWN · ACHERON»).
+- **Tre partite di prova da Capitano sull'apertura** (pomeriggio): [PARTITE_LEAD_2026-10-05.md](PARTITE_LEAD_2026-10-05.md).
+
+  Corretto:
+  - l'apertura non aveva battaglia (il grosso tornava troppo presto, il Mandato arrivava a pezzi e si ritirava);
+  - la vittoria finale dell'arco dichiarata dopo 5 minuti;
+  - il tavolo senza la forza in arrivo;
+  - ordini «falliti» che erano in vigore;
+  - Rourke ripetuto;
+  - l'XO che ripropone;
+  - la mente vecchia nelle prove.
+
+  Nella terza prova la battaglia per il Gate c'è stata: 17 navi del Mandato, 4 distrutte in 90 s di fuoco pesante, l'Aquila al 67 %, ritirata del Mandato all'arrivo dei soccorsi.
+- **Uniti** BATTAGLIA-3 tappa 5 (la prua non più sventrata, la mira del Capitano) e ABBORDAGGI-4 tappa 2 (la fanteria si comanda: prendere, sfondare, rastrellare, imboscata, scortare il Capitano, chiudere dietro).
 - **Lo schermo principale racconta lo scontro a tagli** (il lead): il bersaglio, poi «ASN AQUILA · FIRING ON …» (l'Aquila da fuori che spara,
   `astra.viewscreen.broadside`), poi il bersaglio. Provato nel gioco. Brief pronti: **VFX-2**, **PRESTAZIONI-GPU** (oltre ad ARTE-SCAFI).
 - **Da indagare (PRESTAZIONI-GPU)**: nel gioco di prova (1600x900, 60 fps di obiettivo) la risoluzione dinamica sta al minimo (33–34 %) e
