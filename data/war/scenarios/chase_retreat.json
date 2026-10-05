@@ -1,0 +1,8 @@
+{
+  "_doc": "BATTAGLIA-3: the Aquila (at her cruise of 288 m/s, bow to +x, her stations on their defaults: the bench scripts the Captain) and a Kharon Mandate cruiser with two destroyers coming at her from 40 km; the bench orders them to break off after a while (tools/war.py chase: a `withdraw` from the admiral at 150 s). They run at 1.25 times their cruise, faster than she can fly: what the helm does with that is the measure: how long the fire goes on and how much of it lands on ships that are going away. See duel_aq_styx.json.",
+  "aquila": {"at_km": [0, 0, 0], "heading": 0, "speed": 288},
+  "mandate": [
+    {"name": "Raiders", "formation": "wedge", "at_km": [40, 0, 0], "heading": 180, "spacing_km": 1.8, "objective_km": [0, 0, 0],
+     "ships": [{"class": "acheron", "n": 1}, {"class": "styx", "n": 2}]}
+  ]
+}

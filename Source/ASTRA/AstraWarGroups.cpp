@@ -204,6 +204,7 @@ void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 	// focus_a / focus_m: 0 no concentration of fire (each ship the nearest it can hit), 1 the first scored rule (class value and how battered),
 	// 2 the threat removed per unit of effort to kill (the default)
 	static AstraWar::FTuneVar KFocus[2] = {AstraWar::FTuneVar(TEXT("focus_a"), 1.f), AstraWar::FTuneVar(TEXT("focus_m"), 1.f)};
+	static AstraWar::FTuneVar KBreak[2] = {AstraWar::FTuneVar(TEXT("break_a"), 1.f), AstraWar::FTuneVar(TEXT("break_m"), 1.f)};          // the losses a group bears before it breaks, times this (0: never)
 	static AstraWar::FTuneVar KFlankRatio(TEXT("flank_ratio"), 0.9f);      // the strength ratio (ours over theirs) from which the group flanks by itself
 	static AstraWar::FTuneVar KRange[2] = {AstraWar::FTuneVar(TEXT("range_ai_a"), 1.f), AstraWar::FTuneVar(TEXT("range_ai_m"), 1.f)};
 	// --- who is in it and where
@@ -288,7 +289,7 @@ void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 		if (D < 80.0 * WarKm)
 		{
 			E.Add({&O, P, D});
-			if (D < 45.0 * WarKm)
+			if (D < 60.0 * WarKm)
 			{
 				EC += P * O.Radius;
 				EW += O.Radius;
@@ -321,21 +322,51 @@ void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 		G.Order = EAstraGroupOrder::Auto;                             // "continue the attack": the ships are back in the fight
 		SetGroupState(G, EAstraGroupState::Engage, TEXT("the withdrawal is lifted"));
 	}
-	// --- morale: the balance of strength, and how long it has been against the group
+	// --- morale: what the group has lost against what it still faces. It does not break at the sight of a bigger enemy: it breaks when it has taken real losses for the
+	// balance it is in (an outnumbered group early, an even one late), and not in the first moments of a fight (BATTAGLIA-3: the old rule broke a two-ship vanguard at 0.13
+	// on the first sight of a fleet forty kilometres off, before a shot was fired, and the Mandate left every fight as soon as it began)
 	float AllyStr = 0.f;
 	for (const FAstraBattleGroup& A : Groups)
 	{
-		if (A.Id != G.Id && A.Side == G.Side && A.State == EAstraGroupState::Engage && FVector::Dist(A.Centroid, C) < 30.0 * WarKm)
+		if (A.Id != G.Id && A.Side == G.Side && A.State == EAstraGroupState::Engage && FVector::Dist(A.Centroid, C) < 40.0 * WarKm)
 		{
 			AllyStr += A.Strength;                                    // the friends fighting beside it count
 		}
 	}
 	G.AlliedStrength = AllyStr;
-	const float Ratio = EStr > 0.02f ? (Str + AllyStr) / EStr : 9.f;
+	// the enemy that is in the fight now: whose guns reach the group (a fleet forty kilometres off does not weigh as one at its guns: it weighs fully inside its reach, and not at all beyond 1.7 times it)
+	float EngStr = 0.05f * EnemyCraftNear;
+	for (const FEnemy& X : E)
+	{
+		const double Reach = FMath::Max((double)X.S->RailRange, 0.6 * (double)X.S->MissileRange);
+		const double Wt = FMath::Clamp((1.7 * Reach - X.D) / (0.7 * Reach), 0.0, 1.0);
+		EngStr += (float)Wt * X.S->CombatValue * Readiness(*X.S);
+	}
+	G.EnemyEngaged = EngStr;
+	const float Ratio = EngStr > 0.02f ? (Str + AllyStr) / EngStr : 9.f;
+	if (EngStr > 0.02f)
+	{
+		G.FightSince = G.FightSince < 0.f ? Time : G.FightSince;
+	}
+	else if (G.FightSince >= 0.f && Time - G.FightSince > 20.f)
+	{
+		G.FightSince = -1.f;
+	}
+	const float Losses = G.StartStrength > 0.f ? FMath::Clamp(1.f - Str / G.StartStrength, 0.f, 1.f) : 0.f;
+	G.Losses = Losses;
 	if (G.State == EAstraGroupState::Engage)
 	{
-		const float Losses = G.StartStrength > 0.f ? 1.f - Str / G.StartStrength : 0.f;
-		const bool bWeak = bEnemy && KRetreat[Me].Get() > 0.f && (Ratio < KRetreat[Me].Get() || (Losses > 0.6f && Ratio < 0.8f));
+		// what it will bear: an outnumbered group (the balance 0.15) a quarter of its strength, an even one (0.75 and over) three fifths; and in the first forty seconds of a fight only what no group
+		// would stand (half). `break_a/m` scales it (0: it never breaks by itself: a bench's variant)
+		const float KB = KBreak[Me].Get();
+		float Lmin = FMath::Clamp(0.15f + 0.6f * Ratio, 0.15f, 0.6f);
+		if (G.FightSince >= 0.f && Time - G.FightSince < 40.f)
+		{
+			Lmin = FMath::Max(Lmin, 0.5f);
+		}
+		Lmin = FMath::Min(1.f, Lmin * KB);
+		G.BreakAt = Lmin;
+		const bool bWeak = bEnemy && KRetreat[Me].Get() > 0.f && KB > 0.f && EngStr > 0.02f && Losses > Lmin;
 		if (bWeak)
 		{
 			G.WeakSince = G.WeakSince < 0.f ? Time : G.WeakSince;
@@ -344,13 +375,14 @@ void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 		{
 			G.WeakSince = -1.f;
 		}
-		G.Morale = FMath::Clamp(Ratio / 1.2f, 0.f, 1.f) * (1.f - 0.3f * FMath::Clamp(Losses, 0.f, 1.f));
-		if (G.Morale < 0.35f && !G.bBroken)
+		G.Morale = Lmin > 0.f ? FMath::Clamp(1.f - Losses / Lmin, 0.f, 1.f) : 1.f;
+		if (G.Morale < 0.3f && !G.bBroken)
 		{
 			G.bBroken = true;
-			NoteGroupEvent(Me, FString::Printf(TEXT("%s: morale is breaking (%.2f), strength %.1f against %.1f; with no order in force it will break off"), *G.Name, G.Morale, Str, EStr));
+			NoteGroupEvent(Me, FString::Printf(TEXT("%s: morale is breaking (%.2f), it has lost %.0f%% of its strength and breaks at %.0f%% (strength %.1f against %.1f at its guns); with no order in force it will break off"),
+			                                   *G.Name, G.Morale, 100.f * Losses, 100.f * Lmin, Str, EngStr));
 		}
-		else if (G.Morale > 0.6f)
+		else if (G.Morale > 0.5f)
 		{
 			G.bBroken = false;
 		}
@@ -390,7 +422,7 @@ void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 				Ref = X.Pos;
 			}
 		}
-		if (EW > 0.f && FVector::Dist(EC, C) < 45.0 * WarKm)
+		if (EW > 0.f && FVector::Dist(EC, C) < 60.0 * WarKm)
 		{
 			Ref = EC;
 		}
@@ -447,7 +479,7 @@ void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 		{
 			Nearest = FMath::Min(Nearest, X.D);
 		}
-		const bool bContactLost = !bEnemy || Nearest > 38.0 * WarKm;
+		const bool bContactLost = !bEnemy || Nearest > 58.0 * WarKm;
 		if (bContactLost && Time - G.WithdrawSince > 20.f && G.Order != EAstraGroupOrder::Withdraw)
 		{
 			SetGroupState(G, EAstraGroupState::Regroup, TEXT("out of contact"));                        // stop and reform
@@ -469,7 +501,7 @@ void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 		{
 			Nearest = FMath::Min(Nearest, X.D);
 		}
-		const bool bPressed = bEnemy && Nearest < 22.0 * WarKm;
+		const bool bPressed = bEnemy && Nearest < 38.0 * WarKm;
 		if (bPressed && Ratio < 0.9f && G.Order != EAstraGroupOrder::Regroup)      // (an order to regroup stands: the commander decides whether to fall back)
 		{
 			SetGroupState(G, EAstraGroupState::Withdraw, TEXT("the enemy is on it"));                       // they are coming and we are not ready: on
@@ -503,7 +535,7 @@ void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 	}
 	// the focus of fire
 	FAstraBattleShip* Focus = FindById(G.FocusTarget);
-	auto InReachOfGroup = [&](const FAstraBattleShip& X) { return FVector::Dist(KnownPos(Me, X), C) < 45.0 * WarKm; };
+	auto InReachOfGroup = [&](const FAstraBattleShip& X) { return FVector::Dist(KnownPos(Me, X), C) < 55.0 * WarKm; };
 	if (Focus && (!Focus->bAlive || Focus->bDisabled || !Knows(Me, *Focus) || !InReachOfGroup(*Focus) || (Focus->bFleeing && Focus->bNegotiated)))
 	{
 		Focus = nullptr;
@@ -623,19 +655,25 @@ void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 			G.Axis = (G.Axis * 0.4 + A * 0.6).GetSafeNormal();
 		}
 	}
-	// --- the range its armament likes against this enemy (the DPS of both sides at each range)
+	// --- the range its armament likes against this enemy (the DPS of both sides at each range, what each will land there included)
 	if (bEnemy && Focus)
 	{
-		double MinRail = 1e9;
+		double MinRail = 1e9, Liked = 0.0;
+		int32 NLiked = 0;
 		for (FAstraBattleShip* S : M)
 		{
 			MinRail = S->RailDamage > 0.f ? FMath::Min(MinRail, (double)S->RailRange) : MinRail;
+			if (const AstraWar::FShipClass* Cl = S->ClassKey.IsNone() ? nullptr : AstraWar::FindClass(S->ClassKey); Cl && Cl->RangeMaxKm > 0.f)
+			{
+				Liked += 0.5 * (Cl->RangeMinKm + Cl->RangeMaxKm) * WarKm;            // the band its class's armament likes (data/war/classes.json)
+				++NLiked;
+			}
 		}
 		const double Cap = MinRail < 1e8 ? MinRail * 0.92 : 7000.0;
-		// Where it likes to be when the two sides' DPS do not settle it (equal reach: they never do): close enough that the whole
-		// formation reaches the enemy, not just its front rank. A preference and no more: an outranging (a clear difference in
-		// the DPS at some range) outweighs it. Measured: a group that held the longest range left the rear of its wedge out of
-		// reach and lost to one that closed (docs/GUERRA.md, sec. 7.3).
+		// Where it likes to be when the two sides' DPS do not settle it (equal reach: they never do): the middle of the band the group's
+		// armament likes, nearer for a deep formation (the whole of it must reach the enemy, not just its front rank). A preference and
+		// no more: an outranging (a clear difference in the DPS at some range) outweighs it. Measured: a group that held the longest
+		// range left the rear of its wedge out of reach and lost to one that closed (docs/GUERRA.md, sec. 7.3).
 		double AvgRad = 0.0;
 		for (const FAstraBattleShip* S : M)
 		{
@@ -652,24 +690,29 @@ void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 		case EAstraFormation::Line: Depth = 0.5 * (Nm - 1) * Sp0; break;
 		default: break;
 		}
-		const double R0 = FMath::Max(3000.0, 0.6 * (MinRail < 1e8 ? MinRail : 8000.0) - 0.3 * Depth);
+		const double Likes = NLiked ? Liked / NLiked : 0.6 * (MinRail < 1e8 ? MinRail : 8000.0);
+		const double R0 = FMath::Clamp(Likes - 0.3 * Depth, 3000.0, Cap);
+		const double Lo = FMath::Min(Cap, FMath::Max(3000.0, 0.2 * Cap));
+		const double Step = FMath::Max(1000.0, (Cap - Lo) / 20.0);
+		const double Span = FMath::Max(3000.0, 0.4 * (Cap - Lo));
+		const FAstraBattleShip* Ours = M[0];                                 // (what the enemy's guns aim at, for the cross-section they see)
 		double BestR = G.EngageRange, BestScore = -1.0;
-		for (double R = 3000.0; R <= FMath::Min(9500.0, Cap) + 1.0; R += 1000.0)
+		for (double R = Lo; R <= Cap + 1.0; R += Step)
 		{
 			double Mine = 0.0, Theirs = 0.0;
 			for (FAstraBattleShip* S : M)
 			{
-				Mine += ShipDps(*S, R);
+				Mine += ShipDps(*S, R, Focus);
 			}
 			for (const FEnemy& X : E)
 			{
 				if (FVector::Dist(X.Pos, FocusPos) < 15.0 * WarKm)
 				{
-					Theirs += ShipDps(*X.S, R);
+					Theirs += ShipDps(*X.S, R, Ours);
 				}
 			}
-			double Score = (Mine + 4.0) / (Theirs + 4.0) * (1.0 + 0.15 * (1.0 - FMath::Min(1.0, FMath::Abs(R - R0) / 3000.0)));
-			if (FMath::Abs(R - G.EngageRange) < 1.0)
+			double Score = (Mine + 4.0) / (Theirs + 4.0) * (1.0 + 0.15 * (1.0 - FMath::Min(1.0, FMath::Abs(R - R0) / Span)));
+			if (FMath::Abs(R - G.EngageRange) < 0.5 * Step)
 			{
 				Score *= 1.06;                                          // hysteresis: keep the range unless another is clearly better
 			}
@@ -685,13 +728,13 @@ void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 		{
 			TheirCruise = FMath::Max(TheirCruise, (double)X.S->CruiseSpeed);
 		}
-		if (TheirCruise > 1.25 * MyCruise && BestR > 5500.0)
+		if (TheirCruise > 1.25 * MyCruise && BestR > R0)
 		{
-			BestR = 5500.0;                                             // it is faster: it will close on us whatever the range we choose
+			BestR = R0;                                                 // it is faster: it will close on us whatever the range we choose, so the group stays where its own guns are at their best
 		}
 		if (G.Order == EAstraGroupOrder::Pin)
 		{
-			BestR = FMath::Min(Cap, 9000.0);
+			BestR = Cap;
 		}
 		G.EngageRange = (float)(BestR * KRange[Me].Get());
 	}

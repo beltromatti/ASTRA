@@ -22,6 +22,14 @@ real time. For the lead and the war module's support agents (in their own worktr
   tools/war.py duel --shooter acheron --target praetorian --range 5
                                               static shooters against a passive dummy from each face: the damage model on a bench
   tools/war.py embed                          after a change in data/war/classes.json: rewrite the table compiled into the game
+  tools/war.py suite [--seeds 8] [--only duel] [--tag base] [--exec "astra.war.tune ..."]
+                                              the battle suite of BATTAGLIA-3 (duels, small fleets, the opening, the fleet battle) over seeds: one line each, before and
+                                              after a change (tools/war.py SUITE)
+  tools/war.py chase [--seeds 6] [--order-at 150]
+                                              the helm on a retreat (BATTAGLIA-3): the Mandate raiders break off, the Aquila's helm goes after them five ways
+  tools/war.py fight Saved/War/run.json | --tag batch [--vs other]
+                                              what a battle was like to watch: the fire second by second, silences, engagements, the accuracy at each
+                                              range, who killed whom, the retreats, the Aquila's heat and fires (tools/war_fight.py; BATTAGLIA-3)
 
 `run` needs the editor target built for this checkout (Build.sh ASTRAEditor Mac Development -Project=... -WaitMutex) and uses
 -nullrhi: it never opens a window or touches the GPU, so it can run while the game or the editor is open. It never starts more than two
@@ -39,6 +47,35 @@ import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from war_fight import cmd_fight  # noqa: E402  (the fight log's reader, BATTAGLIA-3)
+
+# The Captain's orders for the bench (the Aquila's stations take them as the officers would: `station` commands at battle times), by name:
+#   engage   the tactical officer fires on every hostile warship as it comes, engineering moves to combat power (BATTAGLIA-3's duels)
+#   standoff engage, plus the helm holds the range of the action (keep_on_bow with a standoff, in km, after the colon: standoff:20)
+#   bow      engage, plus the helm keeps the bow on the action
+#   intercept engage, plus the helm closes on the action on a lead course and holds the standoff (intercept:<km>)
+CAPTAIN_SCRIPTS = {
+    "engage": ["1=astra.cmd station {'station':'tactical','mode':'engage','params':{'targets':['hostiles']}}",
+               "1=astra.cmd station {'station':'engineering','mode':'combat'}"],
+}
+
+
+def captain_script(name: str) -> list[str]:
+    """The `--at` items of a named script of the Captain's (see CAPTAIN_SCRIPTS); `standoff:<km>` and `bow` are made here."""
+    if not name:
+        return []
+    base, _, arg = name.partition(":")
+    items = list(CAPTAIN_SCRIPTS["engage"]) if base in ("engage", "standoff", "bow", "intercept") else []
+    if base == "standoff":
+        items.append("1=astra.cmd station {'station':'helm','mode':'keep_on_bow','params':{'target':'action','standoff_km':%s}}" % (arg or "20"))
+    elif base == "bow":
+        items.append("1=astra.cmd station {'station':'helm','mode':'keep_on_bow','params':{'target':'action'}}")
+    elif base == "intercept":
+        items.append("1=astra.cmd station {'station':'helm','mode':'intercept','params':{'target':'action','standoff_km':%s}}" % (arg or "20"))
+    return items
+
 
 ROOT = Path(__file__).resolve().parent.parent
 MAX_PROCESSES = 2                                             # AstraWarSim processes at once, whatever --jobs says
@@ -275,6 +312,10 @@ def cmd_batch(a: argparse.Namespace) -> None:
     paths = seeds_run(a, a.tag, a.exec, seeds, a.jobs)
     print(f"== {a.tag}: {a.scenario or 'opening'} {a.exec or ''} ({time.time() - t0:.0f} s)")
     print_batch(a.tag, paths)
+    if getattr(a, "fight", False):
+        from war_fight import fight_of, print_rows
+        have = [p for p in paths if p.exists()]
+        print_rows([fight_of(load(p)) for p in have], [p.stem.split("_")[-1] for p in have], detail=False)
 
 
 def cmd_ab(a: argparse.Namespace) -> None:
@@ -308,6 +349,116 @@ def cmd_sweep(a: argparse.Namespace) -> None:
         print(f"   ASTRA ahead {wa}, Mandate ahead {wm}, level {len(rows) - wa - wm};"
               f" survivors edge {statistics.mean(edge):+.2f}±{se(edge):.2f} warships; craft edge {statistics.mean(cedge):+.1f}±{se(cedge):.1f}"
               f"; ASTRA alive {statistics.mean(r['astra']['alive'] + r['astra']['gone'] for r in rows):.2f}, Mandate alive {statistics.mean(r['mandate']['alive'] + r['mandate']['gone'] for r in rows):.2f}")
+
+
+# The battle suite (BATTAGLIA-3): what a battle is like to watch, in the situations the user plays. (name, scenario, seconds, jump, script, exec)
+SUITE = [
+    ("duel Aquila-Styx", "duel_aq_styx", 600, -1, "engage", ""),
+    ("duel Aquila-Acheron", "duel_aq_acheron", 900, -1, "engage", ""),
+    ("Aquila v the strike group", "duel_aq_strike", 900, -1, "engage", ""),
+    ("Styx v Styx", "duel_styx_styx", 600, -1, "", ""),
+    ("cruiser+destroyer a side", "duel_cruisers", 900, -1, "", ""),
+    ("sym_small 3 v 3", "sym_small", 900, -1, "", ""),
+    ("sym_medium 6 v 6", "sym_medium", 1200, -1, "", ""),
+    ("the opening", "", 900, 160, "engage", ""),
+    ("fleet_battle", "fleet_battle", 1200, -1, "engage", ""),
+]
+
+
+def cmd_suite(a: argparse.Namespace) -> None:
+    """Every battle of SUITE over the seeds, and one line each: how long the fire went on, how continuous it was, who killed whom, who left."""
+    from war_fight import fight_of
+    seeds = list(range(1, a.seeds + 1))
+    print(f"{'battle':<28} {'len':>5} {'action':>6} {'fire%':>5} {'sil':>4} {'eng':>4} {'maxeng':>6} | kills A/M (aq, craft) | {'shots/kill':>10} | {'ret':>4} | alive A/M | Aquila hull  heat")
+    for name, scenario, seconds, jump, script, ex in SUITE:
+        if a.only and a.only.lower() not in name.lower() and a.only.lower() not in scenario.lower():
+            continue
+        ns = argparse.Namespace(**vars(a))
+        ns.scenario, ns.seconds, ns.jump, ns.every = scenario, seconds, jump, 5
+        ns.at = "|".join([x for x in [a.at] + captain_script(script) if x])
+        ns.views, ns.aquila, ns.aquila_opts, ns.holo_at = False, False, "", ""
+        tag = f"{a.tag}_{(scenario or 'opening')}"
+        paths = seeds_run(ns, tag, "; ".join([x for x in [ex, a.exec] if x]), seeds, a.jobs)
+        recs = [p for p in paths if p.exists()]
+        if not recs:
+            print(f"{name:<28} (no records)")
+            continue
+        rows = []
+        for p in recs:
+            d = load(p)
+            f = fight_of(d)
+            fin = d["final"]["ships"]
+            aq = next((x for x in fin if x["c"] == "AQUILA"), None)
+            alive = {side: sum(1 for x in fin if x["side"] == side and not x["craft"] and x["c"] != "AQUILA" and fate_of(x) in ("alive", "gone")) for side in ("astra", "mandate")}
+            rows.append((f, alive, aq))
+        mean = lambda xs: statistics.mean(xs) if xs else float("nan")
+        ok = [r for r in rows if r[0].get("has_log")]
+        if not ok:
+            print(f"{name:<28} (no fight log)")
+            continue
+        def k(f, side, cat=""):
+            return sum(v for key, v in f["kills_by"].items() if key.startswith(("mandate lost" if side == "astra" else "astra lost")) and (not cat or key.endswith(cat)))
+        ka = mean([k(r[0], "astra") for r in ok]); km = mean([k(r[0], "mandate") for r in ok])
+        kaq = mean([k(r[0], "astra", "to aquila") for r in ok])
+        kcraft = mean([k(r[0], "astra", "to astra_craft") for r in ok])
+        spk = [r[0]["shots_per_kill_astra"] for r in ok if r[0]["shots_per_kill_astra"]]
+        heat = [r[0].get("heat_max") for r in ok if r[0].get("heat_max") is not None]
+        ah = [r[2].get("hull", 0) if r[2] and r[2]["alive"] else 0 for r in ok if r[2]]
+        print(f"{name:<28} {mean([r[0]['t'] for r in ok]):5.0f} {mean([r[0]['action_s'] for r in ok]):6.0f} {mean([100 * r[0]['fire_share'] for r in ok]):5.0f} "
+              f"{mean([r[0]['longest_silence'] for r in ok]):4.0f} {mean([len(r[0]['engagements']) for r in ok]):4.1f} {mean([r[0]['longest_engagement'] for r in ok]):6.0f} | "
+              f"{ka:4.1f}/{km:<4.1f} ({kaq:.1f}, {kcraft:.1f})       | {mean(spk) if spk else float('nan'):10.0f} | {mean([len(r[0]['retreats']) for r in ok]):4.1f} | "
+              f"{mean([r[1]['astra'] for r in ok]):4.1f}/{mean([r[1]['mandate'] for r in ok]):<4.1f} | {mean(ah) if ah else float('nan'):5.0f}%  {mean(heat) if heat else float('nan'):4.0f}")
+        sys.stdout.flush()
+
+
+def chase_of(d: dict, t0: float) -> dict:
+    """What the Aquila's helm made of a retreat: after the order at t0, how much of the time the nearest enemy was in her rails' reach, how far off it was, how much
+    hull the enemy lost and how many ships were put out of action (from the record's frames: positions are km from the Aquila)."""
+    frames = [f for f in d["frames"] if f["t"] >= t0]
+    if not frames:
+        return {}
+    rail_km = 45.0
+    in_reach, rng, hull0, hull1 = 0, [], None, None
+    for f in frames:
+        ships = [s for s in f["ships"] if s["side"] == "mandate" and not s["craft"] and s["alive"] and s.get("km")]
+        if not ships:
+            continue
+        near = min(math.sqrt(sum(c * c for c in s["km"])) for s in ships)
+        rng.append(near)
+        in_reach += 1 if near <= rail_km else 0
+        hull = sum(s["hull"] for s in ships)
+        hull0 = hull if hull0 is None else hull0
+        hull1 = hull
+    fin = d["final"]["ships"]
+    dead = sum(1 for s in fin if s["side"] == "mandate" and not s["craft"] and fate_of(s) in ("destroyed", "disabled"))
+    aq = next((s for s in fin if s["c"] == "AQUILA"), None)
+    return {"in_reach": in_reach / max(1, len(rng)), "range_end": rng[-1] if rng else float("nan"), "range_mean": statistics.mean(rng) if rng else float("nan"),
+            "hull_lost": (hull0 - hull1) if hull0 is not None else 0.0, "out": dead, "aquila": aq.get("hull", 0) if aq and aq["alive"] else 0}
+
+
+def cmd_chase(a: argparse.Namespace) -> None:
+    """The helm on a retreat (BATTAGLIA-3): the Mandate raiders are ordered to break off at --order-at; the same Captain's orders each time except the helm's."""
+    seeds = list(range(1, a.seeds + 1))
+    withdraw = f"{a.order_at}=astra.cmd group_order {{'side':'mandate','group':'all','order':'withdraw','by':'admiral'}}"
+    variants = [("hold (the default: bow to the action)", "engage"), ("keep the bow on it", "bow"), ("hold 25 km (bow, throttle)", "standoff:25"),
+                ("intercept, 25 km", "intercept:25"), ("intercept, 15 km", "intercept:15")]
+    print(f"{'helm':<40} {'in reach%':>9} {'range now':>9} {'mean':>6} {'hull lost':>9} {'out':>4} {'Aquila':>7}")
+    for name, script in variants:
+        if a.only and a.only.lower() not in name.lower() and a.only.lower() not in script.lower():
+            continue
+        ns = argparse.Namespace(**vars(a))
+        ns.scenario, ns.jump, ns.every, ns.views, ns.aquila, ns.aquila_opts, ns.holo_at = "chase_retreat", -1, 5, False, False, "", ""
+        ns.at = "|".join([withdraw] + captain_script(script))
+        tag = f"{a.tag}_{script.replace(':', '')}"
+        paths = seeds_run(ns, tag, a.exec, seeds, a.jobs)
+        rows = [chase_of(load(p), a.order_at) for p in paths if p.exists()]
+        rows = [r for r in rows if r]
+        if not rows:
+            print(f"{name:<40} (no records)")
+            continue
+        m = lambda k: statistics.mean(r[k] for r in rows)
+        print(f"{name:<40} {100 * m('in_reach'):8.0f}% {m('range_end'):8.1f}k {m('range_mean'):5.1f}k {m('hull_lost'):8.0f}% {m('out'):4.1f} {m('aquila'):6.0f}%")
+        sys.stdout.flush()
 
 
 def cmd_compare(a: argparse.Namespace) -> None:
@@ -581,6 +732,7 @@ def main() -> None:
         p.add_argument("--every", type=float, default=10)
         p.add_argument("--scenario", default="")
         p.add_argument("--at", default="", help='commands at battle times: "200=astra.cmd ...|300=..."')
+        p.add_argument("--script", default="", help="the Captain's orders for the Aquila, by name: engage | standoff:<km> | bow (tools/war.py CAPTAIN_SCRIPTS)")
         p.add_argument("--views", action="store_true", help="record the side views (your_groups, enemy_groups, group_events) in every frame")
         p.add_argument("--aquila", action="store_true", help="keep the Aquila in the scenario (at the origin, with the ASTRA side): the game's scale test from the bridge")
         p.add_argument("--aquila-opts", default="", help='the Aquila in the scenario, where and how ("at=-34,0,0;speed=0;heading=0": km, m/s, degrees; implies --aquila)')
@@ -606,6 +758,7 @@ def main() -> None:
     p.add_argument("--jobs", type=int, default=2)
     p.add_argument("--tag", default="batch")
     p.add_argument("--exec", default="")
+    p.add_argument("--fight", action="store_true", help="after the batch, the fight log's measures (tools/war_fight.py)")
     p.set_defaults(fn=cmd_batch)
     p = sub.add_parser("sweep", help="what each behaviour is worth: switched off for the ASTRA side alone, in a symmetric scenario")
     common(p, 900, -1)
@@ -650,7 +803,32 @@ def main() -> None:
     p.add_argument("path")
     p.add_argument("contact")
     p.set_defaults(fn=cmd_ship)
+    p = sub.add_parser("suite", help="the battle suite of BATTAGLIA-3: duels, small fleets, the opening, the fleet battle: one line each over seeds")
+    common(p, 900, -1)
+    p.add_argument("--seeds", type=int, default=8)
+    p.add_argument("--jobs", type=int, default=2)
+    p.add_argument("--tag", default="suite")
+    p.add_argument("--only", default="", help="a part of a battle's name or scenario")
+    p.add_argument("--exec", default="")
+    p.set_defaults(fn=cmd_suite)
+    p = sub.add_parser("chase", help="the helm on a retreat: five ways of steering the Aquila after a Mandate force that is ordered to break off")
+    common(p, 600, -1)
+    p.add_argument("--seeds", type=int, default=6)
+    p.add_argument("--jobs", type=int, default=2)
+    p.add_argument("--tag", default="chase")
+    p.add_argument("--order-at", dest="order_at", type=float, default=150.0, help="when the Mandate admiral orders the withdrawal (battle seconds)")
+    p.add_argument("--only", default="")
+    p.add_argument("--exec", default="")
+    p.set_defaults(fn=cmd_chase)
+    p = sub.add_parser("fight", help="what a battle was like to watch: continuity of the fire, accuracy by range, who killed whom, retreats, heat")
+    p.add_argument("path", nargs="*")
+    p.add_argument("--tag", default="batch")
+    p.add_argument("--vs", default="")
+    p.add_argument("--brief", action="store_true")
+    p.set_defaults(fn=cmd_fight)
     a = ap.parse_args()
+    if getattr(a, "script", ""):
+        a.at = "|".join([x for x in [getattr(a, "at", "")] + captain_script(a.script) if x])
     a.fn(a)
 
 

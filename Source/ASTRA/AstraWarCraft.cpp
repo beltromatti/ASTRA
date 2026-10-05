@@ -463,7 +463,7 @@ void UAstraBattleSubsystem::LandCraft(FAstraBattleShip& S, FAstraBattleShip& Car
 			Q.RearmT = Q.Kind == 1 ? 120.f : 60.f;
 			Q.Mission = TEXT("recall");
 			Report(FString::Printf(TEXT("flight: %s squadron recovered, %d of %d %ss aboard, rearming (%.0f s)"), *Q.Name, Q.OnDeck, Q.Total, *Q.CallSign, Q.RearmT),
-			       Carrier.bPlayer);                      // (another ship's wing coming home is fleet news, not a report for the Aquila's bridge)
+			       false);                                // (a wing coming home is routine: the flight board and the log have it, and the flight officer reads them at the next turn; 5 Oct: ten of them woke a turn each)
 		}
 	}
 	else

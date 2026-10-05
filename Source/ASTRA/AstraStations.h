@@ -100,6 +100,7 @@ private:
 	double LastFightAt = -1e9;              // the last time the enemy was near or firing
 	double LastDecoysAt = -1e9;
 	double NextReflexAt = 0.0;
+	double HelmAvoidTold = -1e9;           // the last time the helm said it was bending her course clear of a ship
 	void Expire(const FString& Station, const FString& AspectName, const FString& Fallback, const FString& Why);
 	void UpdateStatus();
 };

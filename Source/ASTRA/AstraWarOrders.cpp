@@ -97,6 +97,7 @@ void UAstraBattleSubsystem::SetGroupState(FAstraBattleGroup& G, EAstraGroupState
 		{
 			NoteGroupEvent(Me, FString::Printf(TEXT("%s: breaking off, %s (%d ships, strength %.1f against %.1f, morale %.2f)"), *G.Name, *Why, Alive,
 			                                   G.Strength, G.EnemyStrength, G.Morale));
+			Stats.NoteRetreat(Time, Me, FString::Printf(TEXT("group %s: %s (strength %.1f against %.1f, morale %.2f)"), *G.Name, *Why, G.Strength, G.EnemyStrength, G.Morale), Alive);
 		}
 		break;
 	case EAstraGroupState::Regroup:
@@ -337,7 +338,7 @@ FString UAstraBattleSubsystem::DescribeGroupOrder(const FAstraBattleGroup& G, co
 			}
 		}
 		Text = Nearest < 1e17 ? FString::Printf(TEXT("withdrawing: the nearest enemy is %.1f km away; the group breaks contact, the healthiest ship covering the rear, and is clear of them in ~%.0f s"), Nearest / WarKm,
-		                                        OrdEtaS(FMath::Max(0.0, 38.0 * WarKm - Nearest), Pace))
+		                                        OrdEtaS(FMath::Max(0.0, 58.0 * WarKm - Nearest), Pace))
 		                      : FString(TEXT("withdrawing: no enemy in contact; the group falls back and reforms"));
 		break;
 	}
@@ -576,7 +577,7 @@ bool UAstraBattleSubsystem::GroupOrderCommand(const TSharedPtr<FJsonObject>& Arg
 		}
 		if (RangeKm > 0.0 && Order != TEXT("auto") && Order != TEXT("withdraw") && Order != TEXT("regroup"))
 		{
-			G->OrderRangeM = (float)(FMath::Clamp(RangeKm, 1.5, 12.0) * WarKm);   // the commander's distance: stands over the group's own choice
+			G->OrderRangeM = (float)(FMath::Clamp(RangeKm, 1.5, 40.0) * WarKm);   // the commander's distance: stands over the group's own choice
 		}
 		Done.Add(DescribeGroupOrder(*G, bNeedsEnemy ? TargetShip : nullptr, TargetGroup));
 	}
@@ -648,7 +649,10 @@ TSharedRef<FJsonObject> UAstraBattleSubsystem::SideGroupsJson(int32 SideIdx) con
 		J->SetNumberField(TEXT("your_strength"), OrdRound(G.Strength, 0.1));
 		J->SetNumberField(TEXT("enemy_strength_near"), OrdRound(G.EnemyStrength, 0.1));
 		J->SetNumberField(TEXT("allied_strength_near"), OrdRound(G.AlliedStrength, 0.1));
+		J->SetNumberField(TEXT("enemy_strength_at_our_guns"), OrdRound(G.EnemyEngaged, 0.1));     // the part of it whose guns reach the group now (the rest is still coming)
 		J->SetNumberField(TEXT("morale"), OrdRound(G.Morale, 0.01));
+		J->SetNumberField(TEXT("losses_pct"), OrdRound(100.0 * G.Losses, 1.0));                    // what it has lost of its starting strength (ships, and the damage on the rest)
+		J->SetNumberField(TEXT("breaks_at_losses_pct"), OrdRound(100.0 * G.BreakAt, 1.0));         // what it would bear before it broke off by its own judgement, for the balance it is in
 		TArray<TSharedPtr<FJsonValue>> Mem;
 		for (const int32 Id : G.Members)
 		{
