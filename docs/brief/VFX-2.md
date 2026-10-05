@@ -31,10 +31,23 @@ alle nuove distanze: decine di km, precisione che cala con la distanza, navi che
 5. **Prestazioni**: decine di navi e centinaia di velivoli (SCALA.md): istanze, pool, nessun attore per colpo; misura `astra.fx.stats`,
    `astra.war.perf`, e il costo della GPU della sovrapposizione (additiva e traslucida) quando un'esplosione riempie lo schermo.
 
+## I fatti di BATTAGLIA-3 (su main da f4032c5) che ti servono
+- La scheggia di rotaia vola a 12 km/s: fino a 3,75 s di volo a 45 km. In una battaglia di flotta ci sono fino a 160-200 colpi in volo.
+- Il dardo di rotaia è lungo al massimo 560 m (`DrawShots`), con il pavimento in pixel nello shader. Le leve per renderlo più visibile:
+  `astra.fx.intensity` e la lunghezza `Len`.
+- I laser arrivano a 6,5-9 km, i missili a 30-40 km.
+- Gli impatti e i pezzi persi sono in `UAstraBattleSubsystem::ConsumeFightEvents`: PlayerHit (punto, danno, quanto ha passato lo scudo),
+  SectionGutted, SystemOut, MountOut, ShieldFell.
+  - Quella coda la consuma già lo schermo principale. Se ti serve, chiedimi una seconda coda o un accessore di sola lettura invece di consumarla.
+- Le morti passano da `ConsumeDeathEvents`.
+
 ## Prove
 `astra.fx.scene / fire / hit / burn / break / swatch` (davanti alla plancia), `-astra_decisive` (una battaglia vera davanti alla plancia),
-`astra.viewscreen.dump` (l'immagine dello schermo principale). Il lead guarda nel gioco e giudica; tu fai le anteprime offline (`tools/art/
-war_fx_shader_preview.py`, `war_fx_hlsl_check.py`) e le catture che puoi.
+`astra.viewscreen.dump` (l'immagine dello schermo principale). **Puoi avviare il gioco di prova nel tuo worktree** per vedere ciò che fai:
+`ASTRA_HARNESS_PORT=8771 tools/play.py launch --nomind --res 1280x720`, poi `cmd`, `shot`, `quit`. Il gioco parte dietro e ignora tastiera e
+mouse del Mac (l'utente lo usa di giorno). Partite brevi, sempre chiuse con `quit`, mai due insieme. L'editor del tuo worktree serve solo per
+`make_war_fx.py`, e lo chiudi quando hai finito. Il lead guarda nel gioco e giudica. Le anteprime offline restano utili: `tools/art/
+war_fx_shader_preview.py`, `war_fx_hlsl_check.py`.
 
 ## Vincoli
 - Non tuoi: la simulazione e le regole delle armi (BATTAGLIA-3), lo schermo principale (il lead), le navi (ARTE-SCAFI). Nessuna regola
