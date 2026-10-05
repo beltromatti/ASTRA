@@ -591,6 +591,41 @@ class TestDelegation(unittest.TestCase):
         c2.begin(new=False)
         self.assertEqual((c2.levels["flight"], c2.levels.get("tactical")), ("advise", None))
 
+    def test_the_ship_reads_a_delegation_however_the_model_writes_it(self) -> None:
+        """The first live run: «nessuno lancia senza il mio ordine» made the model call `station flight delegation manual`: refused («flight has no mode delegation»), and the
+        launches went on on their own. It is the XO's mode whoever it names."""
+        from astra_mind import stations as S
+        want = ("xo", "delegation", {"station": "flight", "level": "manual"})
+        for args in ({"station": "xo", "mode": "delegation", "params": {"station": "flight", "level": "manual"}},
+                     {"station": "flight", "mode": "delegation", "params": {"level": "manual"}},
+                     {"station": "flight", "mode": "delegation", "params": {"station": "flight", "level": "manual"}},
+                     {"station": "xo", "mode": "delegation", "params": {"station": "flight", "delegation": "manual"}},
+                     {"station": "flight", "mode": "delegation", "params": {"delegation": "manual"}}):
+            cmd, err = S.normalize(args, None)
+            self.assertIsNotNone(cmd, (args, err))
+            self.assertEqual((cmd["station"], cmd["mode"], cmd["params"]), want, args)
+
+    def test_everyone_in_one_call_and_it_is_kept_for_every_console(self) -> None:
+        from astra_mind import delegation as d
+        from astra_mind import stations as S
+        call = {"station": "xo", "mode": "delegation", "params": {"station": "all", "level": "manual"}}
+        c = Crew(Script(calls=[("station", call), speak("Tutti su richiesta, Capitano.", "xo")]))
+        turn = asyncio.run(c.agent.handle("Nessuno fa nulla senza il mio ordine.", "it"))
+        self.assertTrue(turn.actions[0][2]["ok"], turn.actions)
+        self.assertEqual({st for st, lv in c.ship.delegation.items() if lv == "manual"}, set(S.DELEGABLE), c.ship.delegation)
+        self.assertEqual(len(c.said), 1)
+        dg = d.Delegation(self.path)
+        dg.begin(new=True)
+        self.assertTrue(dg.note_call(*turn.actions[0]))
+        self.assertEqual({st: dg.levels[st] for st in S.DELEGABLE}, {st: "manual" for st in S.DELEGABLE})
+
+    def test_a_sloppy_call_is_kept_like_a_proper_one(self) -> None:
+        from astra_mind import delegation as d
+        dg = d.Delegation(self.path)
+        dg.begin(new=True)
+        self.assertTrue(dg.note_call("station", {"station": "flight", "mode": "delegation", "params": {"level": "manual"}}, {"ok": True}))
+        self.assertEqual(dg.levels["flight"], "manual")
+
     def test_the_wire_is_the_xos_delegation_command_in_the_games_words(self) -> None:
         from astra_mind import delegation as d
         w = d.Delegation(self.path).wire("flight", "advise")
@@ -978,6 +1013,97 @@ class TestCommandWheel(unittest.TestCase):
                 await r.settle(2.0)
                 self.assertEqual(r.trace().order(), [])
                 self.assertEqual([k for k in seen if "[Ship systems event" in str(k["messages"][-1]["content"])], [])
+        run(go())
+
+
+class TestTheFleetNetIsNotWokenWhole(unittest.TestCase):
+    """5 October: every sentence of the Captain's that went out on the fleet net woke the allied captains and the admiral, six calls to the model for what was nearly always «no
+    change». Comms says whom the words are for (the router's `to`) and only they are woken: the admiral alone, one ship's captain alone, or everyone when it is not clear."""
+
+    @staticmethod
+    def fleet_channel() -> context_model.Context:
+        return context_model.Context(channel=context_model.Channel(open=True, party="fleet", name="Vice Admiral Adrian Rourke and the 7th Fleet", kind="fleet"))
+
+    @staticmethod
+    def ally_channel() -> context_model.Context:
+        return context_model.Context(channel=context_model.Channel(open=True, party="T-48", name="Captain Imre Dalca (the Valiant)", kind="ally"))
+
+    def test_the_router_reads_whom_the_words_are_for(self) -> None:
+        from astra_mind import router
+        for reply, want in (('{"to_party": "Rourke, we need reinforcements.", "to": "admiral"}', "admiral"),
+                            ('```json\n{"to_party": "Vigilant, report.", "to": " Vigilant "}\n```', "Vigilant"),
+                            ('{"to_party": "All ships, fire.", "to": "all"}', "all"),
+                            ('{"to_party": "x"}', ""), ('{"to_party": "x", "to": null}', ""), ("not json", ""), ("", "")):
+            self.assertEqual(router.parse_to(reply), want, reply)
+
+    def test_only_the_fleet_net_asks_for_it_and_carries_it(self) -> None:
+        from unittest import mock
+
+        from astra_mind import router
+        asked: list[str] = []
+        reply = ['{"to_party": "Vigilant, qui l\'Aquila.", "to": "Vigilant"}']
+
+        async def model(llm, role, messages, **kw) -> Completion:  # noqa: ANN001, ANN003
+            asked.append(messages[0]["content"])
+            return Completion(content=reply[0], cost=0.0001)
+
+        async def go() -> None:
+            with mock.patch.object(router, "role_chat", model):
+                fleet = await router.for_party(None, "Vigilant, qui l'Aquila: rispondete.", self.fleet_channel())
+                self.assertEqual((fleet.external, fleet.to, fleet.how), ("Vigilant, qui l'Aquila.", "Vigilant", "model"))
+                self.assertIn('"to": "<who they are for', asked[0], "the fleet net's reply says whom the words are for")
+                self.assertIn("`to` says whom", asked[0])
+                ally = await router.for_party(None, "Capitano, come state?", self.ally_channel())
+                self.assertEqual(ally.to, "", "one captain on the channel: nobody to choose between")
+                self.assertNotIn('"to": "<who they are for', asked[1])
+                reply[0] = '{"to_party": "Tutti, rapporto."}'
+                nobody = await router.for_party(None, "Tutti, rapporto.", self.fleet_channel())
+                self.assertEqual((nobody.external, nobody.to), ("Tutti, rapporto.", ""), "no addressee given: it is not clear, so everyone")
+        run(go())
+
+    def test_the_words_go_only_to_whom_they_are_for(self) -> None:
+        async def go() -> None:
+            async with Replay() as r:
+                m = r.mind
+                woke: list[tuple] = []
+                ships = {"all": 4, "vigilant": 1, "praetorian": 1}
+
+                def captain_to_fleet(words: str, lang: str, to: str = "all") -> int:
+                    woke.append(("ships", to))
+                    return ships.get(to, 0)
+
+                async def admiral_reply(words: str, lang: str, state: dict) -> None:
+                    woke.append(("admiral", words))
+                m.war.captain_to_fleet = captain_to_fleet
+                m.war.kick = lambda: woke.append(("kick",))
+                m.director.admiral_reply = admiral_reply
+
+                async def said(to: str) -> list[tuple]:
+                    woke.clear()
+                    await m._to_party("fleet", "the words", "it", to)
+                    return list(woke)
+                self.assertEqual(await said("admiral"), [("admiral", "the words")], "to Rourke: his captains are not woken")
+                for name in ("Rourke", "Fleet Command", "  Vice  Admiral Rourke "):
+                    self.assertEqual(await said(name), [("admiral", "the words")], name)
+                self.assertEqual(await said("Vigilant"), [("ships", "vigilant"), ("kick",)], "to a ship: her captain alone, and the admiral does not answer for her")
+                self.assertEqual(await said("praetorian"), [("ships", "praetorian"), ("kick",)])
+                for name in ("all", "Everyone", "the fleet", ""):
+                    self.assertEqual(await said(name), [("ships", "all"), ("kick",), ("admiral", "the words")], f"{name!r}: everyone, as before")
+                for name in ("the ghost", "ammiraglio"):
+                    self.assertEqual(await said(name), [("ships", name), ("ships", "all"), ("kick",), ("admiral", "the words")],
+                                     "a name nobody answers to: everyone is told, never nobody")
+        run(go())
+
+    def test_words_for_one_allied_captain_go_to_that_one_whoever_the_net_is(self) -> None:
+        async def go() -> None:
+            async with Replay() as r:
+                m = r.mind
+                woke: list[tuple] = []
+                m.war.can_answer = lambda party: party == "T-48"
+                m.war.captain_to_fleet = lambda words, lang, to="all": woke.append(("ships", to)) or 1
+                m.war.kick = lambda: woke.append(("kick",))
+                await m._to_party("T-48", "the words", "it", "")
+                self.assertEqual(woke, [("ships", "T-48"), ("kick",)])
         run(go())
 
 

@@ -65,10 +65,13 @@ class Delegation:
         """A tool call of the Captain's turn: when it is the XO's `delegation` mode and it worked, keep it. Returns True when something was kept."""
         if name != "station" or not result.get("ok"):
             return False
-        if str(args.get("station", "")).lower() != "xo" or str(args.get("mode", "")).lower() != "delegation":
+        cmd, _ = station_model.normalize(args, None)          # (as the ship read it: «flight delegation manual» is the XO's call too)
+        if cmd is None or cmd["station"] != "xo" or cmd["mode"] != "delegation":
             return False
-        p = args.get("params") or {}
-        return self.set(str(p.get("station") or ""), str(p.get("level") or p.get("delegation") or ""))
+        station, level = str(cmd["params"].get("station") or ""), str(cmd["params"].get("level") or "")
+        if station == "all":                                                 # («fate da soli»: every console in one call)
+            return all([self.set(st, level) for st in CONSOLES])
+        return self.set(station, level)
 
     # ------------------------------------------------------------------------------------------------ what the game lacks
     def pending(self, state: dict[str, Any] | None) -> list[tuple[str, str]]:

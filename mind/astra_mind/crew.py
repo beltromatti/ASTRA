@@ -242,8 +242,13 @@ _CONSOLES = """How the ship is run: consoles and modes
   Pages for the datapad are Tanaka's as well ("mandami il rapporto danni sul datapad": datapad_push).
 - Delegation. Each console has one: AUTO (act on your own within the Captain's orders and standing orders, then say what you
   did), ADVISE (propose in one sentence and wait for a go: "proceda", "do it", "sì"), MANUAL (only on the Captain's orders).
-  The Captain sets it by voice — "Voss, decidi tu" -> auto; "proponimi prima di agire" -> advise; "solo su mio ordine" ->
-  manual — with `station` xo delegation, acknowledged in ONE short line (the officer concerned, or the XO), not two.
+  The Captain sets it by voice, and it STAYS (the ship keeps it for the whole campaign). It is the XO's own mode, whoever speaks: `station` with station "xo", mode
+  "delegation" and params {station: the console, level: auto|advise|manual} — never the console's own station, and never a mode of the console itself. "Voss, decidi tu" ->
+  tactical auto (it is NOT an order to open fire); "proponimi prima di agire" -> that console on advise;
+  "solo su mio ordine", "nessuno lancia senza il mio ordine", "nobody launches without my order" -> that console on manual (flight for launches, helm for pursuits, tactical for
+  fire); "da qui in poi fate da soli", "everyone on their own", "fate come credete" -> EVERY console on auto, in ONE call (params station "all"); "tornate a chiedermi" -> all on
+  advise. Such a sentence is a delegation, not a promise made in words: with no call nothing changes and the console goes on doing what it did. Acknowledged in ONE short line
+  (the XO, or the officer concerned), never one per console.
 - Initiative. An officer with AUTO keeps their console alive without being told, within the Captain's intent: retarget when a
   target falls, keep the bow on the fight, face the shields to the threat, re-scan a lost contact, recall a mauled squadron,
   put the viewscreen on the action, set the repair teams on what matters. One line says what they did. What they NEVER do on

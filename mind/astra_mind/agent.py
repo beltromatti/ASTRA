@@ -416,8 +416,18 @@ class BridgeAgent:
             ok, why = station_model.may_on_initiative(cmd, station_model.delegation_of(state, cmd["station"]), standing_for)
             if not ok:
                 return {"ok": False, "detail": why}
+        by = "captain" if captain else "officer"
+        if cmd["mode"] == "delegation" and cmd["params"].get("station") == "all":
+            # «fate da soli»: every console in one call (the game takes one console at a time, and seven calls and a spoken line do not fit a turn's tokens)
+            level = cmd["params"]["level"]
+            done, refused = [], []
+            for sid in station_model.DELEGABLE:
+                one = {**cmd, "params": {"station": sid, "level": level}}
+                res = await _safe_execute(self.ship, "station", station_model.to_wire(one, by=by), owner_of("station", one))
+                (done if res.get("ok") else refused).append(sid)
+            return {"ok": not refused, "detail": f"every console on {level}" if not refused else f"{', '.join(done) or 'none'} on {level}; refused: {', '.join(refused)}"}
         # to the game in its own words: the aspect, the game's mode name, and who decided (the console log and the board show it)
-        wire = station_model.to_wire(cmd, by="captain" if captain else "officer")
+        wire = station_model.to_wire(cmd, by=by)
         return await _safe_execute(self.ship, "station", wire, owner_of("station", cmd))
 
     async def _collect(self, pending: list, turn: Turn) -> dict[int, dict[str, Any]]:

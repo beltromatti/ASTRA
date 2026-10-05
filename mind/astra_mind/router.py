@@ -35,6 +35,7 @@ class Route:
     how: str = "no_channel"              # no_channel | model | timeout | error
     ms: float = 0.0
     cost: float = 0.0
+    to: str = ""                         # on a fleet channel: whom the words are for: "admiral", a ship or a captain as the Captain named them, or "all" ("" when the model did not say)
 
 
 PROMPT = """You are the communications officer of a starship. The Captain is speaking aloud on the bridge, and a channel with {party} ({kind})
@@ -52,7 +53,13 @@ said to {party}, even in the imperative: an order to board, to launch, to recall
 When one sentence is for {party} and another for the crew, let out only the part for {party}, word for word.
 
 The words may be typed fast with slips or come from speech recognition: read them for what they mean, in any language. {situation}
-Reply with JSON only: {{"to_party": "<the words for {party}, or an empty string>"}}"""
+Reply with JSON only: {reply}"""
+
+REPLY = '{{"to_party": "<the words for {party}, or an empty string>"}}'
+# on a fleet channel the words are for the admiral, for one ship, or for everyone: only the ones they are for are woken (5 October: every sentence of the Captain's on the fleet net woke
+# the four allied captains and the admiral, six calls to the model, and nearly always for «no change»)
+REPLY_FLEET = ('{{"to_party": "<the words for the fleet, or an empty string>", "to": "<who they are for: admiral (Vice Admiral Rourke, Fleet command), a ship or its captain '
+               'by the name the Captain used, or all when he speaks to the whole fleet or it is not clear>"}}')
 
 
 # the bridge officers as comms knows them: surname and post, the way the Captain calls them in any language
@@ -63,7 +70,9 @@ def _situation(ctx: Context) -> str:
     ch = ctx.channel
     out = []
     if ch and ch.kind == "fleet":
-        out.append("This channel reaches the admiral and the allied ships: an order or a request put to any of them is for the channel.")
+        out.append("This channel reaches the admiral and the allied ships: an order or a request put to any of them is for the channel. `to` says whom: admiral when he speaks to Rourke "
+                   "or to Fleet command (the rank, «ammiraglio», «Fleet», «Rourg»), a ship or its captain when he names one (Praetorian, Vigilant, Castellan...), all when he speaks to the "
+                   "whole fleet («tutti», «flotta») or it is not clear.")
     if ch and ch.kind == "flight":
         out.append("This channel is the flight net: the CAG, the squadron leaders (Alpha Lead, Bravo Lead), their wingmen and the Chief of the Deck. A call, an order, a question "
                    "or a request the Captain puts to a pilot, a squadron, the CAG or the deck chief is for the channel, whatever the call sign or the post it uses. Price is Flight "
@@ -94,6 +103,17 @@ def parse(content: str) -> str:
         return ""
 
 
+def parse_to(content: str) -> str:
+    """Whom the words on a fleet channel are for, from the model's JSON reply ("" when it did not say)."""
+    m = re.search(r"\{.*\}", content or "", re.S)
+    if not m:
+        return ""
+    try:
+        return str(json.loads(m.group(0)).get("to") or "").strip()
+    except (ValueError, AttributeError):
+        return ""
+
+
 async def for_party(llm: OpenRouter, text: str, ctx: Context, wait_s: float = 4.5) -> Route:
     """What of the Captain's words goes out on the open channel (nothing when there is no live channel). The wait covers one stalled
     request and its retry (models.chat: the router's first token is due in 1.2 s, the retry gets twice that): at 2.5 s the retry was always
@@ -103,7 +123,9 @@ async def for_party(llm: OpenRouter, text: str, ctx: Context, wait_s: float = 4.
     if not ch or not ch.live:
         return Route()
     t0 = time.perf_counter()
-    system = PROMPT.format(party=ch.name or ch.party, kind=ch.kind or "radio", situation=_situation(ctx), crew=_CREW_LINE)
+    fleet = ch.kind == "fleet"
+    system = PROMPT.format(party=ch.name or ch.party, kind=ch.kind or "radio", situation=_situation(ctx), crew=_CREW_LINE,
+                           reply=(REPLY_FLEET if fleet else REPLY).format(party=ch.name or ch.party))
     try:
         comp = await asyncio.wait_for(role_chat(llm, "router", messages=[{"role": "system", "content": system},
                                                                         {"role": "user", "content": text}], max_tokens=200),
@@ -118,4 +140,4 @@ async def for_party(llm: OpenRouter, text: str, ctx: Context, wait_s: float = 4.
     if comp.error:
         log.warning("comms: router model error: %s", comp.error[:120])
         return Route(party=ch.party, how="error", ms=ms, cost=comp.cost)
-    return Route(external=parse(comp.content), party=ch.party, how="model", ms=ms, cost=comp.cost)
+    return Route(external=parse(comp.content), party=ch.party, how="model", ms=ms, cost=comp.cost, to=parse_to(comp.content) if fleet else "")
