@@ -53,6 +53,26 @@ abbordaggi contro l'Aquila, chiesto da ABBORDAGGI).
   ciò che è nostro, 14 capitani alleati. Da provare nella partita lunga dopo BATTAGLIA-3. VOCI-3 sta facendo il ventaglio della flotta e
   i nomi della campagna al riconoscitore, poi chiude. Richieste inoltrate: report=false per gli eventi di routine (a BATTAGLIA-3), rethink e
   chiave «Capitano a bordo» per la rete dei marine (ad ABBORDAGGI-4).
+- **Unita BATTAGLIA-3 tappe 1-4** (f4032c5) e provata nel gioco. Le armi:
+  - rotaie a 22-45 km per classe con il colpo che vola (12 km/s) e la precisione che cala con la distanza;
+  - laser a 6,5-9 km.
+
+  Il resto della tappa:
+  - timone e tattico che manovrano da soli;
+  - morale che regge;
+  - calore e incendi che pesano senza paralizzare (sprinkler);
+  - eventi di routine report=false.
+
+  Nel gioco:
+  - **duello con uno Styx**: distrutto in 64 s dal primo ordine (missili + rotaie da 49 km), Aquila intatta;
+  - **contro il gruppo d'attacco di 4 navi**: dopo ~5 min la sezione di PRUA dell'Aquila è sventrata (91 locali, 14 morti, la plancia è lì) e poi la vista dalla plancia mostra l'esterno. Da capire (riproduzione in corso) e da bilanciare: il timone che tiene la prua offre sempre la stessa faccia (richiesta a BATTAGLIA-3).
+
+  Il lead ha già adeguato a main:
+  - le menti: dottrina con la fisica nuova, fascia dell'Aquila 18-30 km;
+  - la console del tattico;
+  - lo schermo principale (GetPlayerFireState);
+  - la ruota: ENGAGE alla distanza dell'Aquila, 24 km, e intercept a 16 km per chi fugge.
+- **I tre aiutanti erano fermi per il limite d'uso** (5/10 mattina): ripresi da dove erano.
 - **Lo schermo principale racconta lo scontro a tagli** (il lead): il bersaglio, poi «ASN AQUILA · FIRING ON …» (l'Aquila da fuori che spara,
   `astra.viewscreen.broadside`), poi il bersaglio. Provato nel gioco. Brief pronti: **VFX-2**, **PRESTAZIONI-GPU** (oltre ad ARTE-SCAFI).
 - **Da indagare (PRESTAZIONI-GPU)**: nel gioco di prova (1600x900, 60 fps di obiettivo) la risoluzione dinamica sta al minimo (33–34 %) e
