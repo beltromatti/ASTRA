@@ -47,7 +47,7 @@ ASTRA_CLASSES = ("praetorian", "vigilant", "battleship", "destroyer")
 # where the war stands when a campaign begins (the director rewrites them at every beat): what each side is gathering
 OPENING_THREADS = (
     "The Kharon Mandate's Interdiction Fleet is gathering beyond the Janus Gate for the assault on Aurelia — carrier groups with their "
-    "wings, a Styx line, raider wedges; Archon Varek Solm's strike group is its vanguard, sent to test the picket",
+    "wings, a Styx line, raider wedges; Archon Varek Solm's strike group is its spearhead, sent to take the Gate before the 7th Fleet can gather",
     "The 7th Fleet's main body holds New Ravenna under Vice Admiral Rourke; the Aquila's picket guards the Gate and Keeper Station, the "
     "first to meet whatever comes through",
 )

@@ -195,7 +195,7 @@ ORBAT: list[dict[str, Any]] = [
          # (two cruisers: with one the picket and the Aquila broke it in three minutes without a loss, BATTAGLIA-3's bench, 5 Oct; the opening is a fight that costs)
          ships=[("acheron", "Acheron"), ("styx", "Styx"), ("styx", "Cocytus"), ("styx", "Phlegethon"), ("acheron", "Hecate")], wings=[(0, "fighter", 4), (4, "fighter", 4)],
          contacts=["T-21", "T-22", "T-23", "T-24"], commander=dict(key="solm"),
-         order=dict(kind="assault", target="Aurelia", stance="bold", reason="seize Janus Gate Aurelia and Keeper Station; test the picket")),
+         order=dict(kind="assault", target="Aurelia", stance="bold", reason="seize Janus Gate Aurelia and Keeper Station: the spearhead of the Interdiction Fleet's assault")),
     dict(id="F-M2", side="mandate", name="Lethe Hale", where="Aurelia", supply=0.9, morale=0.8, dark=True,
          ships=[("lethe", "Lethe")], contacts=["T-11"], commander=dict(key="hale"),
          order=dict(kind="recon", target="Aurelia", stance="cautious", reason="the eyes of the strike group: watch the picket and stay alive")),

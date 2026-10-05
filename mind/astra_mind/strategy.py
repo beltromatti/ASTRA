@@ -78,8 +78,9 @@ PEOPLE = {"astra": Person(**{k: ASTRA_HIGH_COMMAND[k] for k in ("key", "name", "
 OPENING_PLANS = {
     "astra": ("Hold Aurelia: the Aquila's picket guards the Janus Gate and Keeper Station and the 7th Fleet's main body, drawn to Cassia by a false distress call, is to come "
               "back to New Ravenna; Constance's battle group joins the picket. Find out what the Mandate has through the Gate before committing the Home Fleet."),
-    "mandate": ("Take the Janus Gate at Aurelia and Keeper Station. The strike group and the vanguard test the picket and take the Gate if they can; the main body musters at "
-                "Erebus Anchorage and goes in when the picket's strength is known. Do not spend the fleet where it does not take a Gate."),
+    "mandate": ("Take the Janus Gate at Aurelia and Keeper Station. The strike group and the vanguard go through together and strike the picket before the 7th Fleet can "
+                "gather: an even fight at the Gate is the one to win, and it is fought; the main body musters at Erebus Anchorage and follows when the Gate is held or "
+                "the picket is broken. Do not spend the fleet where it does not take a Gate, and do not turn away from the one it can."),
 }
 
 

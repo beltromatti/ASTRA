@@ -5,9 +5,10 @@ cd "$(dirname "$0")/.."
 PY=/opt/homebrew/bin/python3.13
 EDITOR_BIN="UnrealEditor.app/Contents/MacOS/UnrealEditor"
 # the editor (or a game the harness started): not the commandlets the helpers run from the same binary (-run=...), which do not hold this checkout's module
-editor_up() { pgrep -fl "$EDITOR_BIN" | grep -v -- "-run=" | grep -q .; }
+# (this checkout's only: a helper's editor or test game in its own worktree has its own binaries, 5 Oct: the build waited four minutes for VFX-2's game)
+editor_up() { pgrep -fl "$EDITOR_BIN" | grep -v -- "-run=" | grep -F "$PWD/ASTRA.uproject" | grep -q .; }
 # a game started by the playtest harness runs the same binary: close it first
-pgrep -f "astra_harness_port" >/dev/null && $PY tools/play.py quit >/dev/null 2>&1
+pgrep -f "astra_harness_port=8770" >/dev/null && $PY tools/play.py quit >/dev/null 2>&1
 if editor_up; then
   $PY tools/ue.py pie stop >/dev/null 2>&1
   $PY tools/ue.py py "import unreal
