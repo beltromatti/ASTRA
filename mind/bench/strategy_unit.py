@@ -114,6 +114,7 @@ class CadenceTest(Fixture):
         self.assertEqual(len(self.looks("mandate")), 0)
 
     async def test_the_periodic_look_comes_only_when_the_picture_moved(self) -> None:
+        self.sm.quiet_s = lambda: 0.0                                              # (a war that is fighting somewhere: the quiet look is another test)
         await self.tick(FIRST_PULSE_S + 10)
         n = len(self.looks())
         self.assertEqual(n, 2)
@@ -122,7 +123,18 @@ class CadenceTest(Fixture):
         ok, _ = self.m.order("astra", self.astra.id, "move", "Cassia", by="auto")
         self.assertTrue(ok)
         await self.tick(PERIODIC_S + 30)
-        self.assertEqual([c["side"] for c in self.looks()[n:]], ["astra"])          # her picture moved; the Mandate's did not (it does not see her)
+        later = [c["side"] for c in self.looks()[n:]]
+        self.assertTrue(later and set(later) == {"astra"}, later)                  # her picture moved; the Mandate's did not (it does not see her)
+
+    async def test_a_war_quiet_for_minutes_is_looked_at_even_when_the_map_stands_still(self) -> None:
+        await self.tick(FIRST_PULSE_S + 10)
+        n = len(self.looks())
+        self.assertEqual(n, 2)
+        await self.tick(PERIODIC_S + 60)                                           # nothing moved, and no battle anywhere for minutes
+        quiet = self.pulses()[n:]
+        self.assertEqual(sorted(p["side"] for p in quiet), ["astra", "mandate"])
+        self.assertTrue(all("the war has been quiet for" in p["why"][0] for p in quiet))
+        self.assertIn("TEMPO: no battle anywhere in the March for", self.prompt("mandate"))
 
     async def test_news_wakes_a_mind_after_a_settle_and_never_more_often_than_the_gap(self) -> None:
         await self.tick(FIRST_PULSE_S + 10)

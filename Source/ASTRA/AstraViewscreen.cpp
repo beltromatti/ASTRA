@@ -948,12 +948,16 @@ void AAstraViewscreen::Tick(float DeltaSeconds)
 	const int32 Hz = HzMax <= 0 ? 0 : (Fps >= 0.92f * TargetFps ? HzMax : (Fps >= 0.8f * TargetFps ? FMath::Min(HzMax, 20) : FMath::Min(HzMax, 12)));
 	const bool bDue = Hz > 0 && Now - LastCaptureAt >= 1.0 / Hz - 0.004;
 	// the feed's width: as many pixels as the screen covers on the Captain's view (a 640-pixel feed was stretched to some 1100 Retina pixels from
-	// the chair, 4 Oct: soft), between 480 and astra.viewscreen.maxwidth in steps of 64; it grows only while the game keeps its pace and gives way
-	// at once when frames run long, like the feed's rate; astra.viewscreen.width fixes it
+	// the chair, 4 Oct: soft), between 480 and astra.viewscreen.maxwidth in steps of 64. It grows to that after the game has kept its pace for some
+	// seconds and gives way a quarter at a time when frames have run long for seconds; a glance away never shrinks it (5 Oct, in the app at its
+	// 30 fps cap: the width went 1280 -> 960 -> 1280 -> 480 within a minute as the Captain looked round and single frames ran long, and every change
+	// costs the capture its history and shows); astra.viewscreen.width fixes it
 	int32 Want = CVarViewscreenWidth.GetValueOnGameThread();
 	if (Want <= 0 && bWatched && Now >= NextSizeAt)
 	{
-		NextSizeAt = Now + 3.0;
+		NextSizeAt = Now + 1.0;
+		SlowFor = Fps < 0.8f * TargetFps ? SlowFor + 1.0 : 0.0;
+		GoodFor = Fps >= 0.92f * TargetFps ? GoodFor + 1.0 : 0.0;
 		APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
 		FVector2D L, R;
 		const FTransform T = GetActorTransform();
@@ -963,10 +967,15 @@ void AAstraViewscreen::Tick(float DeltaSeconds)
 		{
 			const int32 MaxW = FMath::Clamp(CVarViewscreenMaxWidth.GetValueOnGameThread(), 480, 2048);
 			const int32 Covered = FMath::Clamp(FMath::DivideAndRoundUp(FMath::RoundToInt((float)FVector2D::Distance(L, R)), 64) * 64, 480, MaxW);
-			Want = Fps < 0.8f * TargetFps ? FMath::Min(FeedWidth, 640) : (Covered > FeedWidth && Fps < 0.92f * TargetFps ? FeedWidth : Covered);
-			if (FMath::Abs(Want - FeedWidth) < FeedWidth / 5)
+			if (SlowFor >= 3.0 && FeedWidth > 480)
 			{
-				Want = FeedWidth;                       // (a fifth or less of a change: not worth the capture's lost history)
+				Want = FMath::Max(480, FeedWidth * 3 / 4 / 64 * 64);
+				SlowFor = GoodFor = 0.0;
+			}
+			else if (GoodFor >= 8.0 && Covered >= FeedWidth + FeedWidth / 5)
+			{
+				Want = Covered;                         // (a fifth or less more: not worth the capture's lost history)
+				GoodFor = 0.0;
 			}
 		}
 	}
