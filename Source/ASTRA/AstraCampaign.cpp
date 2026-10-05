@@ -150,6 +150,10 @@ public:
 						[
 							SNew(STextBlock).Font(MonoFont(13)).ColorAndOpacity(MenuAccent).Text(FText::FromString(TEXT("THE AURELIA MARCH  ·  ASN AQUILA  ·  2491")))
 						]
+						+ SVerticalBox::Slot().AutoHeight().Padding(4, 6, 0, 0)
+						[
+							SNew(STextBlock).Font(MonoFont(10)).ColorAndOpacity(MenuDim).Text(FText::FromString(FString(TEXT("ALPHA  ")) + FString(ASTRA_VERSION).Replace(TEXT("-alpha"), TEXT(""))))
+						]
 						+ SVerticalBox::Slot().FillHeight(1.f) [ SNew(SSpacer) ]
 						+ SVerticalBox::Slot().AutoHeight() [ Items ]
 						+ SVerticalBox::Slot().FillHeight(0.6f) [ SNew(SSpacer) ]

@@ -318,6 +318,9 @@ namespace AstraMindLaunch
 			P.DataDir = NativePath(H, Data);
 			P.Env.Emplace(TEXT("ASTRA_HOME"), P.DataDir);
 			P.Env.Emplace(TEXT("UV_PROJECT_ENVIRONMENT"), NativePath(H, Data / TEXT("venv")));
+			// the mind's sources are inside the signed app (or a folder the player may not write): Python keeps their compiled bytecode in the
+			// data folder, never beside them (a file written into a signed bundle breaks its seal)
+			P.Env.Emplace(TEXT("PYTHONPYCACHEPREFIX"), NativePath(H, Data / TEXT("pycache")));
 		}
 		if (H != EHost::Mac)
 		{

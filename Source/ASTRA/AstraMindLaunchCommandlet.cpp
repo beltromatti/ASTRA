@@ -163,6 +163,7 @@ namespace
 			MlCheck(TEXT("mac app: packaged"), P.bPackaged);
 			MlCheckEq(TEXT("mac app: ASTRA_HOME is Application Support/ASTRA, as before"), MlEnvOf(P, TEXT("ASTRA_HOME")), OldHome);
 			MlCheckEq(TEXT("mac app: the venv is in it, as before"), MlEnvOf(P, TEXT("UV_PROJECT_ENVIRONMENT")), OldHome + TEXT("/venv"));
+			MlCheckEq(TEXT("mac app: Python's bytecode in the data folder, never in the signed bundle"), MlEnvOf(P, TEXT("PYTHONPYCACHEPREFIX")), OldHome + TEXT("/pycache"));
 			MlCheckEq(TEXT("mac app: uv from the uv installer's folder"), P.Uv, TEXT("/Users/me/.local/bin/uv"));
 			MlCheckEq(TEXT("mac app: ASTRA_SAVED"), MlEnvOf(P, TEXT("ASTRA_SAVED")), TEXT("/Users/me/Library/Application Support/Epic/ASTRA/Saved/"));
 			MlCheck(TEXT("mac app: the data folder is where the shell launch had it"), P.DataDir == OldHome);
@@ -177,6 +178,7 @@ namespace
 			MlCheck(TEXT("windows package: packaged"), P.bPackaged);
 			MlCheckEq(TEXT("windows package: data in %LOCALAPPDATA%\\ASTRA"), MlEnvOf(P, TEXT("ASTRA_HOME")), TEXT("C:\\Users\\me\\AppData\\Local\\ASTRA"));
 			MlCheckEq(TEXT("windows package: the venv in it"), MlEnvOf(P, TEXT("UV_PROJECT_ENVIRONMENT")), TEXT("C:\\Users\\me\\AppData\\Local\\ASTRA\\venv"));
+			MlCheckEq(TEXT("windows package: Python's bytecode in the data folder"), MlEnvOf(P, TEXT("PYTHONPYCACHEPREFIX")), TEXT("C:\\Users\\me\\AppData\\Local\\ASTRA\\pycache"));
 			MlCheckEq(TEXT("windows package: ASTRA_SAVED"), MlEnvOf(P, TEXT("ASTRA_SAVED")), TEXT("C:\\Users\\me\\AppData\\Local\\ASTRA\\Saved\\"));
 			MlCheckEq(TEXT("windows package: the log"), MlEnvOf(P, TEXT("ASTRA_MIND_LOG")), TEXT("C:\\Users\\me\\AppData\\Local\\ASTRA\\Saved\\Logs\\astra-mind.log"));
 			MlCheckEq(TEXT("windows package: text is UTF-8 whatever the console's code page"), MlEnvOf(P, TEXT("PYTHONUTF8")), TEXT("1"));
