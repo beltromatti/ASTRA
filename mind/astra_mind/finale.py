@@ -1,7 +1,8 @@
 """The end of an arc of the war: after the decisive battle, the outcome — computed from what really happened (the
-battle's result, the war map, the losses, the Captain's choices and promises) — is told: Rourke's words to the Aquila,
-cards on a black screen (the battle's name, what it decided, the fates of the officers as their bonds with the Captain
-have made them, the fallen), the war map redrawn, and then the war goes on: a new arc begins."""
+battle's result, the war map, the losses, the Captain's choices and promises) — is told: Rourke's words to the Aquila, then
+a few cards on a black screen read aloud by the narrator in the Captain's language (the battle's name and what it decided,
+two or three lines of what became of the people, the war going on), the game holding still under them (story.py); the war
+map is redrawn, and the war goes on: a new arc begins."""
 from __future__ import annotations
 
 import asyncio
@@ -11,6 +12,7 @@ from typing import Any, Awaitable, Callable
 
 from .crew import CREW, LANG_NAMES, WORLD
 from .openrouter import OpenRouter, ToolCall
+from .story import tell
 from .war import OWNERS
 
 log = logging.getLogger("astra.finale")
@@ -23,19 +25,22 @@ FINALE = {"type": "function", "function": {"name": "finale", "description": "How
         "outcome": {"type": "string", "enum": ["victory", "defeat", "stalemate", "armistice"]},
         "battle_name": {"type": "string", "description": "what history will call the decisive battle, in English (e.g. "
                                                         "\"The Battle of the Aurelia Gate\")"},
-        "decided": {"type": "string", "description": "one line, in English, for a card: what the battle decided"},
+        "decided": {"type": "string", "description": "one short sentence, in the Captain's language, for the first card (the narrator reads it): what "
+                                                    "the battle decided"},
         "admiral_words": {"type": "string", "description": "Vice Admiral Rourke to the Aquila over the fleet net, in the "
                                                           "Captain's language: the outcome and what it cost, 2-4 sentences"},
-        "epilogue": {"type": "array", "items": {"type": "string"}, "description": "4-6 short lines in English for the "
-                     "epilogue cards: what became of the people (officers by name, as their bond with the Captain made them; "
-                     "the fallen remembered; the enemy commanders the Captain faced), and of the March"},
+        "epilogue": {"type": "array", "items": {"type": "string"}, "description": "2 or 3 lines in the Captain's language, at most 20 "
+                     "words each, for the epilogue cards the narrator reads: what became of the people (an officer by name, as their bond "
+                     "with the Captain made them; the fallen remembered; an enemy commander the Captain faced)"},
+        "closing": {"type": "string", "description": "one sentence of at most 10 words, in the Captain's language, for the last card: the war "
+                                                    "goes on (where, or against what)"},
         "war": {"type": "array", "items": {"type": "object", "properties": {
             "system": {"type": "string"}, "owner": {"type": "string", "enum": list(OWNERS)},
             "threat": {"type": "integer", "minimum": 0, "maximum": 3}}, "required": ["system"]},
             "description": "the systems whose holder or threat the outcome changes"},
         "next_arc": {"type": "string", "description": "in English, for the story: where the war goes from here — the "
                                                      "seed of the next arc (one or two sentences)"}},
-    "required": ["outcome", "battle_name", "decided", "admiral_words", "epilogue", "next_arc"]}}}
+    "required": ["outcome", "battle_name", "decided", "admiral_words", "epilogue", "closing", "next_arc"]}}}
 
 PROMPT = """You are the director of the war story of ASTRA. An arc of the war has reached its decisive battle, and it is
 over:
@@ -58,7 +63,8 @@ what was lost), then the war map, then the Captain's choices (mercy shown, promi
 overruled). victory: the Mandate's offensive is broken and ASTRA holds or retakes ground; defeat: the March buckles
 (systems fall, the fleet falls back); stalemate: both sides bled and hold; armistice: only if the story earned it
 (talks over the channel, promises kept on both sides). Epilogue lines are specific and human, never generic; the
-Captain's gender is not known (say "the Captain"). Call `finale` once."""
+Captain's gender is not known (say "the Captain"). The cards are few and short: they are read aloud over a black screen while the
+game waits, and a player wants to be back on the bridge. Call `finale` once."""
 
 
 class Finale:
@@ -112,14 +118,11 @@ class Finale:
         await self._wait_voice(1.0)
         await self.say("admiral", str(choice.get("admiral_words", "")).strip(), lang, "measured")
         await self._wait_voice(2.0)
-        await self._card(str(choice.get("battle_name", "THE BATTLE")).upper(), str(choice.get("decided", "")).upper(), 6.0, black=True)
-        await asyncio.sleep(9.0)
-        for line in (choice.get("epilogue") or [])[:6]:
-            await self._card("", str(line), 5.5, black=True)
-            await asyncio.sleep(8.0)
+        cards = [(str(choice.get("battle_name", "THE BATTLE")).upper(), str(choice.get("decided", "")))]
+        cards += [("", str(line)) for line in (choice.get("epilogue") or [])[:3]]
+        cards.append(("THE AURELIA MARCH", str(choice.get("closing") or "")))
+        await tell(self.command, self.say, self.voice_busy, cards, lang)
         fallen = sum(1 for c in director.campaign if c.startswith("fallen:"))
-        await self._card("THE AURELIA MARCH", "THE WAR GOES ON", 5.0, black=False)
-        await asyncio.sleep(8.0)
         if director.announce and changes:
             await director.announce(f"{choice.get('battle_name')}: {choice.get('decided')}")
         log.info("finale told (%d fallen notes)", fallen)

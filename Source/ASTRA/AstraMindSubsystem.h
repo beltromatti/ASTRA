@@ -72,6 +72,11 @@ private:
 	UPROPERTY() TObjectPtr<class UAudioComponent> ComputerAudio;
 	UPROPERTY() TObjectPtr<class UAstraVoiceWave> ComputerWave;
 	class UAstraVoiceWave* BeginComputerLine(int32 LineId, int32 Rate);
+	/** The narrator of the story's cards (the end of a chapter, the loss of the ship, the introduction): clean, a little closer, and heard with the
+	 *  game paused (a UI sound). Its words are on the card: no subtitle. */
+	UPROPERTY() TObjectPtr<class UAudioComponent> NarratorAudio;
+	UPROPERTY() TObjectPtr<class UAstraVoiceWave> NarratorWave;
+	class UAstraVoiceWave* BeginNarratorLine(int32 LineId, int32 Rate);
 
 	/** A line being heard (voice protocol 2, docs/protocollo_voce.md): where its audio goes and how much of it has been
 	 *  played, so the game can tell the mind that a voice started, stalled, failed or finished. */

@@ -126,6 +126,8 @@ from .npc import Npcs  # noqa: E402
 from .transporter import DISPLAY as XFER_DISPLAY, SPEAKER as XFER_SPEAKER, TITLE as XFER_TITLE, VOICE as XFER_VOICE, TransporterRoom  # noqa: E402
 EXTERNAL_SPEAKERS[PORT_CONTROL["key"]] = (f'{PORT_CONTROL["name"]} ({PORT_CONTROL["place"]})', PORT_CONTROL["voice"])
 EXTERNAL_SPEAKERS["director"] = ("The Director (game master)", "paul")
+from .story import NARRATOR, NARRATOR_NAME, NARRATOR_VOICE  # noqa: E402
+EXTERNAL_SPEAKERS[NARRATOR] = (NARRATOR_NAME, NARRATOR_VOICE)          # the story's narrated cards (story.py)
 EXTERNAL_SPEAKERS[XFER_SPEAKER] = (XFER_DISPLAY, XFER_VOICE)         # the Transporter Room's Chief (transporter.py)
 
 
@@ -361,6 +363,8 @@ class Mind:
         on the comms log and the datapad. It reaches the speaker by itself only as an `answer` to what the Captain said (it goes first), or with the fleet net on the speaker;
         a line that waited is thought again by whoever was to say it. `to`: "aquila" (the Captain: his listener has it at once), "fleet" (the net), or another captain's id
         (traffic between ships: on the log, nobody is woken for it)."""
+        if self.aftermath.muted:
+            return                                  # (the Aquila is gone: the story of her loss has the floor)
         who = EXTERNAL_SPEAKERS.get(speaker, (speaker, ""))[0]
 
         async def rethink(t: str, waited: float, cut_after: str) -> str | None:
@@ -396,6 +400,8 @@ class Mind:
     async def _rourke_say(self, speaker: str, text: str, lang: str, tone: str, *, answer: bool = False, direct: bool = False) -> None:
         """Vice Admiral Rourke speaks on the fleet net (strategy.py). A line that answers the Captain goes first, in his own voice, and is never lost. What Fleet says on its own
         is addressed to the Captain, and Communications tells him (nets.py); `direct`: a call that comes in the admiral's own voice (Fleet's order to the Aquila)."""
+        if self.aftermath.muted:
+            return                                  # (the Aquila is gone: the story of her loss has the floor)
         who = EXTERNAL_SPEAKERS.get(speaker, (speaker, ""))[0]
 
         async def aloud() -> None:
@@ -408,6 +414,8 @@ class Mind:
 
     async def _march_news(self, text: str) -> None:
         """What the March's war brings to the fleet net: comms relays it to the bridge (march_glue.py chooses what is worth saying)."""
+        if self.aftermath.active:
+            return                                  # (no bridge to relay it to: the Aquila is lost)
         self.last_activity = time.monotonic()
         await self.turns.put(("\x00event:comms: fleet net news — " + text, self.lang))
 
@@ -437,6 +445,8 @@ class Mind:
         """Someone on the flight net speaks (flight_minds.py). It is NET TRAFFIC (nets.py): Flight Control (Price) reads it and tells the Captain what he must know, the rest is on
         the flight console's log and the datapad. It reaches the speaker by itself only as the answer to the Captain's call (it goes first), with the net on the speaker, or while
         the Captain sits in a cockpit or stands on the flight deck (the net is his own radio there); a line that waited too long is thought again by whoever was to say it."""
+        if self.aftermath.muted:
+            return                                  # (the Aquila is gone: the story of her loss has the floor)
         who = EXTERNAL_SPEAKERS.get(speaker, (speaker, ""))[0]
 
         async def rethink(t: str, waited: float, cut_after: str) -> str | None:
@@ -500,6 +510,8 @@ class Mind:
         datapad. It reaches the speaker by itself as the answer to the Captain's call (it goes first), as a call to him in the speaker's own voice (`direct`: the marine says it
         is for him: a decision only he can take), with the net on the speaker, or while he is with the marines (`_marines_presence`); a line that waited too long is thought again by
         whoever was to say it (`rethink`)."""
+        if self.aftermath.muted:
+            return                                  # (the Aquila is gone: the story of her loss has the floor)
         who = EXTERNAL_SPEAKERS.get(speaker, (speaker, ""))[0]
 
         async def rethink(t: str, waited: float, cut_after: str) -> str | None:
@@ -584,6 +596,8 @@ class Mind:
     def _war_look(self, state: dict[str, Any]) -> None:
         """The war minds read the new ship state: the story's pulse, the commanders' look (they start the pulses that are due), the XO's board of the
         groups. A defect in them must never cut the crew off from the ship."""
+        if self.aftermath.active:
+            return                                  # (the Aquila is lost: the war's commanders wait for the new command; the story has the floor)
         try:
             self.director.observe(state)
             self.war.feed(state)
@@ -1474,7 +1488,11 @@ class Mind:
                     elif text.startswith(("comms: channel closed", "comms: the Mandate cut the channel")):
                         self._channel = ""
                     if text.startswith("director: the Aquila is lost"):
-                        # the story of the loss: who finds the Captain, the board, a new command (mind/astra_mind/loss.py)
+                        # the story of the loss: who finds the Captain, the board, a new command (mind/astra_mind/loss.py). The war holds still
+                        # meanwhile: the March, its raids and its news wait for the new command (5 Oct: Rourke announced waves at the Gate in the
+                        # middle of the board of inquiry he chaired, and the bridge kept reporting from a ship that was gone)
+                        if self.march_glue is not None:
+                            self.march_glue.stop()
                         asyncio.create_task(self.aftermath.on_lost(text, self.lang))
                     elif text.startswith("director:") and not self.aftermath.active:
                         if "engagement over" in text:

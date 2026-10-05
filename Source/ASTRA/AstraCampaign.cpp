@@ -265,6 +265,12 @@ FString UAstraCampaignSubsystem::SaveSummary() const
 void UAstraCampaignSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 {
 	Super::OnWorldBeginPlay(InWorld);
+	// a level starts with a clean screen: the viewport outlives the level, and an overlay of the one before (the black shade of the story's last card,
+	// a transporter's wash) would stay over the new one for ever (5 Oct: the new command after the loss of the Aquila opened on a black screen)
+	if (UGameViewportClient* VC = InWorld.GetGameViewport())
+	{
+		VC->RemoveAllViewportWidgets();
+	}
 	FAstraSettings::Get().Apply();   // the player's graphics, frame rate and resolution floor
 	// a start already chosen: the command line (automation) or the level's URL (a new campaign from the in-game menu)
 	FString Arg;

@@ -118,6 +118,23 @@ void AASTRAPlayerController::BeginPlay()
 	}
 }
 
+void AASTRAPlayerController::EndPlay(const EEndPlayReason::Type Reason)
+{
+	UGameViewportClient* VC = GEngine ? GEngine->GameViewport : nullptr;
+	if (VC)
+	{
+		for (TSharedPtr<SWidget>* W : {&StoryWidget, &SubWidget, &OrderLine, &HelpWidget, &HintWidget})
+		{
+			if (W->IsValid())
+			{
+				VC->RemoveViewportWidgetContent(W->ToSharedRef());
+			}
+			W->Reset();
+		}
+	}
+	Super::EndPlay(Reason);
+}
+
 void AASTRAPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();

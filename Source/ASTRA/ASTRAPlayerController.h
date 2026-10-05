@@ -61,6 +61,9 @@ protected:
 
 	/** Gameplay initialization */
 	virtual void BeginPlay() override;
+	/** The widgets this controller put on the viewport go with it: the viewport outlives the level (5 Oct: after the loss of the Aquila the new
+	 *  command's level opened under the old controller's black story shade, and the screen stayed black). */
+	virtual void EndPlay(const EEndPlayReason::Type Reason) override;
 
 	/** Input mapping context setup */
 	virtual void SetupInputComponent() override;

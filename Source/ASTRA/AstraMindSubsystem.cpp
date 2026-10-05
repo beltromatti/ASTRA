@@ -531,7 +531,8 @@ void UAstraMindSubsystem::OnText(const FString& Text)
 		const int32 Rate = (int32)Msg->GetNumberField(TEXT("rate"));
 		// the subtitle comes up with the voice and stays as long as the audio and a second, or as long as reading it
 		// takes, whichever is longer (protocollo_voce §3.1: the mind says how long)
-		if (const TPair<FString, FString>* T = LineTexts.Find(Id))
+		const bool bNarrator = Speaker == TEXT("narrator");
+		if (const TPair<FString, FString>* T = bNarrator ? nullptr : LineTexts.Find(Id))
 		{
 			double EstS = 0.0, HoldS = 0.0;
 			Msg->TryGetNumberField(TEXT("est_s"), EstS);
@@ -550,9 +551,10 @@ void UAstraMindSubsystem::OnText(const FString& Text)
 			}
 			LineTexts.Remove(Id);
 		}
-		AAstraCrewMember* Crew = AAstraCrewMember::FindByStation(GameWorld(), Speaker);
+		LineTexts.Remove(Id);
+		AAstraCrewMember* Crew = bNarrator ? nullptr : AAstraCrewMember::FindByStation(GameWorld(), Speaker);
 		const bool bComputer = Speaker == TEXT("computer");
-		if (!Crew && !bComputer)
+		if (!Crew && !bComputer && !bNarrator)
 		{
 			// not one of ours: a voice over a channel (the main viewscreen shows who is speaking)
 			ExternalLineId = Id;
@@ -578,6 +580,11 @@ void UAstraMindSubsystem::OnText(const FString& Text)
 		{
 			Wave = BeginComputerLine(Id, Rate);
 			V.Comp = ComputerAudio;
+		}
+		else if (bNarrator)
+		{
+			Wave = BeginNarratorLine(Id, Rate);
+			V.Comp = NarratorAudio;
 		}
 		else
 		{
@@ -908,6 +915,48 @@ UAstraVoiceWave* UAstraMindSubsystem::BeginComputerLine(int32 LineId, int32 Rate
 	ComputerAudio->Play();
 	UE_LOG(LogASTRA, Log, TEXT("[Mind] the ship's computer (line %d)"), LineId);
 	return ComputerAudio->IsPlaying() ? ComputerWave.Get() : nullptr;
+}
+
+UAstraVoiceWave* UAstraMindSubsystem::BeginNarratorLine(int32 LineId, int32 Rate)
+{
+	UWorld* World = GameWorld();
+	if (!World)
+	{
+		return nullptr;
+	}
+	if (NarratorAudio && (!IsValid(NarratorAudio) || NarratorAudio->GetWorld() != World))
+	{
+		NarratorAudio = nullptr;   // another world
+		NarratorWave = nullptr;
+	}
+	if (NarratorAudio && NarratorWave && NarratorWave->GetRate() == Rate && NarratorAudio->IsPlaying() && NarratorWave->GetAvailableAudioByteCount() > 0)
+	{
+		return NarratorWave;       // the last line still sounding: this one follows it
+	}
+	NarratorWave = NewObject<UAstraVoiceWave>(this);
+	NarratorWave->Setup(Rate);
+	if (!NarratorAudio)
+	{
+		NarratorAudio = UGameplayStatics::CreateSound2D(World, NarratorWave, 1.f, 1.f, 0.f, nullptr, true, false);
+		if (NarratorAudio)
+		{
+			NarratorAudio->bOverridePriority = true;
+			NarratorAudio->Priority = 5.f;
+			NarratorAudio->bIsUISound = true;          // (the story's cards pause the game: the narrator is heard all the same)
+		}
+	}
+	else
+	{
+		NarratorAudio->SetSound(NarratorWave);
+	}
+	if (!NarratorAudio)
+	{
+		return nullptr;
+	}
+	NarratorAudio->SetVolumeMultiplier(1.15f * FAstraSettings::Get().Voices);
+	NarratorAudio->Play();
+	UE_LOG(LogASTRA, Log, TEXT("[Mind] the narrator (line %d)"), LineId);
+	return NarratorAudio->IsPlaying() ? NarratorWave.Get() : nullptr;
 }
 
 bool UAstraMindSubsystem::HeardOnRadio(const AAstraCrewMember* Crew)

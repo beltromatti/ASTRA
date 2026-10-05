@@ -2274,6 +2274,15 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 		}
 		return true;
 	}
+	if (Name == TEXT("story_pause"))
+	{
+		// the story's narrated cards (the end of a chapter, the introduction): the world holds still under them, and goes on after
+		bool bOn = true;
+		Args->TryGetBoolField(TEXT("on"), bOn);
+		UGameplayStatics::SetGamePaused(GetWorld(), bOn);
+		OutDetail = bOn ? TEXT("the game holds still") : TEXT("the game goes on");
+		return true;
+	}
 	if (Name == TEXT("new_command"))
 	{
 		if (!bShipLost)

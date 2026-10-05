@@ -198,6 +198,7 @@ class Aftermath:
         if self.active:
             return
         self.active = True
+        self.muted = True                 # (the bridge is gone from the moment the ship is: no more reports of the fight, no nets, no news)
         self.stage = "adrift"
         event = event.split(":", 1)[1].strip() if event.startswith("director:") else event
         self.director.note(f"THE AQUILA WAS LOST: {event}")
