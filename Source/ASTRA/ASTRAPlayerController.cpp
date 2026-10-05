@@ -2,6 +2,7 @@
 
 
 #include "ASTRAPlayerController.h"
+#include "AstraFonts.h"
 #include "Widgets/SBoxPanel.h"
 #include "Styling/CoreStyle.h"
 #include "Widgets/Text/STextBlock.h"
@@ -507,7 +508,7 @@ void AASTRAPlayerController::ShowNotice(const FString& Text, float Seconds)
 		VC->RemoveViewportWidgetContent(HintWidget.ToSharedRef());
 		HintWidget.Reset();
 	}
-	UFont* Mono = LoadObject<UFont>(nullptr, TEXT("/Game/ASTRA/UI/Fonts/F_ASTRA_Mono.F_ASTRA_Mono"));
+	UFont* Mono = AstraFonts::Mono();
 	HintWidget = SNew(SBox).HAlign(HAlign_Right).VAlign(VAlign_Bottom).Padding(FMargin(0, 0, 28, 22))
 	[
 		SNew(SBorder).BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush")).BorderBackgroundColor(FLinearColor(0.004f, 0.006f, 0.01f, 0.7f))
@@ -652,8 +653,8 @@ void AASTRAPlayerController::EnsureStoryWidget()
 	{
 		return;
 	}
-	UFont* Title = LoadObject<UFont>(nullptr, TEXT("/Game/ASTRA/UI/Fonts/F_ASTRA_Title.F_ASTRA_Title"));
-	UFont* Mono = LoadObject<UFont>(nullptr, TEXT("/Game/ASTRA/UI/Fonts/F_ASTRA_Mono.F_ASTRA_Mono"));
+	UFont* Title = AstraFonts::Title();
+	UFont* Mono = AstraFonts::Mono();
 	StoryWidget = SNew(SOverlay)
 		+ SOverlay::Slot()
 		[
@@ -732,7 +733,7 @@ void AASTRAPlayerController::EnsureSubtitles()
 	{
 		return;
 	}
-	UFont* Mono = LoadObject<UFont>(nullptr, TEXT("/Game/ASTRA/UI/Fonts/F_ASTRA_Mono.F_ASTRA_Mono"));
+	UFont* Mono = AstraFonts::Mono();
 	const FSlateFontInfo NameFont = Mono ? FSlateFontInfo(Mono, 14) : FCoreStyle::GetDefaultFontStyle("Bold", 14);
 	const FSlateFontInfo TextFont = Mono ? FSlateFontInfo(Mono, 15) : FCoreStyle::GetDefaultFontStyle("Regular", 15);
 	TSharedRef<SVerticalBox> Box = SNew(SVerticalBox);
@@ -976,7 +977,7 @@ void AASTRAPlayerController::OpenOrderLine()
 	{
 		return;
 	}
-	UFont* Mono = LoadObject<UFont>(nullptr, TEXT("/Game/ASTRA/UI/Fonts/F_ASTRA_Mono.F_ASTRA_Mono"));
+	UFont* Mono = AstraFonts::Mono();
 	const FSlateFontInfo Font = Mono ? FSlateFontInfo(Mono, 16) : FCoreStyle::GetDefaultFontStyle("Mono", 16);
 	const FSlateFontInfo Small = Mono ? FSlateFontInfo(Mono, 11) : FCoreStyle::GetDefaultFontStyle("Mono", 11);
 	OrderLine = SNew(SBox).HAlign(HAlign_Center).VAlign(VAlign_Bottom).Padding(FMargin(0, 0, 0, 150))
@@ -1088,7 +1089,7 @@ void AASTRAPlayerController::ShowHelp(bool bShow)
 	}
 	if (bShow && !HelpWidget.IsValid())
 	{
-		UFont* Mono = LoadObject<UFont>(nullptr, TEXT("/Game/ASTRA/UI/Fonts/F_ASTRA_Mono.F_ASTRA_Mono"));
+		UFont* Mono = AstraFonts::Mono();
 		const FSlateFontInfo Font = Mono ? FSlateFontInfo(Mono, 14) : FCoreStyle::GetDefaultFontStyle("Mono", 14);
 		HelpWidget = SNew(SBox).HAlign(HAlign_Center).VAlign(VAlign_Center)
 		[

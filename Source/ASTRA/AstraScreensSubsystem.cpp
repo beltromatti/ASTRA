@@ -1,6 +1,7 @@
 // ASTRA — live bridge screens.
 
 #include "AstraScreensSubsystem.h"
+#include "AstraFonts.h"
 
 #include "ASTRA.h"
 #include "AstraBattleSubsystem.h"
@@ -310,8 +311,8 @@ UAstraScreenPage* UAstraScreensSubsystem::PageFor(const FString& Name)
 void UAstraScreensSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 {
 	Super::OnWorldBeginPlay(InWorld);
-	TitleFont = LoadObject<UFont>(nullptr, TEXT("/Game/ASTRA/UI/Fonts/F_ASTRA_Title.F_ASTRA_Title"));
-	MonoFont = LoadObject<UFont>(nullptr, TEXT("/Game/ASTRA/UI/Fonts/F_ASTRA_Mono.F_ASTRA_Mono"));
+	TitleFont = AstraFonts::Title();
+	MonoFont = AstraFonts::Mono();
 	if (!TitleFont || !MonoFont)
 	{
 		UE_LOG(LogASTRA, Warning, TEXT("[Screens] UI fonts missing (tools/ue_scripts/make_fonts.py): live screens off"));

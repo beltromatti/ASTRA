@@ -1,6 +1,7 @@
 // ASTRA — a ship's name painted on her flanks.
 
 #include "AstraHullName.h"
+#include "AstraFonts.h"
 
 #include "ASTRA.h"
 #include "CanvasItem.h"
@@ -57,7 +58,7 @@ void UAstraHullName::Paint(AActor* Ship, const FString& InName, const FString& H
 
 void UAstraHullName::Draw(UCanvas* Canvas, int32 Width, int32 Height)
 {
-	UFont* Title = LoadObject<UFont>(nullptr, TEXT("/Game/ASTRA/UI/Fonts/F_ASTRA_Title.F_ASTRA_Title"));
+	UFont* Title = AstraFonts::Title();
 	if (!Canvas || !Title)
 	{
 		return;

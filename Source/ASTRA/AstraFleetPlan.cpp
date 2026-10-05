@@ -13,8 +13,10 @@
 namespace
 {
 	FCriticalSection GFleetLock;
-	TMap<FName, TSharedPtr<const FFleetClassPlan>> GFleetPlans;                       // loaded (null: there is none)
-	TMap<FName, TSharedFuture<TSharedPtr<const FFleetClassPlan>>> GFleetPending;       // being loaded on a worker
+	// (never destroyed: at the process's exit a future still waiting here gave its event back to a pool already gone, and the app crashed on
+	// quit, 5 Oct; the memory goes with the process)
+	TMap<FName, TSharedPtr<const FFleetClassPlan>>& GFleetPlans = *new TMap<FName, TSharedPtr<const FFleetClassPlan>>();                       // loaded (null: there is none)
+	TMap<FName, TSharedFuture<TSharedPtr<const FFleetClassPlan>>>& GFleetPending = *new TMap<FName, TSharedFuture<TSharedPtr<const FFleetClassPlan>>>();   // being loaded on a worker
 
 	bool FleetReadJson(const FString& Path, TSharedPtr<FJsonObject>& Out)
 	{

@@ -1,4 +1,5 @@
 #include "AstraFpsHud.h"
+#include "AstraFonts.h"
 
 #include "Engine/Font.h"
 #include "Fonts/FontMeasure.h"
@@ -19,8 +20,8 @@ namespace
 
 void SAstraCombatHud::Construct(const FArguments&)
 {
-	UFont* Mono = LoadObject<UFont>(nullptr, TEXT("/Game/ASTRA/UI/Fonts/F_ASTRA_Mono.F_ASTRA_Mono"));
-	UFont* Title = LoadObject<UFont>(nullptr, TEXT("/Game/ASTRA/UI/Fonts/F_ASTRA_Title.F_ASTRA_Title"));
+	UFont* Mono = AstraFonts::Mono();
+	UFont* Title = AstraFonts::Title();
 	Small = Mono ? FSlateFontInfo(Mono, 11) : FCoreStyle::GetDefaultFontStyle("Mono", 11);
 	Mid = Title ? FSlateFontInfo(Title, 14) : FCoreStyle::GetDefaultFontStyle("Regular", 14);
 	Cap = Mono ? FSlateFontInfo(Mono, 12) : FCoreStyle::GetDefaultFontStyle("Mono", 12);

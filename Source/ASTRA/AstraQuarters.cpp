@@ -1,6 +1,7 @@
 // ASTRA — the Captain's quarters.
 
 #include "AstraQuarters.h"
+#include "AstraFonts.h"
 
 #include "ASTRA.h"
 #include "AstraShipSubsystem.h"
@@ -243,7 +244,7 @@ void AAstraQuarters::ShowCaption(bool bShow)
 	{
 		return;
 	}
-	UFont* Mono = LoadObject<UFont>(nullptr, TEXT("/Game/ASTRA/UI/Fonts/F_ASTRA_Mono.F_ASTRA_Mono"));
+	UFont* Mono = AstraFonts::Mono();
 	const FSlateFontInfo Font = Mono ? FSlateFontInfo(Mono, 16) : FCoreStyle::GetDefaultFontStyle("Mono", 16);
 	Caption = SNew(SBox).HAlign(HAlign_Center).VAlign(VAlign_Bottom).Padding(FMargin(0, 0, 0, 80))
 	[

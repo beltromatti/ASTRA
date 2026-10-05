@@ -1,4 +1,5 @@
 #include "AstraWindowHud.h"
+#include "AstraFonts.h"
 #include "ASTRA.h"
 #include "AstraBattleSubsystem.h"
 #include "AstraHoloTable.h"
@@ -53,8 +54,8 @@ public:
 
 	void Construct(const FArguments&)
 	{
-		UFont* Mono = LoadObject<UFont>(nullptr, TEXT("/Game/ASTRA/UI/Fonts/F_ASTRA_Mono.F_ASTRA_Mono"));
-		UFont* Title = LoadObject<UFont>(nullptr, TEXT("/Game/ASTRA/UI/Fonts/F_ASTRA_Title.F_ASTRA_Title"));
+		UFont* Mono = AstraFonts::Mono();
+		UFont* Title = AstraFonts::Title();
 		Small = Mono ? FSlateFontInfo(Mono, 10) : FCoreStyle::GetDefaultFontStyle("Mono", 10);
 		Name = Title ? FSlateFontInfo(Title, 13) : FCoreStyle::GetDefaultFontStyle("Regular", 13);
 	}

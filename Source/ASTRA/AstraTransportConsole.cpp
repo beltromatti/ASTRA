@@ -1,4 +1,5 @@
 #include "AstraTransportConsole.h"
+#include "AstraFonts.h"
 
 #include "ASTRA.h"
 #include "AstraTransporterSubsystem.h"
@@ -172,8 +173,8 @@ void AAstraTransportConsole::EnsureTarget()
 	{
 		return;
 	}
-	TitleFont = LoadObject<UFont>(nullptr, TEXT("/Game/ASTRA/UI/Fonts/F_ASTRA_Title.F_ASTRA_Title"));
-	MonoFont = LoadObject<UFont>(nullptr, TEXT("/Game/ASTRA/UI/Fonts/F_ASTRA_Mono.F_ASTRA_Mono"));
+	TitleFont = AstraFonts::Title();
+	MonoFont = AstraFonts::Mono();
 	if (!TitleFont || !MonoFont)
 	{
 		return;

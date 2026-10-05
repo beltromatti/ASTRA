@@ -1,6 +1,7 @@
 // ASTRA — the player's settings.
 
 #include "AstraSettings.h"
+#include "AstraFonts.h"
 
 #include "ASTRA.h"
 #include "Engine/Engine.h"
@@ -141,8 +142,8 @@ void SAstraSettingsPage::Construct(const FArguments& Args)
 {
 	static_assert(UE_ARRAY_COUNT(Buttons) == NumRowIds, "a button for every row: BACK's was one past the end of a seven-button array");
 	OnBack = Args._OnBack;
-	UFont* Title = LoadObject<UFont>(nullptr, TEXT("/Game/ASTRA/UI/Fonts/F_ASTRA_Title.F_ASTRA_Title"));
-	UFont* Mono = LoadObject<UFont>(nullptr, TEXT("/Game/ASTRA/UI/Fonts/F_ASTRA_Mono.F_ASTRA_Mono"));
+	UFont* Title = AstraFonts::Title();
+	UFont* Mono = AstraFonts::Mono();
 	auto TitleFont = [Title](int32 Size) { return Title ? FSlateFontInfo(Title, Size) : FCoreStyle::GetDefaultFontStyle("Bold", Size); };
 	auto MonoFont = [Mono](int32 Size) { return Mono ? FSlateFontInfo(Mono, Size) : FCoreStyle::GetDefaultFontStyle("Mono", Size); };
 

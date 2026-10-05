@@ -1,4 +1,5 @@
 #include "AstraViewscreen.h"
+#include "AstraFonts.h"
 #include "AstraWarFX.h"
 #include "Sound/SoundBase.h"
 #include "Engine/Engine.h"
@@ -224,8 +225,8 @@ AAstraViewscreen::AAstraViewscreen()
 void AAstraViewscreen::BeginPlay()
 {
 	Super::BeginPlay();
-	Mono = LoadObject<UFont>(nullptr, TEXT("/Game/ASTRA/UI/Fonts/F_ASTRA_Mono.F_ASTRA_Mono"));
-	Title = LoadObject<UFont>(nullptr, TEXT("/Game/ASTRA/UI/Fonts/F_ASTRA_Title.F_ASTRA_Title"));
+	Mono = AstraFonts::Mono();
+	Title = AstraFonts::Title();
 	// the image plane: a quad facing the Captain (-X), bottom edge at the actor, UVs 0-1 left to right, top to bottom
 	UProceduralMeshComponent* Quad = NewObject<UProceduralMeshComponent>(this, TEXT("ScreenQuad"));
 	Screen = Quad;

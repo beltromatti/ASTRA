@@ -1,6 +1,7 @@
 // ASTRA — the campaign and the title menu.
 
 #include "AstraCampaign.h"
+#include "AstraFonts.h"
 #include "ASTRAPlayerController.h"
 
 #include "ASTRA.h"
@@ -76,8 +77,8 @@ public:
 
 	void Construct(const FArguments& Args)
 	{
-		UFont* Title = LoadObject<UFont>(nullptr, TEXT("/Game/ASTRA/UI/Fonts/F_ASTRA_Title.F_ASTRA_Title"));
-		UFont* Mono = LoadObject<UFont>(nullptr, TEXT("/Game/ASTRA/UI/Fonts/F_ASTRA_Mono.F_ASTRA_Mono"));
+		UFont* Title = AstraFonts::Title();
+		UFont* Mono = AstraFonts::Mono();
 		auto TitleFont = [Title](int32 Size) { return Title ? FSlateFontInfo(Title, Size) : FCoreStyle::GetDefaultFontStyle("Bold", Size); };
 		auto MonoFont = [Mono](int32 Size) { return Mono ? FSlateFontInfo(Mono, Size) : FCoreStyle::GetDefaultFontStyle("Mono", Size); };
 		bNeedConfirm = !Args._SaveSummary.IsEmpty() || Args._InGame;

@@ -1,6 +1,7 @@
 // ASTRA — the Captain at the stick of a Falcon.
 
 #include "AstraFighterPawn.h"
+#include "AstraFonts.h"
 #include "Components/PointLightComponent.h"
 #include "Fonts/FontMeasure.h"
 
@@ -77,7 +78,7 @@ public:
 
 	void Construct(const FArguments&)
 	{
-		UFont* Mono = LoadObject<UFont>(nullptr, TEXT("/Game/ASTRA/UI/Fonts/F_ASTRA_Mono.F_ASTRA_Mono"));
+		UFont* Mono = AstraFonts::Mono();
 		Font = Mono ? FSlateFontInfo(Mono, 16) : FCoreStyle::GetDefaultFontStyle("Mono", 16);
 		Small = Mono ? FSlateFontInfo(Mono, 12) : FCoreStyle::GetDefaultFontStyle("Mono", 12);
 	}
