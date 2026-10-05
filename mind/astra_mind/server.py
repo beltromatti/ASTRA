@@ -46,7 +46,7 @@ from .speech import REPORT_LATE_S, Prio, Voice
 from .flight_minds import CAST as FLIGHT_CAST, PARTY as FLIGHT_PARTY, PARTY_ALIASES as FLIGHT_ALIASES, FlightMinds, flying as _flying, on_flight_deck as _on_flight_deck
 from .marines import PARTY as MARINES_PARTY, MarineMinds
 from .nets import CALL_MARK, NET_EVENT, URGENT_MARK, Nets
-from .war_minds import ALLIES, WarMinds
+from .war_minds import ALLIES, WarMinds, drawn_mandate_officer
 from .march import March
 from .march_glue import MarchGlue
 from .strategy import StrategicMinds
@@ -1008,13 +1008,9 @@ class Mind:
                         m = _re.match(r"transmission:\s*(T-\d+)\s*—\s*(.*)", tr)
                         if m and m.group(1) not in COMMANDERS:
                             # nobody gave this captain a mind yet: a Mandate officer with the ship's name on the call sign
-                            ship = _re.search(r"aboard the ([\w' -]+)", m.group(2))
-                            self._register_commander(m.group(1), {
-                                "name": f"the commander of the {ship.group(1) if ship else 'raid group'}",
-                                "rank": "Ferryman (ship captain)", "ship": f"the {ship.group(1) if ship else 'Mandate warship'}",
-                                "bio": "A hard, tired officer of the Outer Worlds who has lost friends to the Core's guns and "
-                                       "wants the Gates for his people; proud, laconic, honest.",
-                                "voice": "stuart_bell"})
+                            ship = _re.search(r"aboard the ([\w' -]+)", m.group(2)) or _re.search(r"— the ([\w' -]+?) \(", m.group(2))
+                            drawn = drawn_mandate_officer(m.group(1), ship.group(1) if ship else "")
+                            self._register_commander(m.group(1), {**drawn, "ship": f"the {ship.group(1) if ship else 'Mandate warship'}"})
                         if m and self.enemy.open_channel(m.group(1)):
                             written = await self.voice.preemptible(self.enemy.respond(
                                 f"[Situation: {m.group(2)}. You are the one opening this channel: make "
