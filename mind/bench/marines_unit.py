@@ -172,8 +172,8 @@ class Bed:
                                 register_voice=lambda k, n, v: self.voices.__setitem__(k, (n, v)), path=lambda: str(Path(tmp) / "marines.json"))
         self.m.on_unanswered = self._unanswered
 
-    async def _say(self, key: str, text: str, lang: str, tone: str, *, urgent: bool = False, answer: bool = False) -> None:
-        self.lines.append({"speaker": key, "text": text, "lang": lang, "tone": tone, "urgent": urgent, "answer": answer})
+    async def _say(self, key: str, text: str, lang: str, tone: str, *, urgent: bool = False, answer: bool = False, direct: bool = False) -> None:
+        self.lines.append({"speaker": key, "text": text, "lang": lang, "tone": tone, "urgent": urgent, "answer": answer, "direct": direct})
 
     async def _execute(self, name: str, args: dict[str, Any], by: str) -> dict[str, Any]:
         self.commands.append((name, args, by))
@@ -961,6 +961,32 @@ class Voices(unittest.IsolatedAsyncioTestCase):
     async def test_an_unknown_tone_is_calm(self) -> None:
         await self.say(speaker="reyes", text="Capitano.", tone="sarcastic")
         self.assertEqual(self.bed.lines[0]["tone"], "calm")
+
+    async def test_a_line_that_calls_the_captain_is_a_direct_call_and_an_answer_is_not_marked_twice(self) -> None:
+        # the marine says the line is for the Captain (`to_captain`): it reaches his speaker in the marine's own voice (nets.py: direct); the news is the XO's to tell
+        await self.say(speaker="reyes", text="Capitano, Reaction Due è tagliata fuori: mi serve un suo ordine.", to_captain=True)
+        await self.say(speaker="marine_reaction_1", text="Contatto, sei ostili.", tone="tense")
+        self.assertEqual([(l["speaker"], l["direct"], l["answer"]) for l in self.bed.lines], [("reyes", True, False), ("marine_reaction_1", False, False)])
+        rec = {"lines": 0}
+        await self.m._say({"speaker": "reyes", "text": "Ricevuto, Capitano. Reaction Due si ritira.", "tone": "calm", "to_captain": True}, "it", True, rec)          # (an answer to his words reaches him anyway)
+        self.assertEqual((self.bed.lines[-1]["answer"], self.bed.lines[-1]["direct"]), (True, False))
+
+    def test_the_say_tool_has_the_call_and_the_prompt_says_who_hears_whom(self) -> None:
+        say = next(t for t in mm.TOOLS if t["function"]["name"] == "say")["function"]
+        self.assertIn("to_captain", say["parameters"]["properties"])
+        self.assertEqual(say["parameters"]["required"], ["speaker", "text", "tone"])
+        s = mm.system_prompt()
+        for needle in ("Who hears you.", "the XO has the watch on your net", "`to_captain`", "your net is his radio"):
+            self.assertIn(needle, s)
+
+    def test_the_captain_is_with_the_marines_when_the_game_says_so(self) -> None:
+        st = ship_state()
+        self.assertFalse(mm.with_marines(st))
+        st["boarding"]["captain_with_marines"] = True
+        self.assertTrue(mm.with_marines(st))
+        self.assertFalse(mm.with_marines(ship_state(fight=False)))
+        self.assertFalse(mm.with_marines(None))
+        self.assertFalse(mm.with_marines({"boarding": {"captain_with_marines": False, "captain_aboard": False}}))
 
 
 class Orders(unittest.IsolatedAsyncioTestCase):

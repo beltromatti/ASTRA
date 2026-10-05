@@ -202,6 +202,12 @@ def picture_of(state: dict[str, Any] | None) -> dict[str, Any]:
     return p if isinstance(p, dict) else {}
 
 
+def with_marines(state: dict[str, Any] | None) -> bool:
+    """The Captain is with the marines (in their boat on the way out or home, or on the decks of the ship they board): the game says so in the boarding's snapshot
+    (`captain_with_marines`). The marine net is his own radio then, as the flight net is in a cockpit: every line of it is heard by him (nets.py: presence)."""
+    return bool(boarding_of(state).get("captain_with_marines"))
+
+
 def fighting(state: dict[str, Any] | None) -> bool:
     """The game says a boarding is on (its snapshot is there while the fight is)."""
     return bool(boarding_of(state).get("active"))
@@ -218,7 +224,9 @@ SAY = _fn("say", "Say one line on the marine net: the Captain and the bridge hea
     "speaker": {"type": "string", "description": "who speaks: `reyes`, or the key of a squad from the board (marine_reaction_1): the squad's leader speaks"},
     "text": {"type": "string", "description": "the spoken line: one short sentence (4-14 words), two only when the second carries something the Captain must decide or know"},
     "tone": {"type": "string", "enum": list(TONES)},
-    "urgent": {"type": "boolean", "description": "true only for danger now (a marine down, a position lost, the Captain hit): the line goes before routine talk"}},
+    "urgent": {"type": "boolean", "description": "true only for danger now (a marine down, a position lost, the Captain hit): the line goes before routine talk"},
+    "to_captain": {"type": "boolean", "description": "true only when the line CALLS the Captain: it asks him for a decision or an order that only he can give, or warns him of a danger to himself that he must act on now; "
+                                                      "it reaches him in your own voice. False for the picture and the news (the XO tells him those) and for an answer to his words (it reaches him anyway)"}},
     ["speaker", "text", "tone"])
 
 ORDER = _fn("order", "Give a squad (or several) an order: it takes effect at once and stands until changed; the answer says what the squads will do, or why they cannot. Major "
@@ -354,6 +362,9 @@ THE INFANTRY ORDERS (the game's simulation measured each one, with the order and
 WHEN YOU SPEAK
 - Only when something happens to your marines or to the fight, or when the Captain speaks to you. Silence is normal: when the board shows what the Captain can see and nothing needs
   his decision, call stay_quiet. But a marine who falls is always called, by name, once; the first sight of the boarders is always called; the end of the fight is always reported.
+- Who hears you. With the Captain on the bridge the XO has the watch on your net: your lines are on the net's log and he tells the Captain what he must know, in a line, so that nothing of yours is lost. In your own voice
+  he hears only (1) what answers his words, and (2) a line that CALLS him (`to_captain`: a decision or an order only he can give, or a danger to himself he must act on now). With the Captain with you, in the boats or on the other ship's
+  decks, your net is his radio and he hears every line, as it is said.
 - Major Reyes speaks for the detachment: the picture, the decision, the number that matters, what he needs from the Captain; and he answers the Captain. A squad leader speaks for
   his squad, and only of what he has seen or done himself: a contact, a marine down, a place lost or taken, out of room to fall back; and when the Captain addresses him. At the alarm,
   or while a squad is merely moving, only the Major speaks. One voice for one piece of news, the one it happened to; two voices only if the second adds something the first could not know.
@@ -463,7 +474,8 @@ class MarineMinds:
     """The marine net's people. Feed it the ship state (about once a second) and the game's events; it decides when a pulse is due and runs it in the background; what the people
     say goes out through `say`, what they order through `execute`.
 
-    say(key, text, lang, tone, urgent=, answer=) -> awaitable: the voice stage (the server wraps it: the radio voice, the crew's recent events, the rethink hook);
+    say(key, text, lang, tone, urgent=, answer=, direct=) -> awaitable: the voice stage (the server wraps it: the radio voice, the crew's recent events, the rethink hook; `answer`: it answers the Captain's
+    words, `direct`: it calls him: both reach his speaker by themselves, the rest goes to the XO who has the watch on the net);
     execute(name, args, by) -> {"ok", "detail"}: the game's own command (`marine_order`, `lockdown`); lang(): the Captain's language; clock(): seconds (the bench gives its own);
     register_voice(key, name, voice): a speaker the voice stage must know (a squad's leader changes when the squad's leader falls); path(): the file the memories are kept in
     (None: not kept)."""
@@ -1071,7 +1083,7 @@ class MarineMinds:
         tone = str(a.get("tone") or "calm")
         self._note(radio, text)
         rec["lines"] += 1
-        await self.say(key, text, lang, tone if tone in TONES else "calm", urgent=bool(a.get("urgent")), answer=answer)
+        await self.say(key, text, lang, tone if tone in TONES else "calm", urgent=bool(a.get("urgent")), answer=answer, direct=bool(a.get("to_captain")) and not answer)
 
     async def _command(self, name: str, a: dict[str, Any]) -> dict[str, Any]:
         """An order of the net as the game takes it: the authority checked (the Major any squad, a leader his own, the bulkheads are the Major's), then sent as the game's own command."""

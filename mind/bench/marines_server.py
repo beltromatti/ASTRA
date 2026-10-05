@@ -3,8 +3,10 @@
     cd mind && .venv/bin/python -m unittest bench.marines_server -v
 
 A fake game connects to the real `Mind` (its turn worker, router glue, event queue, voice stage with a fake synthesiser) and sends ship states with a boarding in them, the
-boarding's news and the Captain's words. What is checked: the marines tell their own news (a radio voice with the squad leader's own name) and the crew's report turn does not get
-it, while the ship's side of the boarding (the alarm, the Captain down) still goes to the crew and the net looks at it too; with the net off the crew reports as before; during a
+boarding's news and the Captain's words. What is checked: the marines' own news is net traffic (nets.py): the XO has the watch on the marine net and tells the Captain in a line what
+he must know, the marine's voice is not on the speaker, and the crew's report turn does not get the news to report, while the ship's side of the boarding (the alarm, the Captain
+down) still goes to the crew and the net looks at it too; what reaches the Captain's speaker in the marine's own voice is what answers his words and what calls him (`to_captain`),
+and everything when he is with the marines (the boarding's `captain_with_marines`: the net is his own radio); with the net off the crew reports as before; during a
 boarding the marine net is the channel the Captain's words are judged for, the router decides what of them goes out and the net answers and gives its orders to the game as the
 game's own `marine_order` and `lockdown`, while the crew hears everything and is told what went out; with no boarding there is no channel and no router call; a Captain in a Falcon
 keeps the flight net; the bridge's lines are heard by the marines; a net that cannot answer hands the Captain's words to the XO; and a defect in the net never cuts the crew off from
@@ -105,27 +107,54 @@ class MarineServerTest(unittest.IsolatedAsyncioTestCase):
         await self.state(st, 0.3)
 
     # -- the news
-    async def test_the_marines_tell_their_own_news_and_the_crew_does_not(self) -> None:
+    async def test_the_marines_news_goes_to_the_xo_and_not_to_the_speaker_in_their_own_voice(self) -> None:
         self.model.marines = [[("say", {"speaker": "marine_reaction_2", "text": "Contatto, sei ostili. Teniamo.", "tone": "tense", "urgent": True})]]
-        self.model.crew = [("speak", {"speaker": "tactical", "text": "Non dovrei parlare.", "tone": "calm"})]
+        self.model.crew = [("speak", {"speaker": "xo", "text": "Contatto al ponte cinque, Capitano: sei ostili, Reaction Due tiene.", "tone": "urgent"})]
         await self.event(CONTACT)
-        await asyncio.sleep(0.3)
-        line = next(m for m in self.game.sent if m.get("type") == "line")
-        self.assertEqual((line["speaker"], line["name"]), ("marine_reaction_2", "Sergeant Jonas Weber (Reaction 2)"))
-        self.assertTrue(line["channel"])                                               # a radio voice, not an officer of the bridge
-        self.assertEqual(self.crew_calls(), [])                                        # the crew's report turn never got the event
+        await asyncio.sleep(0.5)
+        traffic = [m for m in self.game.sent if m.get("type") == "net_traffic"]
+        self.assertEqual(len(traffic), 1)
+        t = traffic[0]
+        self.assertEqual((t["net"], t["speaker"], t["name"], t["console"], t["aloud"], t["urgent"]), ("marines", "marine_reaction_2", "Sergeant Jonas Weber (Reaction 2)", "xo", False, True))
+        self.assertEqual([m["speaker"] for m in self.game.sent if m.get("type") == "line"], ["xo"])        # the XO tells him: the sergeant's own voice is not on the speaker
+        self.assertEqual(len(self.crew_calls()), 1)                                    # the one crew turn is the XO's, on the net's traffic (not a report turn for the event)
+        prompt = self.crew_calls()[0]["prompt"]
+        self.assertIn("traffic on the marine net", prompt)
+        self.assertIn("Contatto, sei ostili. Teniamo.", prompt)
+        self.assertIn("[URGENT]", prompt)
         self.assertEqual(len(self.model.marine_calls), 1)
-        self.assertIn("over the radio, Sergeant Jonas Weber (Reaction 2): Contatto, sei ostili", " ".join(self.mind.game.events))
         self.assertIn(CONTACT, self.mind.game.events)                                   # (it is in the crew's events all the same: it reads it, it does not say it)
+        self.assertNotIn("over the radio, Sergeant Jonas Weber (Reaction 2)", " ".join(self.mind.game.events))      # (it was not said aloud: nothing of it is a line the bridge heard)
 
-    async def test_the_ships_side_of_the_alarm_goes_to_the_crew_and_the_net_looks_at_it_too(self) -> None:
-        self.model.crew = [("speak", {"speaker": "tactical", "text": "Abbordaggio al ponte cinque, Capitano.", "tone": "urgent"})]
-        self.model.marines = [[("say", {"speaker": "reyes", "text": "Reaction in venticinque secondi, Capitano.", "tone": "focused"})]]
-        await self.event(DOCKED)
-        await asyncio.sleep(0.3)
-        self.assertEqual(len(self.crew_calls()), 1)                                    # the bridge reports the ship's news
-        self.assertEqual(len(self.model.marine_calls), 1)                              # and the Major has his own first look
-        self.assertEqual({s for s, _ in self.game.lines()}, {"tactical", "reyes"})
+    async def test_a_marine_who_calls_the_captain_is_heard_in_his_own_voice(self) -> None:
+        self.model.marines = [[("say", {"speaker": "reyes", "text": "Capitano, Reaction Due è tagliata fuori: mi serve un suo ordine.", "tone": "urgent", "urgent": True, "to_captain": True})]]
+        self.model.crew = []
+        await self.event(CONTACT)
+        await asyncio.sleep(0.5)
+        lines = [m for m in self.game.sent if m.get("type") == "line"]
+        self.assertEqual([(l["speaker"], l["text"]) for l in lines], [("reyes", "Capitano, Reaction Due è tagliata fuori: mi serve un suo ordine.")])
+        traffic = [m for m in self.game.sent if m.get("type") == "net_traffic"]
+        self.assertEqual((len(traffic), traffic[0]["aloud"], traffic[0]["addressed"]), (1, True, True))
+        self.assertIn("over the radio, Reyes (Major Tomás Reyes): Capitano, Reaction Due è tagliata fuori", " ".join(self.mind.game.events))
+        self.assertEqual(self.crew_calls(), [])                                         # nobody has to tell him what he heard
+
+    async def test_with_the_captain_among_the_marines_the_net_is_his_radio(self) -> None:
+        self.model.marines = [[("say", {"speaker": "marine_reaction_2", "text": "Contatto, sei ostili. Teniamo.", "tone": "tense", "urgent": True})]]
+        self.model.crew = []
+        st = ship_state()
+        st["boarding"]["captain_with_marines"] = True
+        st["boarding"]["captain_aboard"] = True
+        await self.state(st)
+        self.assertTrue(self.mind.nets.on_speaker("marines"))                           # (his own radio, as the flight net is in a cockpit)
+        await self.event(CONTACT, st=st)
+        await asyncio.sleep(0.4)
+        self.assertIn(("marine_reaction_2", "Contatto, sei ostili. Teniamo."), self.game.lines())
+        t = [m for m in self.game.sent if m.get("type") == "net_traffic"][0]
+        self.assertTrue(t["aloud"])
+        self.assertEqual(self.crew_calls(), [])                                         # no XO relays what he heard himself
+        # and when he is not with them it is the XO's net again
+        await self.state(ship_state(), 0.1)
+        self.assertFalse(self.mind.nets.on_speaker("marines"))
 
     async def test_what_is_not_a_boarding_stays_with_the_crew(self) -> None:
         self.model.crew = [("speak", {"speaker": "tactical", "text": "Tre missili in arrivo.", "tone": "urgent"})]
@@ -247,11 +276,16 @@ class MarineServerTest(unittest.IsolatedAsyncioTestCase):
         self.model.router_says = {"Grazie": "party"}
         self.model.crew = []
         await self.event(BEATEN)
-        self.assertIn(("reyes", "Il ponte è nostro, Capitano. Due morti, tre feriti."), self.game.lines())
+        await asyncio.sleep(0.3)
+        traffic = [m for m in self.game.sent if m.get("type") == "net_traffic"]
+        self.assertEqual([(t["speaker"], t["aloud"]) for t in traffic], [("reyes", False)])         # the Major's report of the end is the XO's to tell, not a voice on the speaker
+        self.assertNotIn(("reyes", "Il ponte è nostro, Capitano. Due morti, tre feriti."), self.game.lines())
         await self.state(ship_state(fight=False), 0.1)                                  # the fight is over
         await self.game.push(type="player_text", text="Grazie, Maggiore. Ottimo lavoro")
         await asyncio.sleep(0.9)
-        self.assertIn(("reyes", "Grazie, Capitano. Lo dirò ai miei."), self.game.lines())
+        self.assertIn(("reyes", "Grazie, Capitano. Lo dirò ai miei."), self.game.lines())           # his words called the net: the answer is heard
+        reply = next(m for m in self.game.sent if m.get("type") == "line" and m["speaker"] == "reyes")
+        self.assertTrue(reply["answer"])
 
     async def test_a_net_that_cannot_answer_hands_the_words_to_the_xo(self) -> None:
         self.model.marine_error = "provider down"
