@@ -321,23 +321,24 @@ THE INFANTRY ORDERS (the game's simulation measured each one, with the order and
 - The place of take, breach and sweep is the room to be cleared (or a deck's section), never a way into it: the squads work out their doors themselves, each by a door of its own when there are several. The board's
   «ways into» a place are for hold and ambush (the corners where the enemy must pass), not for take.
 - take: the squad stacks beside the room's door with the door held shut (nobody inside sees them), goes in a man every 0.7 s, each to his corner, and holds the room from inside. Six marines against
-  six guards at their posts: the room was taken 21 times in 32 against 10 for a squad that walks in, for 3.2 marines lost against 4.9; against guards waiting at the door 29 in 32 against 16, 0.7
-  lost against 4.1. Squads given one take go in at the same moment by doors of their own (sync): the room cannot cover both. It costs the wait (nine seconds more than each by itself) and wins
-  the room when the guards are many (21 in 32 against 16, in a room with two doors). Only worth it where there is a door to go through.
+  six guards at their posts: the room was taken 68 times in 96 against 26 for a squad that walks in, for 3.1 marines lost against 5.0; against guards waiting at the door 91 in 96 against 51, 0.5
+  lost against 4.0. Squads given one take go in at the same moment by doors of their own (sync): the room cannot cover both. It costs a few seconds of waiting (35 s against 31 for each by itself)
+  and takes the room more often when the guards are many (65 in 96 in a room with two doors, against 47 for each door by itself and 11 for walking in). Only worth it where there is a door to go through.
 - breach: take for a door that is shut. A sealed pressure bulkhead is charged first: nine seconds against the torches' twenty-two, and everyone near hears it, so whoever is behind it is alerted and the
-  nearest are stunned for a moment: the surprise is lost, fourteen seconds are gained (the room taken in 23 s against 37) for the same marines lost. Name the door by its id (the board lists the
+  nearest are stunned for a moment: the surprise is lost, fifteen seconds are gained (the room taken in 23 s against 38) for the same marines lost. Name the door by its id (the board lists the
   objective's doors) or the room beyond it.
 - sweep: the rooms of a place one after the other, a deck's section as «deck 7 section D» or one room: stacked at each door, in together, the room held until nothing has been seen in it for four
-  seconds, reported, the next. Four rooms off a corridor took 80 s against 74 for walking down it, and then 39 times in 48 the squad stood with three or more on their feet against 26, the guards left
-  alive behind it were 0.3 against 1.4, the marines lost 2.0 against 2.9. For when what is behind the doors matters more than the minute.
-- ambush: the corners of a place, the men hidden (seen only from within four and a half metres), the fire held; all at once when the enemy is within eleven metres in sight of half the squad, or
-  when one of them is found or hit; the first volley is a third better and the enemy is startled. Twelve marines at a junction on the boarders' way: against twelve boarders the ambush won 15 times in
-  24 against 6 for the same marines holding with their fire free, for 7.3 marines lost against 9.7; against eight it won as often and ended thirty seconds sooner. It waits three minutes at most;
-  if nobody comes they hold the place with their fire free. It needs the enemy to come by the place (the board's likely approach and default ambush are where he does): an ambush on a room he does not use
-  is a squad out of the fight.
+  seconds, reported, the next. Four rooms off a corridor took 80 s against 71 for walking down it, and then 116 times in 144 the squad stood with three or more on their feet against 87, the guards left
+  alive behind it were 0.3 against 1.4, the marines lost 1.9 against 2.8. For when what is behind the doors matters more than the minute.
+- ambush: the corners of a place, the men hidden (seen only from within four and a half metres), the fire held. It is sprung on the column, not on the first man who walks by: when three of the enemy are
+  within eleven metres of the place in sight of half the squad, or one is on top of it (five metres), or one has stood in the killing ground for three and a half seconds with nobody behind him, or one of
+  the squad is found or hit; the squads of one ambush spring together, the first to open fire is the signal. The first volley is a third better and the enemy is startled. Twelve marines at a junction on the
+  boarders' way: against twelve boarders the ambush won 51 and 56 times in 72 (two samples) against 28 and 31 for the same marines holding with their fire free, for 5.7 marines lost against 8.6; against
+  eight it won 72 times in 72 against 65, losing 0.8 marines against 4.6, and ended in 57 s against 106. It waits three minutes at most; if nobody comes they hold the place with their fire free. It needs the
+  enemy to come by the place (the board's likely approach and default ambush are where he does): an ambush on a room he does not use is a squad out of the fight.
 - escort_captain (only with the Captain in the fight): what he asks for when he wants to be escorted, covered or protected as he moves; follow_captain is for when he only wants them with him. A man ahead of him who looks past every opening, two at his sides, the rest behind; they walk and shoot with him, and when he stands they take
-  the corners round him. On a walk from the hatch to a ship's bridge, where the guns of the ship lay on him before any other man, the Captain was hit 87 times with six marines escorting against 154
-  alone; the squad kept within ten metres of him 83% of the way (one only told to follow him: 64%), and it cost 1.1 of the six on the way. He may still stand in a doorway and be shot; the escort
+  the corners round him. On a walk from the hatch to a ship's bridge, where the guns of the ship lay on him before any other man, the Captain was hit 82 times with six marines escorting against 143
+  alone; the squad kept within ten metres of him 82% of the way (one only told to follow him: 63%), and it cost 0.9 of the six on the way. He may still stand in a doorway and be shot; the escort
   is the best he can have, not a wall.
 - seal_behind (with fall_back, withdraw or advance): the last man of the squad stays four seconds at each pressure bulkhead they go through and shuts it behind them, never on a man in the doorway; the
   boarders' torches cut a shut one in about twenty seconds, a ship's own people override it in ten, his own side opens it again in four. Three bulkheads shut behind a squad put the boarders on it 66
@@ -345,7 +346,7 @@ THE INFANTRY ORDERS (the game's simulation measured each one, with the order and
 - fire (`held`: nobody fires until the squad is found or told), cover (a place the squad covers with its fire while another goes in there: it faces that place's doors), inside (hold the room itself,
   none of the corridors outside its doors) shape what a squad does with the rest.
 - What does not work: spreading a squad thin. A man at every opening of a deck's section was tried and lost twelve marines for one or two of the boarders; twelve marines holding a whole deck's section
-  against sixteen boarders won 3 times in 8, holding Main Engineering itself 8 in 8, and with no order at all 0 in 8 and the twelve dead. When the Captain says «hold the line» he means the place the
+  against sixteen boarders won 13 times in 24, holding Main Engineering itself 24 in 24, and with no order at all 5 in 24 and eleven of the twelve dead. When the Captain says «hold the line» he means the place the
   enemy must come to: hold that place (with `cover` on the way he comes if the squad is to face it), and keep the squads together on the road.
 - The board shows each squad's drill («stacked at the door», «2 rooms cleared, 3 to go», «hidden, fire held, 40 s»): say it as a leader would, never read it out. These orders end by themselves (a sweep
   is done, a room taken is held, an ambush sprung is a hold): the squad reports and holds where it is until it is given another.

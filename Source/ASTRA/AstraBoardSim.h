@@ -122,6 +122,9 @@ namespace AstraBoard
 		float AmbushFirstS = 2.5f;                              // the first volley of a sprung ambush: for this long ...
 		float AmbushFirstHit = 1.3f;                            // ... its rounds are this much better (the men were laid on their targets) and the enemy is startled
 		float AmbushKillCm = 1100.f;                            // the killing ground: an enemy this near the squad's place and in sight of half of it (the full range of a rifle is 4.5 m, a third of the hits at 20)
+		int32 AmbushMinInZone = 3;                              // ... but it waits for the column: this many in the killing ground (the first man is let by) ...
+		float AmbushPointBlankCm = 500.f;                       // ... or one of them within this of the place (he is on top of it) ...
+		float AmbushWaitS = 3.5f;                               // ... or the first has stood in it this long (nobody else comes: it is sprung on him)
 		float AmbushStartleS = 2.2f;                            // the enemy caught in it is startled this long
 		float SealS = 4.f;                                      // the last man at a bulkhead's console: how long it takes to close it (and for his side to open it again)
 		float OverrideS = 10.f;                                 // the ship's own people, at a door the enemy shut behind him: how long they take to override it (the attackers cut it: CutS)
@@ -260,6 +263,8 @@ namespace AstraBoard
 		float SprungAt = -1.f;           // (ambush) when it was sprung
 		float FirstVolleyT = 0.f;        // seconds left of the first volley's advantage
 		bool bSpotted = false;           // (ambush) a man of the squad was seen, shot at or heard
+		bool bSignalled = false;         // (ambush) a squad of the same ambush has sprung it: they all do
+		float ZoneT = 0.f;               // (ambush) how long somebody of the enemy has been in the killing ground
 		int32 SealPortal = INDEX_NONE;   // the pressure door being closed behind the squad
 		int32 SealMan = INDEX_NONE;      // and the man at its console
 		float SealT = 0.f;

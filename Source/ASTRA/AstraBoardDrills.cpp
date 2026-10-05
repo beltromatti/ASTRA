@@ -71,6 +71,8 @@ void FAstraBoardSim::ResetDrill(FSquad& S)
 	S.StackedAt = S.SprungAt = S.SyncGoAt = S.EntryAt = -1.f;
 	S.FirstVolleyT = 0.f;
 	S.bSpotted = false;
+	S.bSignalled = false;
+	S.ZoneT = 0.f;
 	S.SealPortal = S.SealMan = INDEX_NONE;
 	S.SealT = 0.f;
 	S.SealPassed.Reset();
@@ -782,7 +784,9 @@ void FAstraBoardSim::DrillAmbush(FSquad& S, const TArray<int32>& Able)
 	{
 		// the corners of the place (each man a corner of his own, the ones that look the way the enemy comes first), and there hidden
 		HoldAround(S, S.TargetPos, Radius, false);
-		int32 Kill = 0, Seers = 0;
+		TArray<int32, TInlineAllocator<12>> InZone;                    // the enemy in the killing ground that the squad sees now (each once)
+		float Nearest = 1.0e9f;
+		int32 Seers = 0;
 		for (const int32 M : Able)
 		{
 			FUnit& U = People[M];
@@ -798,12 +802,16 @@ void FAstraBoardSim::DrillAmbush(FSquad& S, const TArray<int32>& Able)
 				if (Sn.bVisibleNow && People.IsValidIndex(Sn.Unit) && People[Sn.Unit].Able() && FVector::Dist2D(People[Sn.Unit].Pos, S.TargetPos) < Tuning.AmbushKillCm)
 				{
 					bSees = true;
-					++Kill;
+					InZone.AddUnique(Sn.Unit);
+					Nearest = FMath::Min(Nearest, (float)FVector::Dist2D(People[Sn.Unit].Pos, S.TargetPos));
 				}
 			}
 			Seers += bSees ? 1 : 0;
 		}
-		const bool bSprung = (Kill > 0 && Seers * 2 >= Able.Num()) || S.bSpotted;
+		S.ZoneT = InZone.Num() ? S.ZoneT + 0.5f : 0.f;
+		// it is sprung on the column (not on the first man who walks by), on one who is on top of it, on the first who has stood in the ground with nobody coming, when a man of it is found, or when a squad of the same ambush springs
+		const bool bSeen = Seers * 2 >= Able.Num();
+		const bool bSprung = S.bSpotted || S.bSignalled || (bSeen && (InZone.Num() >= Tuning.AmbushMinInZone || (InZone.Num() >= 1 && (Nearest < Tuning.AmbushPointBlankCm || S.ZoneT >= Tuning.AmbushWaitS))));
 		if (bSprung)
 		{
 			S.bFireHeld = false;
@@ -829,7 +837,14 @@ void FAstraBoardSim::DrillAmbush(FSquad& S, const TArray<int32>& Able)
 					}
 				}
 			}
-			Announce(S, FString::Printf(TEXT("%s has sprung the ambush at %s%s"), *S.Name, S.Where.IsEmpty() ? *Map->Describe(S.TargetComp) : *S.Where, S.bSpotted ? TEXT(" (found: they open fire)") : TEXT("")));
+			for (FSquad& O : Teams)                                       // (the squads of one ambush spring together: the first to open fire is the signal)
+			{
+				if (O.Id != S.Id && O.Side == S.Side && O.Task == ETask::Ambush && O.Drill == EDrill::Spring && FVector::Dist2D(O.TargetPos, S.TargetPos) < 3000.0)
+				{
+					O.bSignalled = true;
+				}
+			}
+			Announce(S, FString::Printf(TEXT("%s has sprung the ambush at %s%s"), *S.Name, S.Where.IsEmpty() ? *Map->Describe(S.TargetComp) : *S.Where, S.bSpotted ? TEXT(" (found: they open fire)") : (S.bSignalled ? TEXT(" (on the signal of the other squad)") : TEXT(""))));
 		}
 		else if (S.DrillT > Tuning.AmbushMaxS)
 		{

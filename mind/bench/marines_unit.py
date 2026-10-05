@@ -445,7 +445,7 @@ class Prompts(unittest.IsolatedAsyncioTestCase):
 
     def test_the_prompt_teaches_the_infantry_orders_with_the_games_numbers(self) -> None:
         s = mm.system_prompt()
-        for needle in ("THE INFANTRY ORDERS", "take:", "breach:", "sweep:", "ambush:", "escort_captain", "seal_behind", "21 times in 32", "15 times in", "87 times", "66", "What does not work: spreading a squad thin"):
+        for needle in ("THE INFANTRY ORDERS", "take:", "breach:", "sweep:", "ambush:", "escort_captain", "seal_behind", "68 times in 96", "51 and 56 times in 72", "82 times", "on the column", "66", "What does not work: spreading a squad thin"):
             self.assertIn(needle, s)
         for task in ("sweep", "breach", "take", "ambush", "escort_captain"):
             self.assertIn(task, mm.TASKS)
