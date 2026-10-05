@@ -37,7 +37,7 @@ abbordaggi contro l'Aquila, chiesto da ABBORDAGGI).
   tace da 4; la dottrina dell'iniziativa per entrambi); lo schermo principale che non cambia risoluzione a ogni sguardo. Uniti i rami finiti
   di ARTE-INTERNI-2, ABBORDAGGI-3 e SPAZIO-VIVO-2 (M7–M9: il Falcon raccoglie le capsule con R, i getti dei velivoli, convogli e pattuglie);
   in corso nell'editor la ricostruzione degli interni e l'importazione del kit dei ponti nemici.
-- **Credito OpenRouter: 3,30 $** (le partite del 5/10 ~1,8 $): segnalato in RICHIESTE.
+- **Credito OpenRouter: 13,27 $** (ricaricato dall'utente il 5/10) (le partite del 5/10 ~1,8 $): segnalato in RICHIESTE.
 - **Che cosa arriva dal Gate** (il lead, `AstraGateWatch.cpp`): il tavolo olografico mostra il Janus Gate e, per una forza annunciata (il transito
   visto da Keeper Station, i rinforzi di Fleet, le flotte della Marcia dirette qui), un anello che pulsa dove uscirà con quante navi e fra quanto;
   lo schermo principale lo mette in testa («GATE · 4 HOSTILE INBOUND · IN 1:32»); un'incursione oscura resta una sorpresa. Provato nel gioco
