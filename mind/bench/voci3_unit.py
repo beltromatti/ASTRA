@@ -470,7 +470,7 @@ class TestThePicturesPace(unittest.TestCase):
                 self.assertLess(b - a, PICTURE_GAP_S + 4.0, "and not much later than the gap")
         run(go())
 
-    def test_after_a_report_that_said_nothing_the_gap_is_short(self) -> None:
+    def test_after_a_report_that_said_nothing_the_gap_is_the_shorter_one(self) -> None:
         from astra_mind.server import REPORT_GAP_S
 
         async def go() -> None:

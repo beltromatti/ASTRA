@@ -153,7 +153,7 @@ ROUTINE_WAIT_S = 25.0          # routine news waits for a quiet bridge this long
 PICTURE_GAP_S = 20.0           # after a report turn that said something, the next one for routine news is this long after it: the picture is given at this pace, not at the
                                # pace of the news (5 October: 86 news items in three minutes of a battle, a report turn for each, ten lines a minute); the news that came meanwhile
                                # is read together, with its age. A warning of danger and a call to the Captain do not wait (`_presses`)
-REPORT_GAP_S = 3.0             # ... and after one that said nothing, this long: the officers are asked a few times a minute, not for every item
+REPORT_GAP_S = 10.0            # ... and after one that said nothing, this long: the officers are asked a few times a minute, not for every item
 URGENT_GAP_S = 6.0             # a warning of danger does not wait behind routine talk, but after one that was said the next waits this long: what comes meanwhile is told together
                                # (a battle's «breach» and «missiles inbound» are every few seconds: a warning turn for each was nine lines out of every seventeen, the same picture again)
 CHANNEL_IDLE_S = 75.0          # a channel with the fleet, an ally or an enemy is open for an exchange: with nothing passed on it for this long Communications closes it (5 October: the
