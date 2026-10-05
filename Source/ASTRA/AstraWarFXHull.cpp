@@ -51,8 +51,9 @@ namespace AstraFx
 
 namespace
 {
-	const FLinearColor FxWhite(1.f, 0.97f, 0.9f);
-	const FLinearColor FxMetal(1.f, 0.7f, 0.32f);
+	// (named apart from AstraWarFXEvents.cpp's: the two files meet in one unity block)
+	const FLinearColor HullFxWhite(1.f, 0.97f, 0.9f);
+	const FLinearColor HullFxMetal(1.f, 0.7f, 0.32f);
 
 	/** The mesh a ship is drawn with (the Aquila's is the level's, not the battle's). */
 	FString FxMeshOf(const FAstraBattleShip& S)
@@ -496,12 +497,12 @@ void UAstraWarFX::GutBurst(const FAstraBattleShip& S, int32 Section)
 	const FVector Pt = HullPoint(S, Section, FMath::FRandRange(0.3f, 0.7f), FMath::FRandRange(-0.5f, 0.5f), FMath::RandBool() ? 1.f : FMath::FRandRange(-0.5f, 0.5f), true);
 	const FVector Out = (Pt - S.Pos).GetSafeNormal();
 	Explosion(Pt + Out * R * 0.03f, S.Vel, FMath::Clamp(R * 0.16f, 14.f, 90.f), bAstra, 1.1f, 0.f);
-	if (FPuff* W = AddPuff(Pt, S.Vel, 0.22f, 0.3f * R * 0.16f, R * 0.22f, FxWhite, ASTRA_FX_TUNE("cut_flash", 520.f) * 0.8f * Bright, LGlow))
+	if (FPuff* W = AddPuff(Pt, S.Vel, 0.22f, 0.3f * R * 0.16f, R * 0.22f, HullFxWhite, ASTRA_FX_TUNE("cut_flash", 520.f) * 0.8f * Bright, LGlow))
 	{
 		W->P1 = 1.f;
 	}
 	Shockwave(Pt, S.Vel, R * 0.7f, 1.0f, FLinearColor(1.f, 0.72f, 0.42f), 0.03f);
-	SparkBurst(Pt, Out, 0.9f, 40, 40.f, 190.f, 0.8f, 2.6f, 14.f, FxMetal, 280.f, S.Vel);
+	SparkBurst(Pt, Out, 0.9f, 40, 40.f, 190.f, 0.8f, 2.6f, 14.f, HullFxMetal, 280.f, S.Vel);
 	const int32 Chunks = FMath::RoundToInt(10.f * FMath::Clamp(Density, 0.2f, 2.f));
 	for (int32 i = 0; i < Chunks; ++i)
 	{
