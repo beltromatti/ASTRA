@@ -1676,7 +1676,11 @@ class March:
             names = tally[s]["names"]
             txt[s] = (f"The battle at {system} is over after {fmt_s(self.t - self.real_t0)}: {res}. We lost {tally[s]['lost']} ships"
                       + (f" ({', '.join(names[:6])}{'...' if len(names) > 6 else ''})" if names else "") + f"; the enemy lost about {tally[o]['lost']}.")
-        weight = 3 if (tally["astra"].get("capital") or tally["mandate"].get("capital") or tally["astra"]["lost"] + tally["mandate"]["lost"] >= 8 or self.value(system) >= 7) else 2
+        # a major battle (it may close a chapter of the story) is one that was fought: many ships lost, or capital ships with others, or a costly fight for a system
+        # that matters; a raid that turns away after a cruiser is lost is not one
+        lost = tally["astra"]["lost"] + tally["mandate"]["lost"]
+        capital = bool(tally["astra"].get("capital") or tally["mandate"].get("capital"))
+        weight = 3 if (lost >= 8 or (capital and lost >= 3) or (self.value(system) >= 7 and lost >= 5)) else 2
         self.say("battle_end", system, txt, SIDES, weight, (), winner=winner, lost={s: tally[s]["lost"] for s in SIDES}, names={s: tally[s]["names"] for s in SIDES})
         self.real_fight = False
         return weight

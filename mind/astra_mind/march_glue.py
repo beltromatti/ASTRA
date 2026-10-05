@@ -168,6 +168,8 @@ class MarchGlue:
         m.aquila_arrived(m.war.current if m.war.current in m.sys else "Aurelia")
         self.reset_real(keep_opening=True, present_only=not new)       # (the game builds the opening's picket whenever it starts: in a saved war too, if the Aquila is at Aurelia)
         self._over_told = bool(m.over)                  # (a war that ended before is not told again)
+        self._arc_t = m.t                               # (a chapter of the story is never closed by the first skirmish of a session: 5 Oct, Solm turned away from the
+                                                        # Gate after four minutes and the arc was told as «the Battle of the Aurelia Gate», won)
         self.active = True
         self._last = None
         self._bul_seen = m.rcv["astra"]
