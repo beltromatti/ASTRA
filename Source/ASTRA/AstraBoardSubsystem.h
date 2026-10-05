@@ -106,6 +106,10 @@ public:
 	TSharedRef<FJsonObject> BoardingOptionsJson(int32 SideIdx) const;
 	/** True while an assault is flying, fighting or coming home (a new order is refused). */
 	bool IsAssaultOn() const { return Assault.bOn; }
+	/** The Captain goes with the marines after the order was given without him (the XO's `board_ship` with action join): he rides in the first Kestrel if it has not left the bay (or is in its mouth), whatever room he is in
+	 *  (the screen goes dark, he is in the troop bay: nobody walks to the bay). Out in flight the first boat takes nobody: the answer says so, with the time to the hull and the way aboard then (the transporter, by its
+	 *  own rules). False, and why, when it cannot be. */
+	bool CaptainJoins(FString& OutDetail);
 	/** The Captain rides in a boat (in its troop bay, flying), or is aboard the other ship, or is coming home: he is not on the Aquila's decks. */
 	bool CaptainAway() const { return Ride != ERide::None; }
 	bool CaptainAboardOther() const { return bCaptainAboard; }
@@ -322,6 +326,10 @@ private:
 		bool bSceneBegun = false;
 		bool bDeparting = false;                     // the fight is over: the boats are told to let go
 		bool bFightSeen = false;                     // a fight was on the scene
+		bool bHeadsUp = false;                       // the half-minute warning (the boats are about to be at the hull) has been given
+		bool bWithdrawing = false;                   // the marines are called out of her decks (call_off): the boats let go when they are aboard
+		float WithdrawT = 0.f;                       // seconds since
+		float PrepS = 0.f;                           // the boats' muster before they leave the bay, as it was told (a recall in that time is asked for)
 		float DoneT = 0.f;
 		FString PlanKey;
 		TFuture<TSharedPtr<FBoardShipPlan>> PlanFuture;   // the target's plan is being read before the boats go
@@ -346,6 +354,8 @@ private:
 		bool bFromWar = false;                       // her people and bulkheads are the war's picture of her inside
 	};
 	FAssault Assault;
+	mutable float MusterCacheS = -1.f;               // the marines' muster as BoatsJson told it (it is worked out every few seconds, not at every state)
+	mutable double MusterCacheAt = -100.0;
 	int32 NextOrder = 1;
 	float AssaultPollT = 0.f;
 	TArray<FString> AssaultNote;                     // what the order said, for the minds (last few lines)
@@ -367,6 +377,11 @@ private:
 	void ReturnMarines(FLeg& L, bool bAlive);
 	void MarkMarinesLost(FLeg& L, const FString& Cause);
 	int32 PickMarines(int32 Total, TArray<TArray<int32>>& OutLegs) const;
+	float MusterTimeS(const TArray<TArray<int32>>& Legs) const;               // how long the marines of the boats (roster indices by boat) need to be aboard them: the way to the bay at a jog, a man asleep wakes first
+	float MusterEstimateS() const;                                           // the same for the marines who would go if the boats were ordered now (worked out every few seconds)
+	bool WithdrawMarines(FString& OutDetail);                                // call_off while the marines are on her decks: they come out by their hatches, the boats let go when they are aboard
+	void TellHeadsUp();                                                      // the half-minute warning of the first boat's cut in
+	float LegEtaS(const FLeg& L) const;                                      // seconds to the way in being cut open (the boat's own clock while it flies)
 	void OpenBreachAt(FLeg& L);
 	FLeg* LegOf(int32 Index);
 	UAstraBattleSubsystem* Battle() const;

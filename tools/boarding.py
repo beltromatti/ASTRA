@@ -112,6 +112,31 @@ CRAFT_SETUPS = {
 }
 
 
+def _at_distance(km: int):
+    """The pair of the `out` and `pd` setups at a battle distance: our carrier at -km/2, the target at +km/2 (positions in km)."""
+    h = km / 2.0
+    ours = f"astra.war.spawn praetorian astra {-h} 0 0 0 id=A1 name=Carrier static hold passive"
+    hulk = f"astra.war.spawn acheron mandate {h} 0 0 90 id=M1 name=Hulk static hold passive"
+    pick = f"astra.war.spawn praetorian astra {h} 0 0 90 id=A1 name=Picket static hold passive"
+    raid = f"astra.war.spawn acheron mandate {-h} 0 0 0 id=M1 name=Raider static hold passive"
+    return ours, hulk, pick, raid
+
+
+# the pace (ABBORDAGGI-4): from a boat leaving its bay to the way in being cut open, and home again, at the distances a battle is fought at (10, 20, 40 and 80 km), with the target's point
+# defence down (a hulk) and up (a Praetorian, shields stripped: the boats cross her four channels), the boats' own clock (the minds are told it) against what the flight does
+for _km in (10, 20, 40, 80):
+    _o, _h, _p, _r = _at_distance(_km)
+    CRAFT_SETUPS[f"d{_km}"] = dict(doc=f"two Kestrels from the Praetorian to a hulk {_km} km away: docked, let go, home (no point defence on her)", seconds=420 + 5 * _km,
+                                   exec=f"astra.war.sandbox;{_o};{_h}",
+                                   at=f"2=astra.board.disable M1|3=astra.board.craft A1 M1 2 port|{150 + 2 * _km}=astra.board.depart 9000", expect=dict(launched=2, docked=2, destroyed=0, recovered=2))
+    CRAFT_SETUPS[f"pd{_km}"] = dict(doc=f"four skiffs from an Acheron at a Praetorian {_km} km away with her shields down and her four point-defence channels working: how many dock", seconds=120 + 6 * _km,
+                                    exec=f"astra.war.sandbox;{_p};{_r}",
+                                    at="2=astra.board.strip A1|3=astra.board.craft M1 A1 4 starboard", expect=dict(launched=4))
+CRAFT_SETUPS["kpd20"] = dict(doc="two Kestrels from the Praetorian at an Acheron 20 km away whose shields are down and whose point defence (two channels) works: how many dock", seconds=240,
+                             exec=f"astra.war.sandbox;{_at_distance(20)[0]};{_at_distance(20)[1]}",
+                             at="2=astra.board.strip M1|3=astra.board.craft A1 M1 2 port", expect=dict(launched=2))
+
+
 def _craft_run(a, name: str, setup: dict) -> dict:
     OUT.mkdir(parents=True, exist_ok=True)
     log = OUT / f"craft_{name}.log"
@@ -169,6 +194,17 @@ def cmd_craft(a: argparse.Namespace) -> int:
                     times.append(float(w[0]) - t0)
         n = max(1, len(r["runs"]))
         print("   " + ", ".join(f"{k} {tot[k]}" for k in ev) + f"  ({n} run{'s' if n > 1 else ''})" + (f"; docked after {min(times):.0f}-{max(times):.0f} s (mean {sum(times) / len(times):.0f})" if times else ""))
+        # the boats' own clock (what the minds are told: AstraBoardCraft::FlightEtaS) against what the first boat of each run did: from leaving the bay to the way in being cut open
+        import re as _re
+        errs = []
+        for lines in r["runs"]:
+            est = next((float(m.group(1)) for l in lines for m in [_re.search(r"the first flies ~(\d+) s", l)] if m), None)
+            t0 = next((float(l.split()[0]) for l in lines if len(l.split()) > 2 and l.split()[1] == "launched" and l.split()[2] in ("Skiff", "Kestrel") and l.split()[3] == "1"), None)
+            t1 = next((float(l.split()[0]) for l in lines if len(l.split()) > 2 and l.split()[1] == "docked" and l.split()[3] == "1"), None)
+            if est is not None and t0 is not None and t1 is not None:
+                errs.append((est - 3.0, t1 - t0))
+        if errs:
+            print(f"   the boats' clock said {sum(e for e, _ in errs) / len(errs):.0f} s from the bay to the cut in, the flight took {sum(g for _, g in errs) / len(errs):.0f} s (worst difference {max(abs(e - g) for e, g in errs):.0f} s over {len(errs)} runs)")
         if a.trace and r["runs"]:
             for l in r["runs"][0]:
                 print("     " + l)
@@ -177,7 +213,7 @@ def cmd_craft(a: argparse.Namespace) -> int:
             ok = tot[k] == want
             print(f"   {'ok  ' if ok else 'FAIL'} {k}: {tot[k]} (expected {want})")
             bad += 0 if ok else 1
-        if name.startswith("pd") or name == "cap":
+        if name.startswith("pd") or name.startswith("kpd") or name == "cap":
             launched = max(1, tot["launched"])
             print(f"   {tot['docked']} of {tot['launched']} skiffs docked ({100.0 * tot['docked'] / launched:.0f}%), {tot['destroyed']} destroyed")
     print("CRAFT VERDICT:", "PASS" if bad == 0 else "FAIL")
@@ -253,6 +289,28 @@ ASSAULT_SETUPS = {
                    at="11000=astra.board.strip M1|11001=astra.board.assault out M1 - 2 port",
                    expect=[r"order \d+: the Aquila launches 2 Kestrels"]),
 }
+# ABBORDAGGI-4: the Captain who decides to go after the order was given (`board_ship join`, the XO's), and the recall with the marines on her decks (they come out by their hatches, the boats let go
+# when they are aboard). The times are the bench's: the plan is read on a worker, so the boats leave a little after the order; a join before they leave is a ride, one after is refused with the way left to him.
+ASSAULT_SETUPS["out_join"] = dict(doc="the Captain says he comes after the order, before the boats leave the bay: he rides in the first Kestrel (a test Captain with no pawn)", seconds=12000,
+                                  exec=f"{_AQ};astra.war.spawn acheron mandate 0 -3 0 90 id=M1 name=Hulk static hold passive;{_NOFATE}",
+                                  at="11000=astra.board.disable M1|11000=astra.board.testcaptain 0 0 0|11001=astra.board.assault out M1 - 2 port|11002=astra.board.join",
+                                  expect=[r"join ok: the Captain goes with the marines: he rides in the first Kestrel", r"the Captain rides with the marines in Kestrel 1", r"the Captain is aboard Hulk with the marines",
+                                          r"Hulk is ours|boarding of Hulk has failed|have broken off|has gone quiet", r"the Captain is back aboard the Aquila"])
+ASSAULT_SETUPS["out_join_late"] = dict(doc="the Captain says he comes when the boats are out of the bay: no boat takes a man in flight, he is told when they are at her hull and that the Chief can beam him then", seconds=11900,
+                                       exec=f"{_AQ};astra.war.spawn acheron mandate 0 -3 0 90 id=M1 name=Hulk static hold passive;{_NOFATE}",
+                                       at="11000=astra.board.disable M1|11000=astra.board.testcaptain 0 0 0|11001=astra.board.assault out M1 - 2 port|11200=astra.board.join|11400=astra.board.join",
+                                       expect=[r"join refused: the Kestrels are already out of the bay.*no boat takes the Captain in flight\. When they are latched at her hatches the Chief can beam him aboard"])
+ASSAULT_SETUPS["out_recall"] = dict(doc="the boarding is called off with the marines on her decks: they come out by their hatches, then the boats let go and fly home with them", seconds=12000,
+                                    exec=f"{_AQ};astra.war.spawn acheron mandate 0 -3 0 90 id=M1 name=Hulk static hold passive;{_NOFATE}",
+                                    at="11000=astra.board.disable M1|11001=astra.board.assault out M1 - 2 port|11215=astra.board.recall the_Captain called_off|11235=astra.board.info",
+                                    expect=[r"ok: the marines are called out of her decks: \d+ squads", r"the marines are called out of her decks: back to the boats by their hatches",
+                                            r"the marines have broken off and are back in their boats|Hulk is ours", r"departed Kestrel 1", r"recovered Kestrel 1", r"is back in the boat bay: \d+ marines aboard"])
+# the pace of the whole operation at the distances a battle is fought at (ABBORDAGGI-4): the order, the muster, the flight, the cut in, the fight, the flight home
+for _km in (10, 20, 40, 80):
+    ASSAULT_SETUPS[f"out_{_km}"] = dict(doc=f"the marines in two Kestrels at a hulk {_km} km away: how long from the order to the cut in, and the boats home", seconds=11900 + 4 * _km,
+                                        exec=f"{_AQ};astra.war.spawn acheron mandate 0 -{_km} 0 90 id=M1 name=Hulk static hold passive;{_NOFATE}",
+                                        at="11000=astra.board.disable M1|11001=astra.board.assault out M1 - 2 port",
+                                        expect=[r"order \d+: the Aquila launches 2 Kestrels", r"docked Kestrel 1", r"has cut in at", r"Hulk is ours|boarding of Hulk has failed|have broken off|has gone quiet", r"recovered Kestrel 1"])
 
 
 def _assault_run(a, name: str, setup: dict) -> dict:
@@ -291,8 +349,19 @@ def cmd_assault(a: argparse.Namespace) -> int:
         for l in keep[-(a.lines):]:
             print("   " + l[:230])
         text = "\n".join(r["lines"])
+        # the pace: the boats' own times against what the order said (the minds are told the same words)
+        re = r["re"]
+        def _t(kind: str, who: str = "1"):
+            m = re.search(rf"\[Boarding\]\s+([\d.]+) {kind} (?:Kestrel|Skiff) {who} ", text)
+            return float(m.group(1)) if m else None
+        t_l, t_d, t_dep, t_rec = _t("launched"), _t("docked"), _t("departed"), _t("recovered")
+        span = r"(\d+ min(?: \d+ s)?|\d+ s)"
+        said = re.search(rf"the boats leave the bay in {span} and the first is at her hull and cutting in {span} from this order", text)
+        if t_l is not None and t_d is not None:
+            print(f"   pace: bay -> way in cut open {t_d - t_l:.0f} s" + (f"; home {t_rec - t_dep:.0f} s after letting go" if t_dep is not None and t_rec is not None else "")
+                  + (f"; the order said: leave in {said.group(1)}, cut in {said.group(2)} from the order" if said else ""))
         for rx in setup["expect"]:
-            ok = bool(r["re"].search(rx, text))
+            ok = bool(re.search(rx, text))
             print(f"   {'ok  ' if ok else 'FAIL'} /{rx}/")
             bad += 0 if ok else 1
     print("ASSAULT VERDICT:", "PASS" if bad == 0 else "FAIL")

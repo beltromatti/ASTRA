@@ -847,7 +847,8 @@ class Mind:
                 asyncio.create_task(self.director.battle_pulse(self.lang, self._battle_state()))
                 continue
             gate = str(st.get("janus_gate", ""))
-            if hostile or st.get("alert") == "red" or quiet < 420 or "under way" in gate or "lane" in gate:
+            # (two and a half minutes of nothing is long in a war played for its fighting: the director is asked, and decides what the war does about it)
+            if hostile or st.get("alert") == "red" or quiet < self.director.STALL_S or "under way" in gate or "lane" in gate:
                 continue
             why = "the Captain has not acted on Fleet's transit orders" if "Fleet orders" in gate else "nothing has happened"
             log.info("story stalled for %.0f s: %s", quiet, why)

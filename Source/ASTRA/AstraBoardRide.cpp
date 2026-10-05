@@ -53,9 +53,9 @@ FString UAstraBoardSubsystem::CaptainWhereText() const
 	{
 	case ERide::Out:
 	{
-		const int32 Eta = FMath::Max(0, FMath::RoundToInt(Assault.EtaS - (Assault.T - Assault.LaunchT)));
-		return FString::Printf(TEXT("away from the ship with the marines, in the troop bay of %s, flying to %s (the hull in about %d s); the XO has the conn of the Aquila and the Captain speaks to the bridge over his comm"),
-		                       *Boat, *Assault.TargetName, Eta);
+		const float Eta = L ? LegEtaS(*L) : FMath::Max(0.f, Assault.EtaS - (Assault.T - Assault.LaunchT));
+		return FString::Printf(TEXT("away from the ship with the marines, in the troop bay of %s, flying to %s (the hull in %s); the XO has the conn of the Aquila and the Captain speaks to the bridge over his comm"),
+		                       *Boat, *Assault.TargetName, *AstraBoardCraft::SpanText(Eta));
 	}
 	case ERide::Aboard:
 	{
@@ -285,6 +285,61 @@ void UAstraBoardSubsystem::RideBegin(FLeg& L)
 	Tell(FString::Printf(TEXT("the Captain rides with the marines in %s"), L.CraftName.IsEmpty() ? TEXT("the first Kestrel") : *L.CraftName), false);
 }
 
+bool UAstraBoardSubsystem::CaptainJoins(FString& OutDetail)
+{
+	if (!Assault.bOn || !Assault.bRoster || Assault.bObserved)
+	{
+		OutDetail = TEXT("no boarding by the marines is under way: there is nothing to join (the boarding is ordered first; or the order says that the Captain goes with them)");
+		return false;
+	}
+	if (Assault.bCaptain || Ride != ERide::None || bCaptainAboard)
+	{
+		OutDetail = TEXT("the Captain is already with the marines");
+		return false;
+	}
+	if (!CaptainOnFoot())
+	{
+		OutDetail = TEXT("the Captain is not on foot aboard (in a Falcon, a pod, or planetside): he cannot go with the marines");
+		return false;
+	}
+	UAstraBattleSubsystem* B = Battle();
+	if (!Assault.bLaunched)
+	{
+		Assault.bCaptain = true;                             // (the boats are not away yet: LaunchAssault asks the battle for him in the first of them)
+		Assault.Spec.bCaptain = true;
+		OutDetail = TEXT("the Captain goes with the marines: he rides in the first Kestrel, wherever he is now (the screen goes dark and he is in its troop bay as it leaves; nobody walks to the bay), fights on her decks with the marines and comes home in the boat");
+		return true;
+	}
+	const int32 Placed = B ? B->SetBoardingCaptain(Assault.Order, true) : 0;
+	if (Placed == 0)
+	{
+		// the first boat is out: no boat takes a man in flight; the facts of what is left to him
+		double Soonest = -1.0;
+		if (B)
+		{
+			for (const FLeg& L : Assault.Legs)
+			{
+				AstraBoardCraft::FBoatStatus St;
+				if (L.State == FLeg::EState::Flying && L.CraftId >= 0 && B->BoatStatus(L.CraftId, St) && !St.bHome && St.EtaS > 0.5 && (Soonest < 0.0 || St.EtaS < Soonest))
+				{
+					Soonest = St.EtaS;
+				}
+			}
+		}
+		OutDetail = FString::Printf(TEXT("the Kestrels are already out of the bay%s: no boat takes the Captain in flight. When they are latched at her hatches the Chief can beam him aboard beside the marines (the transporter's own rules apply: our shield, jamming, a room the marines hold), or the boarding goes on without him"),
+		                            Soonest > 0.0 ? *FString::Printf(TEXT(", the first cuts in in %s"), *AstraBoardCraft::SpanText(Soonest)) : TEXT(""));
+		return false;
+	}
+	Assault.bCaptain = true;
+	Assault.Spec.bCaptain = true;
+	if (Placed == 2 && Assault.Legs.IsValidIndex(0))
+	{
+		RideBegin(Assault.Legs[0]);                          // the first boat is in the bay's mouth: he is in it now
+	}
+	OutDetail = TEXT("the Captain goes with the marines: he rides in the first Kestrel (the screen goes dark and he is in its troop bay), fights on her decks with the marines and comes home in the boat");
+	return true;
+}
+
 void UAstraBoardSubsystem::RideArrive(FLeg& L)
 {
 	if (Ride != ERide::Out || RideLeg != L.Index)
@@ -399,7 +454,7 @@ void UAstraBoardSubsystem::TickRide(float Dt)
 			if (RidePromptT <= 0.f && Leg)
 			{
 				RidePromptT = 1.f;
-				const float Eta = FMath::Max(0.f, Assault.EtaS - (Assault.T - Assault.LaunchT));
+				const float Eta = LegEtaS(*Leg);
 				CaptainPrompt(FString::Printf(TEXT("%s  ·  %d MARINES  ·  %s"), *Leg->CraftName.ToUpper(), Leg->Men, Eta > 1.f ? *FString::Printf(TEXT("THE HULL IN %d:%02d"), (int32)Eta / 60, (int32)Eta % 60) : TEXT("CLOSING ON THE HATCH")), 1.4f);
 			}
 		}

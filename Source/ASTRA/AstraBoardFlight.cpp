@@ -18,7 +18,8 @@ namespace
 {
 	constexpr double BfHullMarginM = 70.0;        // how far off a hull it stays when it is not going to it
 	constexpr float BfHoldGiveUpS = 18.f;         // how long it waits off a shield before it turns back
-	constexpr float BfTransitLimitS = 300.f;
+	constexpr float BfTransitSlackS = 60.f;       // a crossing may take 2.5 times what it should and this long over: a boat that makes no headway is turned back, never one that is on its way
+	constexpr float BfTransitFactor = 2.5f;
 	constexpr float BfApproachLimitS = 110.f;
 
 	/** The signed distance from a point of the target's frame to its hull (a box of the class's measures, a sphere without one): negative inside. */
@@ -120,7 +121,7 @@ void UAstraBattleSubsystem::TickBoardingCraft(FAstraBattleShip& S, float Dt)
 	{
 		Cr = nullptr;
 	}
-	const auto SetPhase = [&B](EPhase P) { B.Phase = P; B.T = 0.f; };
+	const auto SetPhase = [&B](EPhase P) { B.Phase = P; B.T = 0.f; B.TransitLimitS = 0.f; };
 	const auto Steer = [&](const FVector& WantVel, const FVector& Facing, const FVector& UpHint, float MaxAccel, float TurnDeg)
 	{
 		const FVector DV = (WantVel - S.Vel).GetClampedToMaxSize(MaxAccel * Dt);
@@ -255,7 +256,7 @@ void UAstraBattleSubsystem::TickBoardingCraft(FAstraBattleShip& S, float Dt)
 		const FVector Base = Cr ? Cr->Vel : FVector::ZeroVector;
 		const double Out = Cr ? FVector::DotProduct(S.Pos - (Cr->Pos + Cr->Att.RotateVector(B.Bay)), NW) : 100.0;
 		Steer(Base + NW * 75.0, NW, Cr ? Cr->Att.GetUpVector() : FVector::UpVector, K->Accel, 70.f);
-		if (B.T > 7.f || Out > 130.0)
+		if (B.T > (float)LeaveS + 1.f || Out > 130.0)
 		{
 			SetPhase(EPhase::Transit);
 		}
@@ -274,11 +275,15 @@ void UAstraBattleSubsystem::TickBoardingCraft(FAstraBattleShip& S, float Dt)
 		Want = BfWall(*Anchor, S.Pos, Want, K->Cruise, B.Side);
 		Steer(Want, FVector::ZeroVector, Anchor->Att.GetUpVector(), K->Accel, 70.f);
 		B.DockWorldPrev = FVector::ZeroVector;
+		if (B.TransitLimitS <= 0.f)
+		{
+			B.TransitLimitS = BfTransitSlackS + BfTransitFactor * (float)CrossS(*K, Dist);          // (it was 300 s for every crossing: a flight home of 47 km at 180 m/s took longer, and two Kestrels were lost with their 24 marines)
+		}
 		if (Dist < 70.0)
 		{
 			SetPhase(EPhase::Approach);
 		}
-		else if (B.T > BfTransitLimitS)
+		else if (B.T > B.TransitLimitS)
 		{
 			if (!bHome)
 			{

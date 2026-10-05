@@ -16,6 +16,7 @@
 #include "Engine/Font.h"
 #include "AstraArmory.h"
 #include "AstraCampaign.h"
+#include "AstraCommandWheel.h"
 #include "AstraFighterPawn.h"
 #include "AstraHangar.h"
 #include "AstraLadderSubsystem.h"
@@ -83,7 +84,7 @@ void AASTRAPlayerController::BeginPlay()
 		{
 			if (!HintWidget.IsValid())
 			{
-				ShowNotice(TEXT("F1  controls  ·  W or E  stand up  ·  hold V  talk to the crew  ·  T  type  ·  Tab  datapad"), 45.f);
+				ShowNotice(TEXT("F1  controls  ·  W or E  stand up  ·  hold V  talk to the crew  ·  T  type  ·  hold G  orders  ·  Tab  datapad"), 45.f);
 			}
 		});
 	}
@@ -130,6 +131,23 @@ void AASTRAPlayerController::SetupInputComponent()
 		InputComponent->BindKey(EKeys::F1, IE_Pressed, this, &AASTRAPlayerController::ToggleHelp);
 		InputComponent->BindKey(EKeys::T, IE_Pressed, this, &AASTRAPlayerController::OnTypePressed);
 		InputComponent->BindKey(EKeys::Tab, IE_Pressed, this, &AASTRAPlayerController::TogglePad);
+		// the command wheel: G held; while it is open a number picks an order
+		InputComponent->BindKey(EKeys::G, IE_Pressed, this, &AASTRAPlayerController::OnOrdersPressed);
+		InputComponent->BindKey(EKeys::G, IE_Released, this, &AASTRAPlayerController::OnOrdersReleased);
+		const FKey Numbers[] = {EKeys::One, EKeys::Two, EKeys::Three, EKeys::Four, EKeys::Five, EKeys::Six, EKeys::Seven, EKeys::Eight};
+		for (int32 n = 0; n < 8; ++n)
+		{
+			FInputKeyBinding B(FInputChord(Numbers[n]), IE_Pressed);
+			B.bConsumeInput = false;                     // (the lift's list takes the numbers too, when it is open)
+			B.KeyDelegate.GetDelegateForManualSet().BindLambda([this, n]()
+			{
+				if (Orders.IsValid() && Orders->IsOpen())
+				{
+					Orders->Pick(this, n);
+				}
+			});
+			InputComponent->KeyBindings.Add(B);
+		}
 		// the datapad's pages: the mouse wheel while it is raised
 		auto Wheel = [this](const FKey& K, int32 Dir)
 		{
@@ -579,6 +597,8 @@ namespace
 		TEXT("ON THE BRIDGE\n")
 		TEXT("  V (hold)        talk to the crew, in any language\n")
 		TEXT("  T               type to the crew instead (Enter sends, Esc cancels)\n")
+		TEXT("  G (hold)        the orders wheel: point and let go, or a number — weapons free / hold fire, engage what you\n")
+		TEXT("                  are looking at, a missile salvo, the fighters on it or home, shields, red alert, the main screen\n")
 		TEXT("  Tab             the datapad: the ship at a glance, anywhere aboard\n")
 		TEXT("  E               stand up / sit down · doors · the lift · use\n")
 		TEXT("  W (seated)      stand up and walk\n")
@@ -876,6 +896,10 @@ void AASTRAPlayerController::PlayerTick(float DeltaTime)
 			WindowHud = MakeShared<FAstraWindowHud>();
 		}
 		WindowHud->Tick(this, DeltaTime);
+		if (Orders.IsValid())
+		{
+			Orders->Tick(this, DeltaTime);
+		}
 		if (const UAstraLiftSubsystem* Lifts = GetWorld() ? GetWorld()->GetSubsystem<UAstraLiftSubsystem>() : nullptr)
 		{
 			const bool bList = Lifts->IsMenuOpen();
@@ -1074,8 +1098,33 @@ void AASTRAPlayerController::ShowHelp(bool bShow)
 	}
 }
 
+void AASTRAPlayerController::OnOrdersPressed()
+{
+	if (!Orders.IsValid())
+	{
+		Orders = MakeShared<FAstraCommandWheel>();
+	}
+	if (!bPadUp)
+	{
+		Orders->Open(this);
+	}
+}
+
+void AASTRAPlayerController::OnOrdersReleased()
+{
+	if (Orders.IsValid())
+	{
+		Orders->Close(this, true);
+	}
+}
+
 void AASTRAPlayerController::OpenMenu()
 {
+	if (Orders.IsValid() && Orders->IsOpen())
+	{
+		Orders->Close(this, false);                     // Esc: no order (the pause menu is for when the wheel is closed)
+		return;
+	}
 	if (UAstraLiftSubsystem* Lifts = GetWorld() ? GetWorld()->GetSubsystem<UAstraLiftSubsystem>() : nullptr)
 	{
 		if (Lifts->IsMenuOpen())

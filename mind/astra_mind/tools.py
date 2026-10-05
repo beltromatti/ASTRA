@@ -188,9 +188,11 @@ BOARD_SHIP = _fn("board_ship", "The XO (or any officer the Captain asks): board 
                                "shuttle bay on Deck 8): the boats leave the bay, cross to the target and dock at a hatch on her hull, and the marines cut in and fight their way to the objective. The "
                                "boats are shot at by the target's point defence and her fighters on the way in, and cannot dock through a shield that holds on the face they come to (they wait off the "
                                "hull and turn back): `boarding_options` in the ship state lists the ships a boat could dock at now and what each has to stop them. The result says what was launched, "
-                               "from where, at which hatches and how long it takes, and the facts that make it risky, or why not: say that, never a promise of your own. Only on the Captain's order. "
-                               "`call_off` turns the boats back and tells the marines to come out.", {
-    "action": {"type": "string", "enum": ["launch", "call_off"], "description": "launch (the default) or call_off"},
+                               "from where, at which hatches and how long it takes (in minutes and seconds, as one says it: use those words, never convert seconds yourself), and the facts that make it risky, "
+                               "or why not: say that, never a promise of your own. Only on the Captain's order. `call_off` turns the boats back, or, with the marines already aboard her, orders them out by their hatches "
+                               "(the boats let go when they are in them). `join`: the Captain, who gave the order without saying he goes, now says he goes with the marines: he rides in the first Kestrel if it has not left "
+                               "the bay yet (the result says how long he has, or that it is too late and what is left to him).", {
+    "action": {"type": "string", "enum": ["launch", "call_off", "join"], "description": "launch (the default), call_off, or join (the Captain goes with the marines)"},
     "target": {"type": "string", "description": "launch: the ship to board: her contact id (T-30) or name from the plot"},
     "boats": {"type": "integer", "minimum": 1, "maximum": 2, "description": "how many Kestrels (twelve marines each); leave out for both"},
     "face": {"type": "string", "enum": BOARD_FACES, "description": "the side of the target the boats dock on; leave out for the side nearest the Aquila"},

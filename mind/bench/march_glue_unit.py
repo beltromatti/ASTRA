@@ -429,10 +429,10 @@ class MarchOpeningTest(Fixture):
         # the Gate's warning came to ASTRA well before the ships did, with the minutes they need to reach her
         wake = next(e for e in self.m.events if e.kind == "wake" and e.system == "Aurelia")
         arrival = sent_at + beat["delay_s"]
-        self.assertGreaterEqual(wake.t, 150.0)
+        self.assertGreaterEqual(wake.t, 90.0)                                                # (the order is given at 90 s: MARCH_OPENING)
         self.assertGreater(arrival - wake.t, 60.0)
         self.assertIn("they need about 4 min 04 s after it to reach her", wake.text["astra"])
-        self.assertTrue(200.0 < arrival < 330.0, arrival)                                 # (the first strike comes in the first minutes, but not at the first)
+        self.assertTrue(140.0 < arrival < 330.0, arrival)                                 # (the first strike comes in the first minutes, but not at the first)
         # the ships are the fleet's own, led by the people of the game's own opening
         names = sorted(sp["name"] for g in beat["groups"] for sp in g["ships"])
         self.assertEqual(names, ["Acheron", "Cocytus", "Phlegethon", "Styx"])

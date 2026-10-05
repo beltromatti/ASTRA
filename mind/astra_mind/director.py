@@ -57,6 +57,7 @@ IN_BATTLE_BEATS = ("reinforcements", "raid", "negotiation", "none")
 BATTLE_PULSE_FIRST_S = 150.0          # a fight this old is looked in on once...
 BATTLE_PULSE_EVERY_S = 240.0          # ...and then every so often while it lasts
 CALM_AFTER_S = 180.0                  # this much peace ends a run of engagements (the Captain has had a breath)
+STALL_S = 150.0                       # no fight, no transit, no beat for this long: the director is asked what the war does about it (it was 420 s: seven minutes of nothing, 5 Oct)
 
 
 def _fn(name, desc, props, required):
@@ -234,9 +235,12 @@ How the war runs
   Senate wants Aurelia held; the Hall of the Ferried wants a result): a high command that has stalled is moved by it, one that rushes is held. `war_news`: colour for what the
   war has really done. `start_beat`: `calm` (a breath for the Captain), `investigate` (a place to search where the Aquila is: no ambush), `negotiation` (a Mandate commander on the
   plot calls the Aquila to talk), or `none`.
-- Rhythm from the Captain: one who has been pushed hard (long under pressure, hull low, ships or people lost, magazines thin) gets room to breathe: you give it by what the world
-  could really do (a government holding its Archon back, a lull, news, a human moment), never by a gift of ships or a rescue; a rested Captain with a sound ship is not protected.
-  Do not leave the war quiet for long without a reason: a quiet that lasts is a question the next move answers. Alternate; never two calms in a row.
+- The pace: this war is played for its fighting, and the Captain came for it. The breath after a fight is a minute or two (the dead counted, the hull patched, the debrief), not
+  ten; a Captain pushed very hard (hull low, ships or people lost, magazines empty) may have a few minutes more, given by what the world could really do (a government holding its
+  Archon back, a lull, news, a human moment), never by a gift of ships or a rescue; a rested Captain with a sound ship is not protected. A quiet that has already lasted (the story
+  stalled) is never answered with `calm`: it is a question the war's next move answers — `pressure` on the high command that can act soonest, a `reveal` that gives a blind side
+  its target, a Mandate commander who calls, news that leads somewhere — so that the next contact is minutes away, not a quarter of an hour. `investigate` only for a place that
+  leads into the war (a clue, a survivor, a fleet's trace), never as filler. Alternate; never two calms in a row.
 - Balance by the war's logic, never by numbers: both sides are played by minds that read their own pictures; the Mandate learns how this Captain fights (below) and may use it.
 - NEVER rig a fight in progress. In one, you may only `reveal`, `pressure` or let a commander call to talk (`negotiation`), at most once or twice, never as a rescue.
 
@@ -295,9 +299,9 @@ How you decide
   its outcome closes a chapter of the war and the war goes on.
 - Rhythm from the Captain: a rested Captain with a sound ship gets harder problems and a cleverer enemy; one who has been pushed hard (long under
   pressure, hull low, ships or people lost, magazines thin) gets room to breathe — a calm, a resupply, news, a human moment — before the next blow.
-  Alternate. Do not escalate at every beat and do not leave the Captain idle for long: a war that goes quiet has a reason, and a quiet that lasts
-  becomes a question the next beat answers. A Captain who has had several quiet minutes and a sound ship gets the next problem now (a raid, a call,
-  news that bites, a place to search); never two calm beats in a row.
+  Alternate. Do not escalate at every beat and do not leave the Captain idle for long: the war is played for its fighting, the breath after a fight is
+  a minute or two, and a quiet that has already lasted (the story stalled) is answered with the next problem now (a raid, a call, news that bites, a
+  place to search that leads into the war), never with a calm; never two calm beats in a row.
 - Balance by the war's logic, never by numbers: if the Captain is crushing the Mandate, the Mandate answers like an army (a second wave through the gate,
   another approach, a trap built on what it learned of the Captain, a commander who calls to talk); if the Captain is losing, the 7th Fleet answers like
   a fleet (reinforcements, a tender, orders), and the enemy may press or pause. BOTH sides reinforce: a raid is the Mandate's way, `reinforcements` the
@@ -410,6 +414,8 @@ GRANT = _fn("grant", "Send help to the Aquila (the simulation makes it happen)."
 
 
 class Director:
+    STALL_S = STALL_S                     # (the server's story watch reads it here)
+
     def __init__(self, llm: OpenRouter, say: Callable[[str, str, str, str], Awaitable[None]],
                  command: Callable[[str, dict[str, Any]], Awaitable[dict[str, Any]]],
                  register: Callable[[str, dict[str, Any]], None],
