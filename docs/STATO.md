@@ -65,7 +65,7 @@ abbordaggi contro l'Aquila, chiesto da ABBORDAGGI).
 
   Nel gioco:
   - **duello con uno Styx**: distrutto in 64 s dal primo ordine (missili + rotaie da 49 km), Aquila intatta;
-  - **contro il gruppo d'attacco di 4 navi**: dopo ~5 min la sezione di PRUA dell'Aquila è sventrata (91 locali, 14 morti, la plancia è lì) e poi la vista dalla plancia mostra l'esterno. Da capire (riproduzione in corso) e da bilanciare: il timone che tiene la prua offre sempre la stessa faccia (richiesta a BATTAGLIA-3).
+  - **contro il gruppo d'attacco di 4 navi**: dopo ~5 min la sezione di PRUA dell'Aquila è sventrata (91 locali, 14 morti). Da bilanciare: il timone che tiene la prua offre sempre la stessa faccia (richiesta a BATTAGLIA-3).
 
   Il lead ha già adeguato a main:
   - le menti: dottrina con la fisica nuova, fascia dell'Aquila 18-30 km;
@@ -73,6 +73,18 @@ abbordaggi contro l'Aquila, chiesto da ABBORDAGGI).
   - lo schermo principale (GetPlayerFireState);
   - la ruota: ENGAGE alla distanza dell'Aquila, 24 km, e intercept a 16 km per chi fugge.
 - **I tre aiutanti erano fermi per il limite d'uso** (5/10 mattina): ripresi da dove erano.
+- **VOCI-3 chiuso** (c272ddf). Il modulo:
+  - reti con ascoltatori e una voce per il quadro con il suo ritmo;
+  - risposte al Capitano mai perse;
+  - delegazione che resta, canali che si chiudono da soli;
+  - ventaglio della flotta (si sveglia solo chi è chiamato);
+  - 14 capitani alleati;
+  - alias dei nomi storpiati dal riconoscitore.
+
+  Banco S3: 8,0 → 4,0 battute al minuto, risposte invariate. Costanti da tarare nella partita vera: PICTURE_GAP_S 20, REPORT_GAP_S 10 (server.py), se l'XO dice troppo poco. Aperto: gli hotword dentro il motore di Parakeet (Swift, FluidAudio).
+- **VFX-2 avviato** (al posto di VOCI-3): fuoco leggibile a ogni distanza, esplosioni con forma senza accecare la plancia, sezioni che si spezzano. Può usare il gioco di prova nel suo worktree, sulla porta 8771.
+- **Il banco di prova non disturba più chi usa il Mac.** Il gioco parte dietro (niente splash) e, se prende il fuoco, lo restituisce. Ignora tastiera e mouse del Mac (-astra_harness_input per giocarlo a mano). Il 5/10 i tasti dell'utente avevano portato il Capitano fuori dalla plancia: la «plancia sparita» era questo, non un difetto.
+- **Regia sui momenti forti**: lo schermo principale taglia su uno scudo che cade, un sistema fuori uso, una sezione sventrata («BOW SHIELD DOWN · ACHERON»).
 - **Lo schermo principale racconta lo scontro a tagli** (il lead): il bersaglio, poi «ASN AQUILA · FIRING ON …» (l'Aquila da fuori che spara,
   `astra.viewscreen.broadside`), poi il bersaglio. Provato nel gioco. Brief pronti: **VFX-2**, **PRESTAZIONI-GPU** (oltre ad ARTE-SCAFI).
 - **Da indagare (PRESTAZIONI-GPU)**: nel gioco di prova (1600x900, 60 fps di obiettivo) la risoluzione dinamica sta al minimo (33–34 %) e
