@@ -433,7 +433,7 @@ void AASTRAPlayerController::SetSeated(bool bSit)
 		{
 			// the first time on foot: the keys for walking (the card at the start spoke of the chair)
 			bWalkHintShown = true;
-			ShowNotice(TEXT("WASD  walk  ·  Shift  run  ·  C  crouch (hold: lie down)  ·  Space  jump  ·  E  doors, lifts, use  ·  F1  all the controls"), 25.f);
+			ShowNotice(TEXT("WASD  walk  ·  Shift  run  ·  C  crouch (hold: lie down)  ·  Z X  lean  ·  Space  jump  ·  E  doors, lifts, use  ·  F1  all the controls"), 25.f);
 		}
 	}
 	bSeated = bSit;
@@ -607,6 +607,8 @@ namespace
 		TEXT("ON FOOT\n")
 		TEXT("  WASD, mouse     walk and look          Shift (hold)   run\n")
 		TEXT("  Space           jump (low down: stand)  C              crouch · hold C: lie down\n")
+		TEXT("  Z, X (hold)     lean out to the left / right: the eyes and the weapon come out from behind a corner, the body stays covered\n")
+		TEXT("                  (gamepad: the shoulders)\n")
 		TEXT("  Esc             pause · save · menu\n")
 		TEXT("\n")
 		TEXT("THE LIFTS (a panel beside each door; the car's own screen inside)\n")
@@ -622,6 +624,7 @@ namespace
 		TEXT("  R               reload              1 / 2    rifle / sidearm        Q   the last weapon\n")
 		TEXT("  H               holster             wheel    change weapon          the weapon is lowered when you run\n")
 		TEXT("  C, hold C       crouch / lie down: the cone of your rounds closes, you are a smaller target\n")
+		TEXT("  amber arc       somebody has you in sight (the red arcs are rounds that hit you): get low (C) or get behind cover\n")
 		TEXT("  gamepad         right trigger fire · left trigger sights · X reload · Y last weapon · D-pad down holster\n")
 		TEXT("\n")
 		TEXT("ON THE FLIGHT DECK\n")
