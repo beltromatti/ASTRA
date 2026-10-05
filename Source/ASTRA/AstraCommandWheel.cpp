@@ -17,6 +17,8 @@
 #include "Framework/Application/SlateApplication.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/PlayerController.h"
+#include "Kismet/GameplayStatics.h"
+#include "Sound/SoundBase.h"
 #include "Rendering/DrawElements.h"
 #include "Styling/CoreStyle.h"
 #include "Widgets/SLeafWidget.h"
@@ -430,7 +432,7 @@ void FAstraCommandWheel::Tick(APlayerController* PC, float DeltaTime)
 	}
 	float DX = 0.f, DY = 0.f;
 	PC->GetInputMouseDelta(DX, DY);
-	Pointer += FVector2D(DX, -DY) * 9.f;
+	Pointer += FVector2D(DX, -DY) * 1.6f;               // (raw mouse counts: a short flick of the wrist lights a button, the ring is never far)
 	if (Pointer.Size() > PointerMax)
 	{
 		Pointer = Pointer.GetSafeNormal() * PointerMax;
@@ -463,6 +465,10 @@ void FAstraCommandWheel::Execute(APlayerController* PC, int32 Index)
 	FString Detail;
 	const bool bOk = I.Run && I.Run(Detail);
 	UE_LOG(LogASTRA, Log, TEXT("[Orders] the Captain, from the command wheel: %s -> %s (%s)"), *I.Label, bOk ? TEXT("done") : TEXT("refused"), *Detail);
+	if (USoundBase* Click = LoadObject<USoundBase>(nullptr, bOk ? TEXT("/Game/ASTRA/Audio/SW_Pad_Up.SW_Pad_Up") : TEXT("/Game/ASTRA/Audio/SW_Lock_Beep.SW_Lock_Beep")))
+	{
+		UGameplayStatics::PlaySound2D(PC, Click, 0.55f);
+	}
 	if (AASTRAPlayerController* APC = Cast<AASTRAPlayerController>(PC))
 	{
 		APC->ShowNotice(bOk ? FString::Printf(TEXT("ORDER  ·  %s"), *I.Label) : FString::Printf(TEXT("%s  ·  %s"), *I.Label, *Detail.Left(90).ToUpper()), bOk ? 2.5f : 5.f);
