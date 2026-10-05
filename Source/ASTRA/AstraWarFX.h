@@ -135,6 +135,7 @@ namespace AstraFx
 		FVector A = FVector::ZeroVector, B = FVector::ZeroVector;     // system frame (used where no ship holds an end)
 		int32 FromId = -1, ToId = -1;
 		FVector FromLoc = FVector::ZeroVector, ToLoc = FVector::ZeroVector;   // ship-frame offsets (m)
+		FVector RawToLoc = FVector::ZeroVector;                              // where the simulation ended it (the face of the target's box): what a shield's hit is matched with
 		float Age = 0.f, Life = 0.3f, Width = 3.f;
 		FLinearColor Col = FLinearColor::White;
 		float Inten = 300.f;
