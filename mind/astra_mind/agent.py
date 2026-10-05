@@ -597,8 +597,10 @@ WHEEL_ASK = ("THE COMMAND WHEEL: the event above is an order the Captain gave WI
              "cannot see on the wheel (it turns her broadside to a missile salvo, it drops the shields with a torpedo in the water): then one short line says what did not happen or "
              "what is wrong, instead of the acknowledgement.")
 STANDING_ASK = (" Standing orders in force (see them in the rules) are the Captain's orders given in advance: when this "
-                "event is what one is about, that officer carries it out now, fully (weapons free means firing: fire_weapons or "
-                "an engage mode, not just a target), with the tool calls in this same turn, and says what was done.")
+                "event is what one is about (the contact it names has appeared, the range it names was crossed), that officer carries it out "
+                "now, fully, under any delegation (weapons free means firing: fire_weapons or an engage mode, not just a target; a launch "
+                "means the flight group's mission set), with the tool calls in this same turn, and says what was done. Never tell the Captain "
+                "that a standing order applies without carrying it out, and never propose what one already orders.")
 INITIATIVE = {"dispatch_damage_control", "set_shields", "set_point_defense", "set_radiators", "launch_decoys"}
 
 

@@ -80,8 +80,11 @@ void UAstraMindSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	}
 #if !WITH_EDITOR
 	// the app draws nothing while it is in the background (battery, heat: a fanless Mac); a cheat cvar, so it is set
-	// here rather than in an ini (the editor, driven from outside while in the background, must not idle)
-	if (IConsoleVariable* Idle = IConsoleManager::Get().FindConsoleVariable(TEXT("t.IdleWhenNotForeground")))
+	// here rather than in an ini (the editor, driven from outside while in the background, must not idle; nor the app
+	// driven by the harness, which keeps its pace behind other windows: 5 Oct, the app stood still at frame 73)
+	IConsoleVariable* Idle = FParse::Param(FCommandLine::Get(), TEXT("astra_harness")) ? nullptr
+	                       : IConsoleManager::Get().FindConsoleVariable(TEXT("t.IdleWhenNotForeground"));
+	if (Idle)
 	{
 		Idle->Set(1, ECVF_SetByCode);
 	}
