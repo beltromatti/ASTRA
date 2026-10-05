@@ -179,6 +179,8 @@ public:
 	float LastHurtAmount() const { return CapHurtAmount; }
 	/** The nearest able enemy that sees the Captain, distance (cm), or a negative number. */
 	float NearestThreatCm() const { return ThreatCm; }
+	/** What the minds read of the Captain's body in the fight (ship_state.boarding.captain and the marines' picture): how he stands (standing, crouched, lying), whether he leans, how many of the boarders have him in sight. */
+	void AddCaptainBody(FJsonObject& O) const;
 
 	// ------------------------------------------------------------------------------------------------ the minds
 	/** The commands of the game's one entrance (UAstraShipSubsystem::ApplyCommand forwards "boarding", "marine_order" and "lockdown" here). */
@@ -263,6 +265,8 @@ private:
 	FVector CapHurtFrom = FVector::ZeroVector;
 	float CapHurtAmount = 0.f;
 	float ThreatCm = -1.f;
+	int32 CaptainSeenBy = 0;                         // how many able boarders have him in sight now (their last look), and the nearest's distance (cm): the picture the crew and the marines read
+	float CaptainSeenNearCm = -1.f;
 	float CapRegenT = 0.f;
 	bool bCaptainIn = false;
 	int32 CaptainSquad = INDEX_NONE;
@@ -501,7 +505,9 @@ private:
 	UAstraShipSubsystem* ShipSub() const;
 	UAstraLifeSubsystem* LifeSub() const;
 	UAstraCombatFx* FxSub() const;
-	bool CaptainFeet(FVector& OutFeet, float& OutYaw, bool& bOutLow, float& OutSpeed) const;
+	/** Where the Captain stands (feet in the world), which way he faces and how fast he moves, whether he is crouched or lying; and, for the fight, where his eye is from his feet (his camera: the lean puts it out of the line of
+	 *  his body) and whether he lies. False when he is in no fight (in a boat, in the beam, in a Falcon). */
+	bool CaptainFeet(FVector& OutFeet, float& OutYaw, bool& bOutLow, float& OutSpeed, FVector* OutEyeRel = nullptr, bool* bOutProne = nullptr) const;
 };
 
 /** What the Mandate's cutting looks like from inside: a ring of glowing cut and a hot light at the breach, up for as long as the boarders come in by it. */

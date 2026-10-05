@@ -27,6 +27,14 @@ namespace
 	constexpr float CrouchEyes = 105.f;
 	constexpr float ProneEyes = 40.f;
 	constexpr double HoldToLieDown = 0.38;   // s of C held that means "lie down" rather than "crouch"
+	// the lean: a head and shoulders out from a corner (the arms and the weapon with them): how far the eyes go out of the line of the body, how far they come down, how far the picture rolls
+	constexpr float LeanOutCm = 34.f;
+	constexpr float LeanDownCm = 7.f;
+	constexpr float LeanRollMaxDeg = 11.f;
+	constexpr float LeanProneShare = 0.55f;  // lying he can only turn out: just over half
+	constexpr float LeanRateOut = 8.f;       // 1/s of the easing (a lean takes a third of a second)
+	constexpr float LeanRateBack = 11.f;     // and coming back is a little quicker
+	constexpr float LeanSweepRadiusCm = 12.f;      // the eyes' margin from a wall (the near plane and some air)
 }
 
 AASTRACharacter::AASTRACharacter()
@@ -94,6 +102,13 @@ void AASTRACharacter::BeginPlay()
 	}
 }
 
+void AASTRACharacter::PossessedBy(AController* NewController)
+{
+	Super::PossessedBy(NewController);
+	// a lean key that was held when he left the body (a Falcon's cockpit took the input) does not lean him when he is back: its release went to the other pawn
+	bLeanLeft = bLeanRight = false;
+}
+
 void AASTRACharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	UEnhancedInputComponent* EIC = Cast<UEnhancedInputComponent>(PlayerInputComponent);
@@ -119,6 +134,10 @@ void AASTRACharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComp
 	EIC->BindAction(In->Sprint, ETriggerEvent::Completed, this, &AASTRACharacter::SprintEnd);
 	EIC->BindAction(In->Crouch, ETriggerEvent::Started, this, &AASTRACharacter::CrouchPressed);
 	EIC->BindAction(In->Crouch, ETriggerEvent::Completed, this, &AASTRACharacter::CrouchReleased);
+	EIC->BindAction(In->LeanLeft, ETriggerEvent::Started, this, &AASTRACharacter::LeanLeftStart);
+	EIC->BindAction(In->LeanLeft, ETriggerEvent::Completed, this, &AASTRACharacter::LeanLeftEnd);
+	EIC->BindAction(In->LeanRight, ETriggerEvent::Started, this, &AASTRACharacter::LeanRightStart);
+	EIC->BindAction(In->LeanRight, ETriggerEvent::Completed, this, &AASTRACharacter::LeanRightEnd);
 	// ABBORDAGGI: the weapons (UAstraFpsComponent)
 	if (Fps)
 	{
@@ -227,7 +246,19 @@ void AASTRACharacter::ResetPosture()
 		SetPosture(EAstraPosture::Standing);
 	}
 	EyeZ = StandEyes - StandHalfHeight;
+	// and no lean: the eyes are on the body's line and the picture is level (the roll is the control rotation's)
+	bLeanLeft = bLeanRight = false;
+	Lean = LeanSideCm = LeanDropCm = LeanRollDeg = 0.f;
 	FirstPersonCameraComponent->SetRelativeLocation(FVector(0.f, 0.f, EyeZ));
+	if (AController* PC = GetController())
+	{
+		FRotator R = PC->GetControlRotation();
+		if (!FMath::IsNearlyZero(FRotator::NormalizeAxis(R.Roll), 0.02f))
+		{
+			R.Roll = 0.f;
+			PC->SetControlRotation(R);
+		}
+	}
 	CrouchDownAt = -1.0;
 }
 
@@ -299,6 +330,100 @@ void AASTRACharacter::Tick(float DeltaSeconds)
 	if (!FMath::IsNearlyEqual(EyeZ, Target, 0.1f))
 	{
 		EyeZ = FMath::FInterpTo(EyeZ, Target, DeltaSeconds, 9.f);
-		FirstPersonCameraComponent->SetRelativeLocation(FVector(0.f, 0.f, EyeZ));
+	}
+	TickLean(DeltaSeconds);                              // (places the camera: the posture's height and the lean's offset)
+}
+
+// ================================================================================================================== the lean
+
+void AASTRACharacter::LeanFrame(float Lean, EAstraPosture Posture, float& OutSideCm, float& OutDropCm, float& OutRollDeg)
+{
+	const float L = FMath::Clamp(Lean, -1.f, 1.f);
+	const float Share = Posture == EAstraPosture::Prone ? LeanProneShare : 1.f;
+	OutSideCm = L * LeanOutCm * Share;
+	OutDropCm = FMath::Abs(L) * LeanDownCm * Share;            // the head tips as well as moves
+	OutRollDeg = L * LeanRollMaxDeg * Share;
+}
+
+float AASTRACharacter::LeanStep(float Lean, float Target, float Dt)
+{
+	// out at one rate, back at another: an eased approach that does not overshoot
+	const bool bBack = FMath::Abs(Target) < FMath::Abs(Lean) || FMath::Sign(Target) != FMath::Sign(Lean);
+	const float Next = FMath::FInterpTo(Lean, Target, Dt, bBack ? LeanRateBack : LeanRateOut);
+	return FMath::IsNearlyEqual(Next, Target, 0.002f) ? Target : Next;
+}
+
+bool AASTRACharacter::CanLean() const
+{
+	const AASTRAPlayerController* PC = Cast<AASTRAPlayerController>(GetController());
+	if (!PC || PC->IsSeated() || PC->IsPadUp() || PC->IsMoveInputIgnored())
+	{
+		return false;                                        // in the chair, reading the datapad, in a lift's list: the body is not his to bend
+	}
+	const UCharacterMovementComponent* Move = GetCharacterMovement();
+	if (!Move || Move->MovementMode == MOVE_None || Move->IsFalling())
+	{
+		return false;                                        // carried (a lift's car, the transporter), or in the air
+	}
+	if (IsSprinting() && GetVelocity().Size2D() > 120.f)
+	{
+		return false;                                        // running with the weapon down
+	}
+	const UAstraLadderSubsystem* Ladder = GetWorld() ? GetWorld()->GetSubsystem<UAstraLadderSubsystem>() : nullptr;
+	return !(Ladder && Ladder->IsClimbing(this));
+}
+
+float AASTRACharacter::LeanReach(float Side) const
+{
+	UWorld* W = GetWorld();
+	if (!W || FMath::IsNearlyZero(Side))
+	{
+		return 1.f;
+	}
+	// from where the eyes rest to where a full lean puts them: the room is what the swept sphere finds (the camera channel: the level, not the soldiers)
+	float SideCm, DropCm, RollDeg;
+	LeanFrame(Side > 0.f ? 1.f : -1.f, Posture, SideCm, DropCm, RollDeg);
+	const FVector Rest = GetActorLocation() + FVector(0.f, 0.f, EyeZ);
+	const FVector Out = Rest + GetActorRightVector() * SideCm - FVector(0.f, 0.f, DropCm);
+	FCollisionQueryParams Q(SCENE_QUERY_STAT(AstraLean), false, this);
+	FHitResult Hit;
+	if (!W->SweepSingleByChannel(Hit, Rest, Out, FQuat::Identity, ECC_Camera, FCollisionShape::MakeSphere(LeanSweepRadiusCm), Q))
+	{
+		return 1.f;
+	}
+	return Hit.bStartPenetrating ? 0.f : FMath::Clamp(Hit.Time, 0.f, 1.f);
+}
+
+void AASTRACharacter::TickLean(float Dt)
+{
+	// what he asks for, if the body may
+	const bool bLocal = IsLocallyControlled();
+	const float Want = bLocal && CanLean() ? (bLeanRight ? 1.f : 0.f) - (bLeanLeft ? 1.f : 0.f) : 0.f;
+	const float WantReach = Want != 0.f ? LeanReach(Want) : 1.f;
+	Lean = LeanStep(Lean, Want * WantReach, Dt);
+	if (Lean != 0.f)
+	{
+		// never into a wall: held to the room on its own side (the body may have walked towards it)
+		const float Side = FMath::Sign(Lean);
+		const float Reach = Side == FMath::Sign(Want) ? WantReach : LeanReach(Side);
+		Lean = Side * FMath::Min(FMath::Abs(Lean), Reach);
+	}
+	LeanFrame(Lean, Posture, LeanSideCm, LeanDropCm, LeanRollDeg);
+	// the camera: the posture's height, the lean's offset
+	const FVector Rel(0.f, LeanSideCm, EyeZ - LeanDropCm);
+	if (!FirstPersonCameraComponent->GetRelativeLocation().Equals(Rel, 0.01f))
+	{
+		FirstPersonCameraComponent->SetRelativeLocation(Rel);
+	}
+	// the picture's roll is the control rotation's: the camera follows it, and the arms and the weapon ride the camera, so everything leans together; the rounds go where it looks
+	AController* PC = bLocal ? GetController() : nullptr;
+	if (PC)
+	{
+		FRotator R = PC->GetControlRotation();
+		if (!FMath::IsNearlyEqual(FRotator::NormalizeAxis(R.Roll), LeanRollDeg, 0.02f))
+		{
+			R.Roll = LeanRollDeg;
+			PC->SetControlRotation(R);
+		}
 	}
 }

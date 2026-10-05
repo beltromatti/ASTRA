@@ -65,6 +65,7 @@ namespace
 	}
 
 	constexpr float FpsKeysShownS = 24.f;
+	constexpr float FpsFightKeysS = 16.f;             // the card at the start of a fight
 
 	UAnimSequence* FpsLoadAnim(const TCHAR* Path)
 	{
@@ -752,6 +753,33 @@ void UAstraFpsComponent::Prompt(const FString& Text, float Seconds)
 	PromptT = Seconds;
 }
 
+void UAstraFpsComponent::SetWatchers(TConstArrayView<FFpsWatcher> List)
+{
+	WatchAt = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+	for (FWatch& Wt : Watch)
+	{
+		Wt.bLive = false;
+	}
+	for (const FFpsWatcher& W : List)
+	{
+		FWatch* Known = Watch.FindByPredicate([&W](const FWatch& Wt) { return Wt.Id == W.Id; });
+		if (!Known)
+		{
+			Known = &Watch.AddDefaulted_GetRef();
+			Known->Id = W.Id;
+		}
+		Known->Pos = W.Pos;
+		Known->DistCm = W.DistCm;
+		Known->bLive = true;
+	}
+}
+
+void UAstraFpsComponent::ShowKeys(float Seconds)
+{
+	KeysT = FMath::Max(KeysT, Seconds);
+	KeysShownAt = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+}
+
 // ================================================================================================================== the arms
 
 void UAstraFpsComponent::EnsureArms()
@@ -1198,7 +1226,51 @@ void UAstraFpsComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAc
 	HitMark = FMath::Max(0.f, HitMark - Dt * 4.5f);
 	PromptT = FMath::Max(0.f, PromptT - Dt);
 	KeysT = FMath::Max(0.f, KeysT - Dt);
-	KeysAlpha = FMath::FInterpConstantTo(KeysAlpha, (KeysT > 0.f && IsArmed() && !bLockedNow) ? 1.f : 0.f, Dt, 1.2f);
+	// a fight begins with him in it: the card of keys goes up (once he is on his feet), unless it was up a minute ago: the new man finds the keys of the fight on the screen, not in a menu
+	{
+		const UAstraBoardSubsystem* Board = GetWorld() ? GetWorld()->GetSubsystem<UAstraBoardSubsystem>() : nullptr;
+		const bool bFight = Board && Board->IsActive();
+		if (bFight && !bFightSeen)
+		{
+			bKeysDue = true;
+		}
+		bKeysDue &= bFight;
+		bFightSeen = bFight;
+		if (bKeysDue && !bLockedNow)
+		{
+			bKeysDue = false;
+			if (GetWorld()->GetTimeSeconds() - KeysShownAt > 60.0)
+			{
+				ShowKeys(FpsFightKeysS);
+				if (!bHasKit)
+				{
+					Prompt(TEXT("NO WEAPON  ·  ASK THE XO FOR ONE (V)  ·  OR THE RACK IN THE ARMORY, DECK 8 (E)"), 7.f);
+				}
+			}
+		}
+	}
+	KeysAlpha = FMath::FInterpConstantTo(KeysAlpha, (KeysT > 0.f && !bLockedNow) ? 1.f : 0.f, Dt, 1.2f);
+	if (bTestWatch)
+	{
+		FFpsWatcher Fake;
+		Fake.Id = -1;
+		Fake.Pos = TestWatchAt;
+		Fake.DistCm = 1200.f;
+		SetWatchers(MakeArrayView(&Fake, 1));
+	}
+	// who has him in sight: the arcs come in quickly and go slowly (a boarder's look flickers at the edge of the light), and are gone when the fight stops telling
+	if (!Watch.IsEmpty() && GetWorld()->GetTimeSeconds() - WatchAt > 0.9)
+	{
+		for (FWatch& Wt : Watch)
+		{
+			Wt.bLive = false;
+		}
+	}
+	for (FWatch& Wt : Watch)
+	{
+		Wt.Alpha = FMath::FInterpConstantTo(Wt.Alpha, Wt.bLive ? 1.f : 0.f, Dt, Wt.bLive ? 4.5f : 1.3f);
+	}
+	Watch.RemoveAll([](const FWatch& Wt) { return !Wt.bLive && Wt.Alpha <= 0.f; });
 	TickHud(Dt);
 }
 
@@ -1216,7 +1288,7 @@ void UAstraFpsComponent::TickHud(float Dt)
 	const float Strength = Board ? Board->CaptainStrength() : 1.f;
 	const bool bArmed = IsArmed() && !Locked();
 	const bool bShowStrength = bBoarding || Strength < 0.995f;
-	const bool bShow = bArmed || HurtAlpha > 0.01f || PromptT > 0.f || bShowStrength || !Arcs.IsEmpty();
+	const bool bShow = bArmed || HurtAlpha > 0.01f || PromptT > 0.f || bShowStrength || !Arcs.IsEmpty() || !Watch.IsEmpty() || KeysAlpha > 0.01f;
 	if (!bShow)
 	{
 		RemoveHud();
@@ -1258,11 +1330,33 @@ void UAstraFpsComponent::TickHud(float Dt)
 		X.Alpha = Ar.Alpha;
 		S.Arcs.Add(X);
 	}
+	// who has him in sight: an arc towards each who is not in front of him (in front he is on the screen), stronger the nearer he is
+	S.Watchers.Reset();
+	if (Cam)
+	{
+		for (const FWatch& Wt : Watch)
+		{
+			const FVector To = Wt.Pos - Cam->GetComponentLocation();
+			const float Rel = FMath::UnwindDegrees(FMath::RadiansToDegrees(FMath::Atan2(To.Y, To.X)) - Cam->GetComponentRotation().Yaw);
+			const float Aside = FMath::GetMappedRangeValueClamped(FVector2D(28.f, 55.f), FVector2D(0.f, 1.f), FMath::Abs(Rel));
+			const float Near = FMath::GetMappedRangeValueClamped(FVector2D(800.f, 4500.f), FVector2D(1.f, 0.5f), Wt.DistCm);
+			FAstraFpsHudState::FArc X;
+			X.Yaw = Rel;
+			X.Alpha = Wt.Alpha * Aside * Near;
+			S.Watchers.Add(X);
+			if (X.Alpha > 0.6f && !bWatchTold && !Locked())
+			{
+				bWatchTold = true;                          // once: what the amber arc says, and what to do about it
+				Prompt(TEXT("AMBER ARC: SOMEONE HAS YOU IN SIGHT  ·  GET LOW (C) OR BEHIND COVER"), 5.f);
+			}
+		}
+	}
 	S.HitMark = HitMark;
 	S.bHitHead = bHitWasHead;
 	S.Prompt = PromptText;
 	S.PromptAlpha = FMath::Clamp(PromptT / 0.4f, 0.f, 1.f);
 	S.KeysAlpha = KeysAlpha;
+	S.bCarries = bHasKit;
 	S.bLowHint = bArmed && State == EState::Ready && A.Mag <= FMath::Max(2, D.Mag / 6) && A.Reserve > 0 && FMath::Frac(GetWorld()->GetTimeSeconds() * 1.6) < 0.7;
 }
 
@@ -1289,6 +1383,19 @@ void UAstraFpsComponent::SimulateKey(const FKey& Key, bool bDown)
 	}
 }
 
+void UAstraFpsComponent::TestWatcher(bool bOn)
+{
+	bTestWatch = bOn;
+	if (const UCameraComponent* Cam = Camera(); Cam && bOn)
+	{
+		TestWatchAt = Cam->GetComponentLocation() + FRotator(0.f, Cam->GetComponentRotation().Yaw, 0.f).Vector() * 1200.f;
+	}
+	if (!bOn)
+	{
+		SetWatchers(TConstArrayView<FFpsWatcher>());
+	}
+}
+
 void UAstraFpsComponent::Describe(FOutputDevice& Ar) const
 {
 	static const TCHAR* const StateName[] = { TEXT("holstered"), TEXT("drawing"), TEXT("ready"), TEXT("reloading"), TEXT("holstering") };
@@ -1301,6 +1408,9 @@ void UAstraFpsComponent::Describe(FOutputDevice& Ar) const
 	Ar.Logf(TEXT("locked %d: seated %d, datapad up %d, movement ignored %d, captain's fate %d"), Locked() ? 1 : 0, PC && PC->IsSeated() ? 1 : 0, PC && PC->IsPadUp() ? 1 : 0, PC && PC->IsMoveInputIgnored() ? 1 : 0, Ship ? Ship->GetCaptainFate() : -1);
 	const UCameraComponent* Cam = Camera();
 	Ar.Logf(TEXT("camera: field of view %.0f, first-person %.0f (scale %.2f)"), Cam ? Cam->FieldOfView : 0.f, Cam ? Cam->FirstPersonFieldOfView : 0.f, Cam ? Cam->FirstPersonScale : 0.f);
+	Ar.Logf(TEXT("body: %s, lean %.2f (the eyes %.0f cm out of the line of the body, %.0f cm down, rolled %.1f degrees); keys card %.2f (%.0f s left); %d have him in sight%s"),
+		C ? (C->GetPosture() == EAstraPosture::Prone ? TEXT("lying") : (C->GetPosture() == EAstraPosture::Crouched ? TEXT("crouched") : TEXT("standing"))) : TEXT("?"), C ? C->GetLean() : 0.f,
+		C ? C->GetLeanSideCm() : 0.f, C ? C->GetLeanDropCm() : 0.f, C ? C->GetLeanRoll() : 0.f, KeysAlpha, KeysT, Watch.Num(), Watch.IsEmpty() ? TEXT("") : TEXT(" (amber arcs)"));
 	Ar.Logf(TEXT("arms: %s, shown %d, gun %s"), Arms ? (bArmsOnly ? TEXT("the arms-only mesh") : TEXT("the whole mannequin, head off")) : TEXT("none (the weapon alone)"), bShown ? 1 : 0, Gun && Gun->GetStaticMesh() ? *Gun->GetStaticMesh()->GetName() : TEXT("none"));
 	if (!Cam || !bShown || !Gun || Cur == EAstraWeapon::None)
 	{
@@ -1417,6 +1527,43 @@ namespace
 				F->SimulateKey(EKeys::RightMouseButton, bDown);
 			}
 			Ar.Logf(TEXT("aim %s%s: see astra.fps.info next frame (the action counter says whether it arrived)"), bDown ? TEXT("held") : TEXT("let go"), bDirect ? TEXT(", direct") : TEXT(", through the input"));
+		}));
+	FAutoConsoleCommandWithWorldArgsAndOutputDevice FpsCmdLean(TEXT("astra.fps.lean"),
+		TEXT("Testing: astra.fps.lean left|right|off holds Z or X down (through the input system, the road of the real key) or lets both go; astra.fps.info says how far the eyes are out"),
+		FConsoleCommandWithWorldArgsAndOutputDeviceDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* W, FOutputDevice& Ar)
+		{
+			UAstraFpsComponent* F = FpsPlayer(W);
+			if (!F || Args.IsEmpty())
+			{
+				Ar.Logf(TEXT("astra.fps.lean left|right|off%s"), F ? TEXT("") : TEXT("  (no Captain on foot)"));
+				return;
+			}
+			const bool bLeft = Args[0].Equals(TEXT("left"), ESearchCase::IgnoreCase), bRight = Args[0].Equals(TEXT("right"), ESearchCase::IgnoreCase);
+			F->SimulateKey(EKeys::Z, bLeft);
+			F->SimulateKey(EKeys::X, bRight);
+			Ar.Logf(TEXT("lean %s (the keys Z and X, through the input): see astra.fps.info after a moment"), bLeft ? TEXT("left") : (bRight ? TEXT("right") : TEXT("off")));
+		}));
+	FAutoConsoleCommandWithWorldArgsAndOutputDevice FpsCmdWatch(TEXT("astra.fps.watch"),
+		TEXT("Testing: astra.fps.watch on|off puts a boarder who has you in sight 12 m ahead of where you face now (or takes him away): turn and the amber arc comes in from the side; astra.fps.keys puts the card of keys up"),
+		FConsoleCommandWithWorldArgsAndOutputDeviceDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* W, FOutputDevice& Ar)
+		{
+			UAstraFpsComponent* F = FpsPlayer(W);
+			if (!F || Args.IsEmpty())
+			{
+				Ar.Logf(TEXT("astra.fps.watch on|off%s"), F ? TEXT("") : TEXT("  (no Captain on foot)"));
+				return;
+			}
+			F->TestWatcher(!Args[0].Equals(TEXT("off"), ESearchCase::IgnoreCase) && Args[0] != TEXT("0"));
+			Ar.Logf(TEXT("a watcher %s"), Args[0].Equals(TEXT("off"), ESearchCase::IgnoreCase) || Args[0] == TEXT("0") ? TEXT("taken away") : TEXT("12 m ahead of where you face"));
+		}));
+	FAutoConsoleCommandWithWorldArgsAndOutputDevice FpsCmdKeys(TEXT("astra.fps.keys"), TEXT("Testing: the card of keys goes up for 16 seconds"),
+		FConsoleCommandWithWorldArgsAndOutputDeviceDelegate::CreateLambda([](const TArray<FString>&, UWorld* W, FOutputDevice& Ar)
+		{
+			if (UAstraFpsComponent* F = FpsPlayer(W))
+			{
+				F->ShowKeys(16.f);
+				Ar.Logf(TEXT("the card of keys is up"));
+			}
 		}));
 	FAutoConsoleCommandWithWorldArgsAndOutputDevice FpsCmdFire(TEXT("astra.fps.fire"),
 		TEXT("Testing: astra.fps.fire 1 holds the left mouse button down (through the input system), 0 lets it go; add 'direct' to pull the trigger without the input system"),

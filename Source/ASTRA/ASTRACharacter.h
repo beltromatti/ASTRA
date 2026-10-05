@@ -25,7 +25,7 @@ enum class EAstraPosture : uint8
 };
 
 /**
- *  The Captain on foot: walks, runs, jumps, crouches and lies down; the eyes follow the posture.
+ *  The Captain on foot: walks, runs, jumps, crouches and lies down, and leans out from a corner; the eyes follow the posture and the lean.
  *  The controls come from the player controller's UAstraInputSet (built in code).
  */
 UCLASS(abstract)
@@ -68,11 +68,24 @@ public:
 
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;
+	virtual void PossessedBy(AController* NewController) override;
 
 	EAstraPosture GetPosture() const { return Posture; }
 	bool IsSprinting() const { return bSprintHeld && Posture == EAstraPosture::Standing; }
-	/** Back on the feet at once (seated, the lift, a cutscene): no crouch, no prone, eyes at standing height. */
+	/** Back on the feet at once (seated, the lift, a cutscene): no crouch, no prone, no lean, eyes at standing height. */
 	void ResetPosture();
+
+	/** The lean (Z and X held): -1 out to the left .. 1 out to the right, as far as the walls let the eyes go. The eyes come out of the line of the body and the picture rolls with them, the arms and the weapon on the camera
+	 *  with it: a corner is looked round and fired round without the body showing (what the boarders see of him is the eye: UAstraBoardSubsystem takes the camera's place for his). */
+	float GetLean() const { return Lean; }
+	/** What the lean does now to the eyes: how far out of the line of the body (cm, to his right), how far down (cm), and the roll of the picture (degrees, to the right). */
+	float GetLeanSideCm() const { return LeanSideCm; }
+	float GetLeanDropCm() const { return LeanDropCm; }
+	float GetLeanRoll() const { return LeanRollDeg; }
+	/** The shape of a lean at Lean (-1..1) in a posture: the eyes' offset to the right of the line of the body and down, and the picture's roll. Pure (the bench checks it). */
+	static void LeanFrame(float Lean, EAstraPosture Posture, float& OutSideCm, float& OutDropCm, float& OutRollDeg);
+	/** One step of the easing of a lean towards what is asked of it (pure). */
+	static float LeanStep(float Lean, float Target, float Dt);
 
 	/** Speeds on foot (cm/s): a ship's corridors, not a racetrack. */
 	UPROPERTY(EditAnywhere, Category = "Movement") float WalkSpeed = 380.f;
@@ -106,6 +119,10 @@ protected:
 
 	void SprintStart() { bSprintHeld = true; }
 	void SprintEnd() { bSprintHeld = false; }
+	void LeanLeftStart() { bLeanLeft = true; }
+	void LeanLeftEnd() { bLeanLeft = false; }
+	void LeanRightStart() { bLeanRight = true; }
+	void LeanRightEnd() { bLeanRight = false; }
 	void CrouchPressed();
 	void CrouchReleased();
 
@@ -122,6 +139,14 @@ private:
 	float EyeZ = 0.f;                // camera height above the capsule centre, eased towards the posture's
 	float StandHalfHeight = 96.f;
 	float ProneOffset = 0.f;         // how far the capsule centre went down when lying (to lift it back)
+	bool bLeanLeft = false, bLeanRight = false;     // Z and X held
+	float Lean = 0.f;                // -1 .. 1 (left .. right), eased, never into a wall
+	float LeanSideCm = 0.f, LeanDropCm = 0.f, LeanRollDeg = 0.f;     // what it does to the eyes now (the camera's place, the picture's roll)
+
+	bool CanLean() const;
+	/** The share of a full lean to Side (-1 left, 1 right) the walls leave: the eyes are swept out from where they rest, and stop short of anything. */
+	float LeanReach(float Side) const;
+	void TickLean(float Dt);
 
 	void SetPosture(EAstraPosture New);
 	bool RoomToGrow(float NewHalfHeight) const;

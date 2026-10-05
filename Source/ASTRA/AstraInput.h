@@ -31,6 +31,9 @@ public:
 	UPROPERTY() TObjectPtr<UInputAction> Sprint;
 	/** Tap: crouch or stand up; hold: lie down (the character times it). */
 	UPROPERTY() TObjectPtr<UInputAction> Crouch;
+	/** Held: lean out to the left / right (Z, X; the shoulders of a gamepad): the eyes and the weapon come out from behind a corner without the body. */
+	UPROPERTY() TObjectPtr<UInputAction> LeanLeft;
+	UPROPERTY() TObjectPtr<UInputAction> LeanRight;
 
 	// --- ABBORDAGGI: the weapons (UAstraFpsComponent): fire, aim through the sights, reload, the two weapons, the last one, holster, the wheel
 	UPROPERTY() TObjectPtr<UInputAction> Fire;

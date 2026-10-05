@@ -16,6 +16,9 @@
                                        off a corridor; ambush: twelve marines at a junction on the boarders' way, fire held against fire free; hold: twelve marines in Engineering with no order, hold the place,
                                        hold a whole section; seal: a squad falling back to Engineering that shuts the bulkheads behind it); `drills` runs them all. --setup N picks one of a scenario's
                                        orders (a trace: --trace --seeds 1 --boarders 8); --scenario escort [--class acheron]: the Captain walking to a ship's bridge with a squad that follows or escorts him
+                                       --scenario lean (on request): the Captain's body in the fight (ABBORDAGGI-4, docs/ABBORDAGGI.md §15.3): the lean's frame and easing, an enemy who holds the line through an
+                                       opening and the Captain at the corner (behind it unseen, the eye leaned out seen and shot at), standing / crouched / lying at 10 m, and with a wall between (his head over it,
+                                       his chest not seen: a smaller target; crouched and lying not seen at all)
                                        --scenario fps (on request, no plan needed): the Captain's arms on the weapons against the mannequin's own
                                        animations (the sight on its place, the hands on the grips, what the picture holds at 16:9 and 16:10);
                                        --fpsposes FILE writes the engine's poses for the offline preview
@@ -349,15 +352,25 @@ def _assault_run(a, name: str, setup: dict) -> dict:
     out = OUT / f"assault_{name}.json"
     args = [str(ENGINE), str(ROOT / "ASTRA.uproject"), "-run=AstraWarSim", f"-seconds={setup['seconds']}", "-step=0.1", "-every=50", f"-out={out}", f"-seed={a.seed}", f"-seeds=1",
             f"-exec={setup['exec']}", f"-at={setup['at']}", "-nullrhi", "-unattended", "-nosound", "-nosplash", "-NoVerifyGC", "-stdout", "-FullStdOutLogOutput"]
-    with open(log, "w") as f:
-        p = subprocess.Popen(args, stdout=f, stderr=subprocess.STDOUT, cwd=str(ROOT))
-        try:
-            p.wait(timeout=a.timeout)
-        except subprocess.TimeoutExpired:
-            p.kill()
-            p.wait()
-    if sys.platform != "win32":
-        subprocess.run(["pkill", "-f", f"CrashReportClient.*pid-{p.pid}"], check=False)
+    retries = max(0, getattr(a, "retries", 2))
+    for attempt in range(1 + retries):
+        with open(log, "w") as f:
+            p = subprocess.Popen(args, stdout=f, stderr=subprocess.STDOUT, cwd=str(ROOT))
+            try:
+                p.wait(timeout=a.timeout)
+            except subprocess.TimeoutExpired:
+                p.kill()
+                p.wait()
+        if sys.platform != "win32":
+            subprocess.run(["pkill", "-f", f"CrashReportClient.*pid-{p.pid}"], check=False)
+        # The Aquila's plan is read by a worker while the war runs on (the commandlet does not wait for it): on a machine busy with other work the assault is asked for before
+        # the plan is read and refused, which says nothing about the code. That is the machine's, not the boarding's: run it again (bounded).
+        if "assault refused: the ship's plan is not read yet" not in log.read_text(errors="replace"):
+            break
+        if attempt < retries:
+            print(f"   ({name}: the plan was not read in time, the machine is loaded: run {attempt + 2} of {1 + retries})", flush=True)
+        else:
+            print(f"   ({name}: the plan was still not read in time: the machine is too loaded for this bench, a FAIL here is the machine's)", flush=True)
     lines = []
     for l in log.read_text(errors="replace").splitlines():
         for tag in ("[Boarding]", "[Board]"):
@@ -407,7 +420,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     r = sub.add_parser("run")
-    r.add_argument("--scenario", default="all", help="all | map | rules | duel | squad | flank | board | orders (the marines' orders, on request only) | fps (the Captain's arms, on request only) | plans | attack (other ships' plans and the marines aboard one, on request only) | interior (every class's plan made solid and the simulation's routes walked through it, on request only) | war (a ship the war has shot at, boarded, on request only) | take | breach | sweep | ambush | hold | seal | drills (the infantry orders with and without, on request only) | escort (the Captain walking to a bridge with an escort, on request only) | dress (every class's decks dressed: instances and triangles for the ship, each deck and the ring round a Captain against the plain boxes, the soldiers' ways clear of the props, the doors, no one placed in a prop; on request only)")
+    r.add_argument("--scenario", default="all", help="all | map | rules | duel | squad | flank | board | orders (the marines' orders, on request only) | fps (the Captain's arms, on request only) | lean (the Captain's body in the fight: leaning out of cover, lying, a head over a wall; on request only) | plans | attack (other ships' plans and the marines aboard one, on request only) | interior (every class's plan made solid and the simulation's routes walked through it, on request only) | war (a ship the war has shot at, boarded, on request only) | take | breach | sweep | ambush | hold | seal | drills (the infantry orders with and without, on request only) | escort (the Captain walking to a bridge with an escort, on request only) | dress (every class's decks dressed: instances and triangles for the ship, each deck and the ring round a Captain against the plain boxes, the soldiers' ways clear of the props, the doors, no one placed in a prop; on request only)")
     r.add_argument("--seed", type=int, default=1)
     r.add_argument("--seeds", type=int, default=20, help="how many fights of each kind (seeds seed .. seed+seeds-1)")
     r.add_argument("--boarders", type=int, default=0, help="board: the size of the boarding party of the first setup (default 10, one skiff)")
@@ -435,6 +448,7 @@ def main() -> int:
     s.add_argument("--seed", type=int, default=1)
     s.add_argument("--lines", type=int, default=60, help="how many of the last log lines to print")
     s.add_argument("--timeout", type=int, default=900)
+    s.add_argument("--retries", type=int, default=2, help="run a setup again (at most this many times) when the plan was not read before the assault was asked for: a loaded machine, not a fault")
     s.set_defaults(fn=cmd_assault)
     p = sub.add_parser("report")
     p.add_argument("path", nargs="?", default="Saved/Boarding/run.json")

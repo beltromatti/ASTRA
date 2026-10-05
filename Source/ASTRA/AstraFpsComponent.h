@@ -24,6 +24,14 @@ class UAnimSequence;
 struct FKey;
 class FOutputDevice;
 
+/** One of the boarders who has the Captain in sight now (the fight tells the screen four times a second): who, where he stands (world cm) and how far (cm). */
+struct FFpsWatcher
+{
+	int32 Id = 0;
+	FVector Pos = FVector::ZeroVector;
+	float DistCm = 0.f;
+};
+
 UCLASS(ClassGroup = (ASTRA))
 class ASTRA_API UAstraFpsComponent : public UActorComponent
 {
@@ -80,6 +88,11 @@ public:
 	void OnHurt(const FVector& From, float Amount);
 	/** A short line on the screen where the keys are told ("E  TAKE THE WEAPONS"). */
 	void Prompt(const FString& Text, float Seconds);
+	/** The boarders who have him in sight now (the fight tells him four times a second, with the sight they look with: their cone, the real level between, his posture and his lean): the screen shows an arc
+	 *  towards each that is not in front of him, before a round comes. An empty list: nobody sees him. */
+	void SetWatchers(TConstArrayView<FFpsWatcher> List);
+	/** The card of keys goes up for Seconds, armed or not (a fight begins and he is on his feet). */
+	void ShowKeys(float Seconds);
 
 	/** The tests: fire once, as if the button were pressed and released; the rounds that were fired are counted. */
 	int32 ShotsFired() const { return NumShots; }
@@ -88,6 +101,8 @@ public:
 	/** The tests (astra.fps.* in the console): a key goes into the player's input as the viewport would send it, so that it takes the road of a real one (the mapping, the action, the
 	 *  binding); and a report of the state, the arms and where the weapon stands in the view. */
 	void SimulateKey(const FKey& Key, bool bDown);
+	/** The tests: a boarder who has him in sight stands 12 m ahead of where he faces now (or is taken away): the amber arc, without a fight. */
+	void TestWatcher(bool bOn);
 	void Describe(FOutputDevice& Ar) const;
 
 private:
@@ -127,6 +142,14 @@ private:
 	float KeysAlpha = 0.f;                       // the strip that tells the keys, up for a while when he arms
 	float KeysT = 0.f;
 	double KeysShownAt = -1000.0;                // when the card of keys was last put up (it does not come again at every draw)
+	bool bFightSeen = false;                     // a fight is on with him in it
+	bool bKeysDue = false;                       // ... and the card of keys is to go up when he can see it (on his feet, not in the chair)
+	struct FWatch { int32 Id = 0; FVector Pos = FVector::ZeroVector; float DistCm = 0.f; float Alpha = 0.f; bool bLive = false; };
+	TArray<FWatch> Watch;                        // the boarders who have him in sight (the amber arcs), fading in and out
+	double WatchAt = -1000.0;                    // when the fight last told who sees him
+	bool bWatchTold = false;                     // the amber arc's meaning was told once
+	bool bTestWatch = false;                     // the console's: a watcher that stands where it was put (astra.fps.watch), to see the arcs without a fight
+	FVector TestWatchAt = FVector::ZeroVector;
 	FString PromptText;
 	float PromptT = 0.f;
 	TSharedPtr<class SAstraCombatHud> Hud;

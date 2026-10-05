@@ -11,6 +11,7 @@
 #include "AstraLifeSubsystem.h"
 #include "AstraShipSubsystem.h"
 #include "Async/Async.h"
+#include "Camera/CameraComponent.h"
 #include "Camera/PlayerCameraManager.h"
 #include "Components/CapsuleComponent.h"
 #include "Engine/World.h"
@@ -641,8 +642,16 @@ void UAstraBoardSubsystem::ClearBodies()
 
 // ================================================================================================================== the Captain
 
-bool UAstraBoardSubsystem::CaptainFeet(FVector& OutFeet, float& OutYaw, bool& bOutLow, float& OutSpeed) const
+bool UAstraBoardSubsystem::CaptainFeet(FVector& OutFeet, float& OutYaw, bool& bOutLow, float& OutSpeed, FVector* OutEyeRel, bool* bOutProne) const
 {
+	if (OutEyeRel)
+	{
+		*OutEyeRel = FVector::ZeroVector;               // (the posture's eye, unless the pawn says where his is)
+	}
+	if (bOutProne)
+	{
+		*bOutProne = false;
+	}
 	if (Ride != ERide::None && !(Ride == ERide::Aboard && bCaptainAboard))
 	{
 		return false;                                 // in a boat's troop bay: out of any fight
@@ -674,31 +683,47 @@ bool UAstraBoardSubsystem::CaptainFeet(FVector& OutFeet, float& OutYaw, bool& bO
 	const AASTRACharacter* AC = Cast<AASTRACharacter>(Walker);
 	bOutLow = AC && AC->GetPosture() != EAstraPosture::Standing;
 	OutSpeed = (float)Walker->GetVelocity().Size2D();
+	if (AC)
+	{
+		// the eye the boarders look for: the camera (crouched, lying, leaning out of cover), the one the Captain's own rounds leave from
+		if (OutEyeRel && AC->GetFirstPersonCameraComponent())
+		{
+			*OutEyeRel = AC->GetFirstPersonCameraComponent()->GetComponentLocation() - OutFeet;
+		}
+		if (bOutProne)
+		{
+			*bOutProne = AC->GetPosture() == EAstraPosture::Prone;
+		}
+	}
 	return true;
 }
 
 void UAstraBoardSubsystem::SyncCaptain(float Dt)
 {
-	FVector Feet;
+	FVector Feet, EyeRel;
 	float Yaw = 0.f, Speed = 0.f;
-	bool bLow = false;
-	bCaptainIn = CaptainFeet(Feet, Yaw, bLow, Speed);
+	bool bLow = false, bProne = false;
+	bCaptainIn = CaptainFeet(Feet, Yaw, bLow, Speed, &EyeRel, &bProne);
 	if (!bCaptainIn)
 	{
 		Fight.SetCaptain(FVector(0.0, 0.0, -1.0e7), 0.f, false, 0.f, bCapDown);
-		ThreatCm = -1.f;
+		ThreatCm = -1.f;                              // (the screen's amber arcs go out by themselves: nobody tells them any more)
+		CaptainSeenBy = 0;
+		CaptainSeenNearCm = -1.f;
 		return;
 	}
-	Fight.SetCaptain(Feet - WorldOffset(), Yaw, bLow, Speed, bCapDown);
-	// the nearest able boarder who sees the Captain (every quarter second)
+	Fight.SetCaptain(Feet - WorldOffset(), Yaw, bLow, Speed, bCapDown, EyeRel, bProne);
+	// the nearest able boarder who sees the Captain (every quarter second): the threat the crew reads and the chain's (a downed Captain is not carried out under fire)
 	ThreatT -= Dt;
 	if (ThreatT <= 0.f)
 	{
 		ThreatT = 0.25f;
 		const FUnit* C = Fight.Unit(Fight.CaptainId());
 		float Best = -1.f;
+		TArray<FFpsWatcher, TInlineAllocator<8>> Watchers;
 		if (C)
 		{
+			const FVector Off = WorldOffset();
 			for (const FUnit& U : Fight.Units())
 			{
 				if (U.Side != ESide::Mandate || !U.Able() || U.bExternal || FMath::Abs(U.Pos.Z - C->Pos.Z) > 300.f)
@@ -710,9 +735,34 @@ void UAstraBoardSubsystem::SyncCaptain(float Dt)
 				{
 					Best = D;
 				}
+				// and who has him in sight as the boarders' own eyes have it (their last look, a quarter second old at most: the cone they see in, the real level between, his posture and his lean in it):
+				// the few nearest are told to his screen, an arc towards each, before a round comes (crouch, lean back, break the line)
+				const bool bSeen = U.Seen.ContainsByPredicate([Id = C->Id](const FSeen& S) { return S.Unit == Id && S.bVisibleNow; });
+				if (bSeen && D < 6000.f)
+				{
+					FFpsWatcher W;
+					W.Id = U.Id;
+					W.Pos = U.Pos + Off + FVector(0.f, 0.f, 150.f);
+					W.DistCm = D;
+					Watchers.Add(W);
+				}
 			}
 		}
 		ThreatCm = Best;
+		Watchers.Sort([](const FFpsWatcher& A, const FFpsWatcher& B) { return A.DistCm < B.DistCm; });
+		CaptainSeenBy = Watchers.Num();
+		CaptainSeenNearCm = Watchers.IsEmpty() ? -1.f : Watchers[0].DistCm;
+		if (Watchers.Num() > 5)
+		{
+			Watchers.SetNum(5, EAllowShrinking::No);
+		}
+		if (const APlayerController* PC = GetWorld() ? UGameplayStatics::GetPlayerController(GetWorld(), 0) : nullptr)
+		{
+			if (UAstraFpsComponent* Fps = PC->GetPawn() ? PC->GetPawn()->FindComponentByClass<UAstraFpsComponent>() : nullptr)
+			{
+				Fps->SetWatchers(Watchers);
+			}
+		}
 	}
 }
 
@@ -864,6 +914,7 @@ void UAstraBoardSubsystem::Tick(float DeltaTime)
 		if (AfterEnd > (Mode == EMode::Remote ? 6.f : BdCleanUpS))
 		{
 			ClearBodies();
+			BenchOrders.Reset();                             // (a test's orders that waited for a fight that ended without them are not for the next one)
 			Phase = EPhase::Idle;
 			if (Mode == EMode::Remote)
 			{

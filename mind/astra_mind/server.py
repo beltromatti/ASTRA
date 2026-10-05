@@ -44,7 +44,7 @@ from .stt import Recognizer
 from .voice_lang import resolve_language
 from .speech import REPORT_LATE_S, Prio, Voice
 from .flight_minds import CAST as FLIGHT_CAST, PARTY as FLIGHT_PARTY, PARTY_ALIASES as FLIGHT_ALIASES, FlightMinds, flying as _flying, on_flight_deck as _on_flight_deck
-from .marines import PARTY as MARINES_PARTY, MarineMinds
+from .marines import PARTY as MARINES_PARTY, MarineMinds, with_marines
 from .nets import CALL_MARK, NET_EVENT, URGENT_MARK, Nets
 from .war_minds import ALLIES, WarMinds, drawn_mandate_officer
 from .march import March
@@ -226,6 +226,7 @@ class Mind:
         # tells the Captain what he must know; only answers to him, calls to him and the nets he asked to hear reach the speaker. ASTRA_NETS=0: everything on the speaker, as before
         self.nets = Nets(lambda m: self._sink("json", m), self._net_listen, enabled=os.environ.get("ASTRA_NETS", "1") != "0")
         self.nets.presence["flight"] = self._flight_presence
+        self.nets.presence["marines"] = self._marines_presence
         self.agent = BridgeAgent(self.llm, self.local, self._crew_say)
         self.agent.nets = self.nets
         self.enemy = EnemyAgent(self.llm, self._say_external, self._enemy_command)
@@ -461,10 +462,11 @@ class Mind:
         await self.turns.put((f"\x00event:flight: the Captain called the flight net and nobody there answered: \"{' '.join(words)[:240]}\" — Price answers him now, "
                               "from Flight Control", self.lang))
 
-    async def _marines_say(self, speaker: str, text: str, lang: str, tone: str, *, urgent: bool = False, answer: bool = False) -> None:
+    async def _marines_say(self, speaker: str, text: str, lang: str, tone: str, *, urgent: bool = False, answer: bool = False, direct: bool = False) -> None:
         """Someone on the marine net speaks (marines.py). It is NET TRAFFIC (nets.py): the XO reads it and tells the Captain what he must know, the rest is on the XO's log and the
-        datapad. It reaches the speaker by itself only as the answer to the Captain's call (it goes first) or with the net on the speaker; a line that waited too long is thought
-        again by whoever was to say it (`rethink`)."""
+        datapad. It reaches the speaker by itself as the answer to the Captain's call (it goes first), as a call to him in the speaker's own voice (`direct`: the marine says it
+        is for him: a decision only he can take), with the net on the speaker, or while he is with the marines (`_marines_presence`); a line that waited too long is thought again by
+        whoever was to say it (`rethink`)."""
         who = EXTERNAL_SPEAKERS.get(speaker, (speaker, ""))[0]
 
         async def rethink(t: str, waited: float, cut_after: str) -> str | None:
@@ -476,12 +478,17 @@ class Mind:
             self.exchange.heard(MARINES_PARTY, text)
             await self.voice.say(speaker, text, lang, tone, priority=Prio.URGENT if urgent else None, answer=True if answer else None, rethink=rethink)
 
-        await self.nets.post("marines", speaker, who, text, lang, urgent=urgent, answer=answer, aloud=aloud)
+        await self.nets.post("marines", speaker, who, text, lang, urgent=urgent, answer=answer, direct=direct, aloud=aloud)
 
     def _flight_presence(self) -> bool:
         """The Captain is on the flight net by where he is: he flies a Falcon (the cockpit's radio is the net) or stands on the flight deck (the Chief of the Deck is there)."""
         st = (self.game.state if self.game else None) or {}
         return _flying(st) or _on_flight_deck(st)
+
+    def _marines_presence(self) -> bool:
+        """The Captain is on the marine net by where he is: with the marines in their boat or on the decks of the ship they board (the boarding's `captain_with_marines`): it is his own radio."""
+        st = (self.game.state if self.game else None) or {}
+        return with_marines(st)
 
     async def _net_listen(self, net: str, text: str, urgent: bool, lang: str) -> None:
         """A net's traffic goes to its listener: an event of the crew's turn (the turn worker reads it with the rest of the news; an urgent one does not wait for a quiet bridge)."""

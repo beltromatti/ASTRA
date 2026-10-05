@@ -4,6 +4,7 @@
 #include "AstraBoardSubsystem.h"
 
 #include "ASTRA.h"
+#include "ASTRACharacter.h"
 #include "AstraBoardInterior.h"
 #include "AstraCombatant.h"
 #include "AstraCrewRoster.h"
@@ -396,6 +397,7 @@ TSharedRef<FJsonObject> UAstraBoardSubsystem::MarinesPicture() const
 		O->SetStringField(TEXT("where_id"), CompId(C->Comp));
 		O->SetBoolField(TEXT("down"), bCapDown);
 		O->SetNumberField(TEXT("strength_pct"), FMath::RoundToInt(CaptainStrength() * 100.f));
+		AddCaptainBody(*O);
 		J->SetObjectField(TEXT("captain"), O);
 	}
 	TArray<TSharedPtr<FJsonValue>> Recent;
@@ -463,6 +465,7 @@ TSharedRef<FJsonObject> UAstraBoardSubsystem::Snapshot() const
 		TSharedRef<FJsonObject> C = MakeShared<FJsonObject>();
 		C->SetNumberField(TEXT("strength_pct"), FMath::RoundToInt(CaptainStrength() * 100.f));
 		C->SetBoolField(TEXT("down"), bCapDown);
+		AddCaptainBody(*C);
 		if (const APlayerController* PC = GetWorld() ? UGameplayStatics::GetPlayerController(GetWorld(), 0) : nullptr)
 		{
 			if (const UAstraFpsComponent* F = PC->GetPawn() ? PC->GetPawn()->FindComponentByClass<UAstraFpsComponent>() : nullptr)
@@ -483,6 +486,27 @@ TSharedRef<FJsonObject> UAstraBoardSubsystem::Snapshot() const
 	}
 	J->SetArrayField(TEXT("recent"), Recent);
 	return J;
+}
+
+void UAstraBoardSubsystem::AddCaptainBody(FJsonObject& O) const
+{
+	// how he stands and who has him in sight: facts for the minds to say what they judge of them (a Captain standing in the open with two of the enemy on him is worth a word); the pawn's own, so a bench's Captain has none
+	if (const APlayerController* PC = GetWorld() ? UGameplayStatics::GetPlayerController(GetWorld(), 0) : nullptr)
+	{
+		if (const AASTRACharacter* AC = Cast<AASTRACharacter>(PC->GetPawn()))
+		{
+			O.SetStringField(TEXT("posture"), AC->GetPosture() == EAstraPosture::Prone ? TEXT("lying") : (AC->GetPosture() == EAstraPosture::Crouched ? TEXT("crouched") : TEXT("standing")));
+			if (FMath::Abs(AC->GetLean()) > 0.4f)
+			{
+				O.SetStringField(TEXT("leaning"), AC->GetLean() < 0.f ? TEXT("left") : TEXT("right"));
+			}
+		}
+	}
+	O.SetNumberField(TEXT("seen_by"), CaptainSeenBy);
+	if (CaptainSeenBy > 0 && CaptainSeenNearCm >= 0.f)
+	{
+		O.SetNumberField(TEXT("nearest_seer_m"), FMath::RoundToInt(CaptainSeenNearCm / 100.f));
+	}
 }
 
 FString UAstraBoardSubsystem::InfoText() const

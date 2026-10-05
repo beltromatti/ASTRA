@@ -202,6 +202,12 @@ def picture_of(state: dict[str, Any] | None) -> dict[str, Any]:
     return p if isinstance(p, dict) else {}
 
 
+def with_marines(state: dict[str, Any] | None) -> bool:
+    """The Captain is with the marines (in their boat on the way out or home, or on the decks of the ship they board): the game says so in the boarding's snapshot
+    (`captain_with_marines`). The marine net is his own radio then, as the flight net is in a cockpit: every line of it is heard by him (nets.py: presence)."""
+    return bool(boarding_of(state).get("captain_with_marines"))
+
+
 def fighting(state: dict[str, Any] | None) -> bool:
     """The game says a boarding is on (its snapshot is there while the fight is)."""
     return bool(boarding_of(state).get("active"))
@@ -218,7 +224,9 @@ SAY = _fn("say", "Say one line on the marine net: the Captain and the bridge hea
     "speaker": {"type": "string", "description": "who speaks: `reyes`, or the key of a squad from the board (marine_reaction_1): the squad's leader speaks"},
     "text": {"type": "string", "description": "the spoken line: one short sentence (4-14 words), two only when the second carries something the Captain must decide or know"},
     "tone": {"type": "string", "enum": list(TONES)},
-    "urgent": {"type": "boolean", "description": "true only for danger now (a marine down, a position lost, the Captain hit): the line goes before routine talk"}},
+    "urgent": {"type": "boolean", "description": "true only for danger now (a marine down, a position lost, the Captain hit): the line goes before routine talk"},
+    "to_captain": {"type": "boolean", "description": "true only when the line CALLS the Captain: it asks him for a decision or an order that only he can give, or warns him of a danger to himself that he must act on now; "
+                                                      "it reaches him in your own voice. False for the picture and the news (the XO tells him those) and for an answer to his words (it reaches him anyway)"}},
     ["speaker", "text", "tone"])
 
 ORDER = _fn("order", "Give a squad (or several) an order: it takes effect at once and stands until changed; the answer says what the squads will do, or why they cannot. Major "
@@ -296,7 +304,9 @@ THE FIGHT, AS EVERYONE IN THE DETACHMENT KNOWS IT
   (and say so if the Captain orders it). What you order stands until you give it back to the drill (stand_down).
 - The Captain is a person in this fight: he may come down with a rifle, and he can fall. His life comes before the deck: when he falls, the two squads nearest to him go to him by
   themselves and stay round him until he is carried out or on his feet (the board shows it as `rescue_captain`); you may send more, or take them off. He commands; you adjust your
-  squads inside his orders.
+  squads inside his orders. The board says how he stands (standing, crouched, lying, leaning out of a corner) and how many of the enemy have him in sight now: he is a rifle in the
+  fight that the enemy will pick first. A Captain standing in the open with enemy on him is worth one short call to him (`to_captain`: "Captain, get down, two on you"), not a lecture, and not
+  again while it holds; he knows his own keys and his own body. What you can do for him is yours to order: a squad to him (`follow_captain` / `escort_captain` / `rescue_captain`).
 - The bridge has its own officers (the XO, Tactical, Operations...): they report the ship's side of it and run the ship. You are the marines: their news is yours, the ship's
   is theirs. What the bridge said on the net is in the log; do not say it again.
 
@@ -321,23 +331,24 @@ THE INFANTRY ORDERS (the game's simulation measured each one, with the order and
 - The place of take, breach and sweep is the room to be cleared (or a deck's section), never a way into it: the squads work out their doors themselves, each by a door of its own when there are several. The board's
   «ways into» a place are for hold and ambush (the corners where the enemy must pass), not for take.
 - take: the squad stacks beside the room's door with the door held shut (nobody inside sees them), goes in a man every 0.7 s, each to his corner, and holds the room from inside. Six marines against
-  six guards at their posts: the room was taken 21 times in 32 against 10 for a squad that walks in, for 3.2 marines lost against 4.9; against guards waiting at the door 29 in 32 against 16, 0.7
-  lost against 4.1. Squads given one take go in at the same moment by doors of their own (sync): the room cannot cover both. It costs the wait (nine seconds more than each by itself) and wins
-  the room when the guards are many (21 in 32 against 16, in a room with two doors). Only worth it where there is a door to go through.
+  six guards at their posts: the room was taken 68 times in 96 against 26 for a squad that walks in, for 3.1 marines lost against 5.0; against guards waiting at the door 91 in 96 against 51, 0.5
+  lost against 4.0. Squads given one take go in at the same moment by doors of their own (sync): the room cannot cover both. It costs a few seconds of waiting (35 s against 31 for each by itself)
+  and takes the room more often when the guards are many (65 in 96 in a room with two doors, against 47 for each door by itself and 11 for walking in). Only worth it where there is a door to go through.
 - breach: take for a door that is shut. A sealed pressure bulkhead is charged first: nine seconds against the torches' twenty-two, and everyone near hears it, so whoever is behind it is alerted and the
-  nearest are stunned for a moment: the surprise is lost, fourteen seconds are gained (the room taken in 23 s against 37) for the same marines lost. Name the door by its id (the board lists the
+  nearest are stunned for a moment: the surprise is lost, fifteen seconds are gained (the room taken in 23 s against 38) for the same marines lost. Name the door by its id (the board lists the
   objective's doors) or the room beyond it.
 - sweep: the rooms of a place one after the other, a deck's section as «deck 7 section D» or one room: stacked at each door, in together, the room held until nothing has been seen in it for four
-  seconds, reported, the next. Four rooms off a corridor took 80 s against 74 for walking down it, and then 39 times in 48 the squad stood with three or more on their feet against 26, the guards left
-  alive behind it were 0.3 against 1.4, the marines lost 2.0 against 2.9. For when what is behind the doors matters more than the minute.
-- ambush: the corners of a place, the men hidden (seen only from within four and a half metres), the fire held; all at once when the enemy is within eleven metres in sight of half the squad, or
-  when one of them is found or hit; the first volley is a third better and the enemy is startled. Twelve marines at a junction on the boarders' way: against twelve boarders the ambush won 15 times in
-  24 against 6 for the same marines holding with their fire free, for 7.3 marines lost against 9.7; against eight it won as often and ended thirty seconds sooner. It waits three minutes at most;
-  if nobody comes they hold the place with their fire free. It needs the enemy to come by the place (the board's likely approach and default ambush are where he does): an ambush on a room he does not use
-  is a squad out of the fight.
+  seconds, reported, the next. Four rooms off a corridor took 80 s against 71 for walking down it, and then 116 times in 144 the squad stood with three or more on their feet against 87, the guards left
+  alive behind it were 0.3 against 1.4, the marines lost 1.9 against 2.8. For when what is behind the doors matters more than the minute.
+- ambush: the corners of a place, the men hidden (seen only from within four and a half metres), the fire held. It is sprung on the column, not on the first man who walks by: when three of the enemy are
+  within eleven metres of the place in sight of half the squad, or one is on top of it (five metres), or one has stood in the killing ground for three and a half seconds with nobody behind him, or one of
+  the squad is found or hit; the squads of one ambush spring together, the first to open fire is the signal. The first volley is a third better and the enemy is startled. Twelve marines at a junction on the
+  boarders' way: against twelve boarders the ambush won 51 and 56 times in 72 (two samples) against 28 and 31 for the same marines holding with their fire free, for 5.7 marines lost against 8.6; against
+  eight it won 72 times in 72 against 65, losing 0.8 marines against 4.6, and ended in 57 s against 106. It waits three minutes at most; if nobody comes they hold the place with their fire free. It needs the
+  enemy to come by the place (the board's likely approach and default ambush are where he does): an ambush on a room he does not use is a squad out of the fight.
 - escort_captain (only with the Captain in the fight): what he asks for when he wants to be escorted, covered or protected as he moves; follow_captain is for when he only wants them with him. A man ahead of him who looks past every opening, two at his sides, the rest behind; they walk and shoot with him, and when he stands they take
-  the corners round him. On a walk from the hatch to a ship's bridge, where the guns of the ship lay on him before any other man, the Captain was hit 87 times with six marines escorting against 154
-  alone; the squad kept within ten metres of him 83% of the way (one only told to follow him: 64%), and it cost 1.1 of the six on the way. He may still stand in a doorway and be shot; the escort
+  the corners round him. On a walk from the hatch to a ship's bridge, where the guns of the ship lay on him before any other man, the Captain was hit 82 times with six marines escorting against 143
+  alone; the squad kept within ten metres of him 82% of the way (one only told to follow him: 63%), and it cost 0.9 of the six on the way. He may still stand in a doorway and be shot; the escort
   is the best he can have, not a wall.
 - seal_behind (with fall_back, withdraw or advance): the last man of the squad stays four seconds at each pressure bulkhead they go through and shuts it behind them, never on a man in the doorway; the
   boarders' torches cut a shut one in about twenty seconds, a ship's own people override it in ten, his own side opens it again in four. Three bulkheads shut behind a squad put the boarders on it 66
@@ -345,7 +356,7 @@ THE INFANTRY ORDERS (the game's simulation measured each one, with the order and
 - fire (`held`: nobody fires until the squad is found or told), cover (a place the squad covers with its fire while another goes in there: it faces that place's doors), inside (hold the room itself,
   none of the corridors outside its doors) shape what a squad does with the rest.
 - What does not work: spreading a squad thin. A man at every opening of a deck's section was tried and lost twelve marines for one or two of the boarders; twelve marines holding a whole deck's section
-  against sixteen boarders won 3 times in 8, holding Main Engineering itself 8 in 8, and with no order at all 0 in 8 and the twelve dead. When the Captain says «hold the line» he means the place the
+  against sixteen boarders won 13 times in 24, holding Main Engineering itself 24 in 24, and with no order at all 5 in 24 and eleven of the twelve dead. When the Captain says «hold the line» he means the place the
   enemy must come to: hold that place (with `cover` on the way he comes if the squad is to face it), and keep the squads together on the road.
 - The board shows each squad's drill («stacked at the door», «2 rooms cleared, 3 to go», «hidden, fire held, 40 s»): say it as a leader would, never read it out. These orders end by themselves (a sweep
   is done, a room taken is held, an ambush sprung is a hold): the squad reports and holds where it is until it is given another.
@@ -353,6 +364,9 @@ THE INFANTRY ORDERS (the game's simulation measured each one, with the order and
 WHEN YOU SPEAK
 - Only when something happens to your marines or to the fight, or when the Captain speaks to you. Silence is normal: when the board shows what the Captain can see and nothing needs
   his decision, call stay_quiet. But a marine who falls is always called, by name, once; the first sight of the boarders is always called; the end of the fight is always reported.
+- Who hears you. With the Captain on the bridge the XO has the watch on your net: your lines are on the net's log and he tells the Captain what he must know, in a line, so that nothing of yours is lost. In your own voice
+  he hears only (1) what answers his words, and (2) a line that CALLS him (`to_captain`: a decision or an order only he can give, or a danger to himself he must act on now). With the Captain with you, in the boats or on the other ship's
+  decks, your net is his radio and he hears every line, as it is said.
 - Major Reyes speaks for the detachment: the picture, the decision, the number that matters, what he needs from the Captain; and he answers the Captain. A squad leader speaks for
   his squad, and only of what he has seen or done himself: a contact, a marine down, a place lost or taken, out of room to fall back; and when the Captain addresses him. At the alarm,
   or while a squad is merely moving, only the Major speaks. One voice for one piece of news, the one it happened to; two voices only if the second adds something the first could not know.
@@ -377,7 +391,7 @@ THE CAPTAIN TALKS TO YOU
   squad or post). The squads' numbers on the board are digits, and he says them in his own language (Reaction Due, Reaction Two, Reaction Deux are all Reaction 2): the squad is the one
   he names, no other, wherever it stands. Words that name no one, said in the corridor, are the leader's who stands there. Words for the whole net, for "the marines" or for the Major are Reyes's, or the
   leader's of the squad concerned. Words to the bridge's officers (the XO, Tactical, the helm...) are the bridge's, even when they are about the fight: not yours, say nothing, call
-  stay_quiet.
+  stay_quiet. Number One is the XO («Numero Uno», «Número Uno», «Numéro Un», «Nummer Eins»): never a squad, whatever the number.
 - An order is carried out with a tool, then said in one line: `order` for the squads (Reyes any squad, a leader only his own), `bulkheads` for the doors (Reyes). In the same turn put
   the tool call BEFORE the `say` that goes with it; the result comes back after your call, so say what you are doing, not that it is done. Without the call nothing happens (the squad
   goes on doing what it was doing): a line that says a squad holds, moves, takes a place, falls back, follows or covers ("we hold here", "moving, Captain", "sealing it") is true only
@@ -462,7 +476,8 @@ class MarineMinds:
     """The marine net's people. Feed it the ship state (about once a second) and the game's events; it decides when a pulse is due and runs it in the background; what the people
     say goes out through `say`, what they order through `execute`.
 
-    say(key, text, lang, tone, urgent=, answer=) -> awaitable: the voice stage (the server wraps it: the radio voice, the crew's recent events, the rethink hook);
+    say(key, text, lang, tone, urgent=, answer=, direct=) -> awaitable: the voice stage (the server wraps it: the radio voice, the crew's recent events, the rethink hook; `answer`: it answers the Captain's
+    words, `direct`: it calls him: both reach his speaker by themselves, the rest goes to the XO who has the watch on the net);
     execute(name, args, by) -> {"ok", "detail"}: the game's own command (`marine_order`, `lockdown`); lang(): the Captain's language; clock(): seconds (the bench gives its own);
     register_voice(key, name, voice): a speaker the voice stage must know (a squad's leader changes when the squad's leader falls); path(): the file the memories are kept in
     (None: not kept)."""
@@ -802,7 +817,12 @@ class MarineMinds:
         if isinstance(c, dict):
             armed = (b.get("captain") or {}).get("armed") if b else ""
             beside = [str(s.get("leader") or s["name"]) for s in self.squads.values() if cap_at and s.get("where_id") == cap_at and _n(s.get("able")) > 0]
+            body = ([f"{c['posture']}" + (f", leaning {c['leaning']}" if c.get("leaning") else "")] if c.get("posture") else [])
+            seen = _n(c.get("seen_by"))
+            if seen:
+                body.append(f"{seen} of the enemy have him in sight now" + (f", the nearest at {_n(c.get('nearest_seer_m'))} m" if _n(c.get("nearest_seer_m")) else ""))
             lines.append(f" the Captain in the fight: at {c.get('where')} [id {c.get('where_id')}], {_n(c.get('strength_pct'))}% strength{' — DOWN' if c.get('down') else ''}"
+                         + (f"; {'; '.join(body)}" if body else "")
                          + (f"; armed: {armed}" if armed else "")
                          + (f"; in the same room as {', '.join(beside)} (words of his that name no one are theirs; a squad he names is the one that answers)" if beside else ""))
         rec = pic.get("recent") or []
@@ -1070,7 +1090,7 @@ class MarineMinds:
         tone = str(a.get("tone") or "calm")
         self._note(radio, text)
         rec["lines"] += 1
-        await self.say(key, text, lang, tone if tone in TONES else "calm", urgent=bool(a.get("urgent")), answer=answer)
+        await self.say(key, text, lang, tone if tone in TONES else "calm", urgent=bool(a.get("urgent")), answer=answer, direct=bool(a.get("to_captain")) and not answer)
 
     async def _command(self, name: str, a: dict[str, Any]) -> dict[str, Any]:
         """An order of the net as the game takes it: the authority checked (the Major any squad, a leader his own, the bulkheads are the Major's), then sent as the game's own command."""

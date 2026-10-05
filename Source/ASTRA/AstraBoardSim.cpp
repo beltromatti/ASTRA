@@ -429,7 +429,7 @@ int32 FAstraBoardSim::AddCaptain(const FVector& Pos)
 	return U.Id;
 }
 
-void FAstraBoardSim::SetCaptain(const FVector& Pos, float Yaw, bool bLow, float Speed, bool bDown)
+void FAstraBoardSim::SetCaptain(const FVector& Pos, float Yaw, bool bLow, float Speed, bool bDown, const FVector& EyeRel, bool bProne)
 {
 	if (!People.IsValidIndex(CaptainUnit))
 	{
@@ -438,7 +438,10 @@ void FAstraBoardSim::SetCaptain(const FVector& Pos, float Yaw, bool bLow, float 
 	FUnit& U = People[CaptainUnit];
 	U.Pos = Pos;
 	U.Yaw = Yaw;
-	U.bLow = bLow;
+	U.bLow = bLow || bProne;
+	U.bProne = bProne;
+	// his eye is where his camera is; a bench's Captain with no pawn has the posture's
+	U.EyeRel = EyeRel.Z > 1.0 ? EyeRel : FVector(0.0, 0.0, bProne ? 45.0 : (bLow ? 105.0 : 152.0));
 	U.Speed = Speed;
 	U.Comp = Map->CompAt(Pos, 60.f);
 	if (U.Act != EAct::Gone && U.Act != EAct::Dead)
@@ -996,6 +999,12 @@ void FAstraBoardSim::Perceive(FUnit& U, float Dt)
 		S->Pos = E.Pos;
 		S->AgeS = 0.f;
 		S->bVisibleNow = true;
+		// the Captain's body: his eye is seen through the real level; if his chest is not, what shows of him is a head over cover or an eye round an edge (the game's sight: a console, a pillar)
+		S->bCovered = false;
+		if (E.bExternal && SightOverride)
+		{
+			S->bCovered = !SightOverride(MyEye, E.Pos + FVector(0.0, 0.0, E.bProne ? 22.0 : (E.bLow ? 70.0 : 110.0)));
+		}
 		U.AlertT = 0.f;
 	}
 }
@@ -1152,11 +1161,23 @@ float FAstraBoardSim::HitChance(const FUnit& Shooter, const FUnit& Target, float
 	{
 		P *= Tuning.CoverFactor + 0.2f;
 	}
-	if (Target.bLow)
+	if (Target.bExternal)
+	{
+		const FSeen* Seen = Shooter.Seen.FindByPredicate([&Target](const FSeen& S) { return S.Unit == Target.Id; });
+		if (Seen && Seen->bCovered)
+		{
+			P *= Tuning.CoverFactor;                             // all he shows is a head over the cover: a small mark
+		}
+	}
+	if (Target.bProne)
+	{
+		P *= 0.6f;                                           // lying down: all there is to hit is a back and a head
+	}
+	else if (Target.bLow)
 	{
 		P *= 0.8f;
 	}
-	if (Target.Speed > 60.f)
+	if (Target.Speed > (Target.bProne ? 130.f : 60.f))       // (a man crawling is not running)
 	{
 		P *= Tuning.MoveFactor;
 	}
@@ -1241,7 +1262,7 @@ void FAstraBoardSim::FireRounds(FUnit& U, float Dt)
 		FVector End;
 		if (bHit)
 		{
-			End = T.Pos + FVector(Rng.FRandRange(-12.f, 12.f), Rng.FRandRange(-12.f, 12.f), bHead ? (T.bLow ? 95.f : 160.f) : (T.bLow ? 70.f : Rng.FRandRange(85.f, 135.f)));
+			End = T.Pos + FVector(Rng.FRandRange(-12.f, 12.f), Rng.FRandRange(-12.f, 12.f), bHead ? (T.bProne ? 40.f : (T.bLow ? 95.f : 160.f)) : (T.bProne ? 22.f : (T.bLow ? 70.f : Rng.FRandRange(85.f, 135.f))));
 			++Stats.Hits;
 		}
 		else
