@@ -103,10 +103,12 @@ class Models:
             self.calls["listener"] += 1
             self.listener_turns += 1
             await asyncio.sleep(1.0)
-            net = re.search(r"net: traffic on the (fleet|flight|marine) net", last).group(1)
-            urgent = "[URGENT]" in last
-            addressed = "and calls the Captain" in last
-            first = re.search(r"«(.*?)»", last, re.S)
+            block = last.split("[Ship systems event, not the Captain speaking] ", 1)[-1]
+            block = re.split(r"NET TRAFFIC \(the «net:»|NEWS \(the events above", block, maxsplit=1)[0]          # (the event itself: the ask that follows it talks of [URGENT] and calls too)
+            net = re.search(r"net: traffic on the (fleet|flight|marine) net", block).group(1)
+            urgent = "[URGENT]" in block
+            addressed = "and calls the Captain" in block
+            first = re.search(r"«(.*?)»", block, re.S)
             tell = first is not None and (self.relay == "all" or (self.relay in ("urgent", "addressed") and urgent) or (self.relay == "addressed" and addressed))
             if tell:
                 self.relayed += 1

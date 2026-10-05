@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from astra_mind import models
-from astra_mind.agent import WHEEL_ASK, Turn, net_ask
+from astra_mind.agent import SYSTEM_CALL_ASK, WHEEL_ASK, Turn, net_ask, system_calls_only
 from astra_mind.crew import WHEEL_EVENT
 from astra_mind.nets import NET_EVENT, Nets
 from astra_mind.openrouter import OpenRouter
@@ -78,6 +78,14 @@ NET_CASES = [
     Net("marine down", "marines", [("reyes", "Major Reyes", "Marine down on deck 9, Corporal Hale, medic on the way, squad three is pulling back.", {"urgent": True})], "line"),
 ]
 LISTENER = {"fleet": ("comms", "comms"), "flight": ("flight", "flight"), "marines": ("xo", "xo")}     # (the officer who tells him, the console whose log it is)
+
+# the three merchants' calls for help the lead heard in 80 s of the approach (6 October test): a full line of Martin's for each. The first is told in a line; the ones that
+# follow go on the comms log, or into one grouped line; in a fight only what the Aquila can really do now
+DISTRESS = [
+    "comms: distress call from the passenger liner Morning Tide III (Orrery Lines) — 4 hostile warships 16 km off her and closing; she is running for the berths of the Arsenal. She is at 32 km from us, bearing 089",
+    "comms: distress call from the freighter Open Hand (Karst Haulage) — 2 hostile warships 11 km off her and closing; she is running blind, no berth within reach. She is at 41 km from us, bearing 120",
+    "comms: distress call from the freighter Orrery Dawn — 3 hostile strike craft 9 km off her and closing; she is running for the berths of the Arsenal. She is at 38 km from us, bearing 101",
+]
 
 
 # ------------------------------------------------------------------------------------------------ running
@@ -164,9 +172,41 @@ async def run_net(llm: OpenRouter, case: Net, lang: str) -> Out:
     return out
 
 
+async def run_distress(llm: OpenRouter, lang: str) -> Out:
+    """Three merchants call for help in 80 s (the ages of what the officers said aloud are kept by hand, as the speech floor keeps them): who tells the Captain, and how often."""
+    out = Out("three distress calls", "distress")
+    h = Harness(llm, lang)
+    nets = Nets(lambda m: _nothing(), lambda *a: _nothing())
+    h.agent.nets = nets
+    clock = [0.0]
+    spoken: list[tuple[float, str, str]] = []
+    h.agent.heard = lambda seconds: [(clock[0] - t, who, text, True) for t, who, text in spoken if clock[0] - t <= seconds]
+    t0 = time.perf_counter()
+    for k, event in enumerate(DISTRESS):
+        clock[0] = 30.0 * k
+        turn = await h.agent.handle_event(event, lang, ask=SYSTEM_CALL_ASK if system_calls_only([event]) else None)      # (as the turn worker asks for it)
+        out.cost += turn.cost
+        for who, text in turn.lines:
+            spoken.append((clock[0], who, text))
+            out.lines.append((who, text))
+        out.logs += [(str(a.get("station")), str(a.get("text"))) for n, a, _ in turn.actions if n == "console_log"]
+        out.other += [n for n, _, _ in turn.actions if n not in ("console_log", "speak")]
+    out.seconds = time.perf_counter() - t0
+    out.must("the first call is told", bool(out.lines) and out.lines[0][0] == "comms", f"{out.lines}")
+    out.must("in all at most two lines for the three calls", len(out.lines) <= 2, f"{len(out.lines)}")
+    out.must("the others are on the comms log", any(s == "comms" for s, _ in out.logs), f"{out.logs}")
+    out.must("nobody but Comms speaks of them", all(s == "comms" for s, _ in out.lines), f"{[s for s, _ in out.lines]}")
+    out.must("no other tool", not out.other, f"{out.other}")
+    return out
+
+
+async def _nothing() -> None:
+    return None
+
+
 async def main_async(args: argparse.Namespace) -> int:
     llm = OpenRouter()
-    only = set(args.only.split(",")) if args.only else {"wheel", "nets"}
+    only = set(args.only.split(",")) if args.only else {"wheel", "nets", "distress"}
     cases = [c for c in args.case.split(",") if c]
     outs: list[tuple[str, Out]] = []
     t_all = time.perf_counter()
@@ -181,6 +221,8 @@ async def main_async(args: argparse.Namespace) -> int:
                     for n in NET_CASES:
                         if not cases or any(k in n.name for k in cases):
                             outs.append((lang, await _guard(run_net(llm, n, lang), n.name, "nets")))
+                if "distress" in only and (not cases or any(k in "three distress calls" for k in cases)):
+                    outs.append((lang, await _guard(run_distress(llm, lang), "three distress calls", "distress")))
     finally:
         await llm.close()
     for lang, o in outs:

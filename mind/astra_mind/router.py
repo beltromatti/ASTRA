@@ -45,7 +45,10 @@ a statement of the Captain's position that only makes sense said to them. When t
 a refusal, a promise, a yes or a no, "stop", "enough", "answer me" — are most likely said to them. On a fleet channel, orders and
 requests the Captain puts to the admiral or to allied ships are what the channel is for: they go out. When the Captain tells you to pass
 something on, pass the message itself.
-Staying on the bridge: orders and questions for our own crew ({crew}), talk about {party} in the third person, thinking aloud.
+Staying on the bridge: orders and questions for our own crew ({crew}), and everything about our own ship and the people and craft aboard her — her systems and weapons, the
+screen, the fighters (Alpha, Bravo, the drones), the boats (the Kestrels), the marines and the Marine Detachment (send them, board a ship, recall them, how they are, where they are),
+the transporter, the Medbay, "take me to...", "where can I find..." —, talk about {party} in the third person, thinking aloud. A command about our own craft or people is never
+said to {party}, even in the imperative: an order to board, to launch, to recall is for our crew unless it names {party} or answers them.
 When one sentence is for {party} and another for the crew, let out only the part for {party}, word for word.
 
 The words may be typed fast with slips or come from speech recognition: read them for what they mean, in any language. {situation}

@@ -124,11 +124,11 @@ class BridgeAgent:
         last message (crew.crew_context)."""
         return crew_context(self.campaign(), self.war(), self.mood(), self.bonds(), self.standing_lines(), self.memories(), self.style(), self.home())
 
-    def _now(self, state: dict[str, Any], ctx: context_model.Context | None = None) -> str:
-        """The bridge this moment (crew.bridge_now), for the head of a turn's last message."""
+    def _now(self, state: dict[str, Any], ctx: context_model.Context | None = None, news: bool = False) -> str:
+        """The bridge this moment (crew.bridge_now), for the head of a turn's last message. `news`: it is the head of a report turn."""
         hearing = context_model.describe(ctx, self.titles) if ctx else ""
         return bridge_now(state, self.ship.recent_events(), hearing, self._said_aloud(), self._waiting(), self._context(), self._orders(),
-                          where=context_model.where_now(ctx, state), logs=self._logs())
+                          where=context_model.where_now(ctx, state), logs=self._logs(), news=news)
 
     def _logs(self) -> str:
         """What the nets said that the Captain has not heard, and what the consoles' logs hold (nets.Nets.digest): the officers' sense of what the bridge knows and has not said."""
@@ -272,7 +272,7 @@ class BridgeAgent:
         hist = self.history if history_turns is None else self._last_turns(history_turns)
         sysmsg = {"role": "system", "content": system} if system else self._system(lang, state)
         msgs: list[dict[str, Any]] = [sysmsg] + hist
-        now = "" if system else self._now(state) + "\n\n"            # (a role with a prompt of its own carries its own view of the ship)
+        now = "" if system else self._now(state, news=True) + "\n\n"            # (a role with a prompt of its own carries its own view of the ship)
         msgs.append({"role": "user", "content": now + user + "\n" + (ask or EVENT_ASK) + (STANDING_ASK if self.standing and not speak_only else "")})   # (a turn that can only speak carries nothing out)
         on_call = self._on_call(turn, lang, t0, pending, ts, state, fired, captain=False, allowed=allowed)
         tools = [t for t in ts.tools if t["function"]["name"] in (allowed | {"speak"} | (set() if speak_only else {"console_log"}))]   # (the log is silent: nobody's authority is needed)
@@ -468,10 +468,10 @@ class BridgeAgent:
                "asked for: a report ABOUT them, in the third person (they are other members of the crew, not the officer speaking), "
                "who they are, where they are and what they are doing, in one or two short lines; nothing the file does not say. Then, "
                "one short line each, any other officer who acted says what was done." if lookup else
-               "The officers who acted now say to the Captain, one short line each and in speaking order, WHAT was done, with the "
-               "exact values (never a bare 'aye'); for anything that FAILED, why, and an alternative." if readback else
+               "The officers who acted now say to the Captain, one short line each and in speaking order, WHAT was done in a few words, "
+               "with the value that matters (never a bare 'aye', and nothing around it); for anything that FAILED, why, and an alternative." if readback else
                "The responsible officer now tells the Captain briefly what failed and why, and proposes an alternative "
-               "if there is one.")
+               "if there is one — unless the line above already said it: then call no tool, nothing is said twice.")
         follow = msgs + [
             {"role": "assistant", "content": " ".join(f"[{s}] {t}" for s, t in turn.lines) or "(orders executed)"},
             {"role": "user", "content": f"[Ship systems report]\n{notes}\n{ask} Use speak."}]
@@ -517,32 +517,32 @@ class BridgeAgent:
 
 HEARD_WINDOW_S = 60.0       # how far back the officers' «Said aloud» goes
 
-EVENT_ASK = ("The Captain should hear this: the responsible officer reports it now, in one short line with speak (in the "
-             "Captain's language), unless the Captain has already heard it from anyone on the bridge («Said aloud» in the bridge now: "
-             "what was really said, in the words it was said) and nothing has changed since "
-             "(a victory, a retreat, a distance said once is said; the same picture again is noise), or it is news that has "
-             "grown old while the bridge was busy ([happened N s ago]) and no longer matters as it stands — then say nothing, or "
-             "say what it means now. When lines are already waiting to be said («Waiting to be said» in the bridge now), a new line is "
-             "worth adding only if it matters more to the Captain than all of them, and nothing waiting is said again in other words: in a "
-             "crisis a good bridge is a few clear voices, not every voice at once. When several things happened at once (they are joined by |), the officers report the one or "
-             "two that matter most to the Captain right now, the most dangerous first, one short line each: the rest stays on "
-             "the boards and the datapad, where the Captain can ask for it; in a battle the Captain hears many voices, and a "
-             "report that changes nothing the Captain must decide is better left unsaid. Ranges, shield percentages and countdowns "
-             "that move every few seconds are on the screens: say them when they cross a line that matters (into or out of our guns, "
-             "shields failing, a section gone), never as a running commentary of the same target — and news that is about someone else's "
-             "post is no occasion for an officer to restate their own fight (the target's range and shields again, the next salvo). A voice over the radio that the Captain "
-             "heard himself (an enemy commander on his channel, the admiral or a captain answering him, a net he asked to hear: it is in «Said aloud» and in the recent events "
-             "as «over the radio») is nobody's to repeat or sum up; an "
-             "officer speaks after it only to add what the bridge knows and it did not say. Net traffic he did not hear (the «net:» events) is its listener's: see the nets. "
-             "A hail and a channel are Communications' "
-             "(Martin): he alone says who is calling, if the Captain did not hear it, and keeps the channel; no other officer relays a "
-             "call or offers to answer it for the Captain. Within "
-             "their own authority an officer may also act at once: with live consoles, set a mode on their own console when their "
-             "delegation is auto and it keeps the Captain's intent alive; on an older build, damage control, shield facing, point "
-             "defense and the radiators. To act, CALL the tool in this same turn, then say what was done — saying it without the "
-             "tool call does nothing and misleads the Captain. What needs the Captain's word (course changes on your own, a "
-             "new offensive, leaving, breaking off, a channel with the enemy) is proposed instead — unless a standing order in "
-             "force covers it.")
+EVENT_ASK = ("NEWS (the events above, several joined by |): it happened while the Captain was busy, and the default of a news turn is SILENCE: most of them say nothing, or only "
+             "write on a log. The test: would the Captain act differently, or be worse off, if nobody said this aloud? If not, it is not said. "
+             "SAY IT with one short `speak` line (in the Captain's language): from the XO, who is the voice of the picture and of advice — what changed, what it means, what he might "
+             "do, in one sentence of ten to twenty words — or from the officer who owns it ONLY for danger he can act on right now in their field (a salvo inbound, a breach, the reactor "
+             "or the heat at a limit, a squadron lost), a decision in their field that is his to make, or a call that needs his answer. When several things happened at once ONE line "
+             "covers them, the most dangerous first. "
+             "LOG IT with `console_log` on the console it belongs to — one telegraphic line in English, and NO `speak` — when it is routine: a range or a shield percentage that moved, a "
+             "rearm or a repair done, a fire out, a contact that faded or was lost, point defence splashing a missile, a target retargeted inside the orders. "
+             "SAY NOTHING when the Captain has already heard it («Said aloud» in the bridge now: from anyone, in any words), when it is already waiting to be said («Waiting to be said»), "
+             "when it is the same picture again (the same fight, the next salvo, the next range of the same target), when it is his own order coming back, or when it is news that grew old "
+             "while the bridge was busy ([happened N s ago]) and no longer matters as it stands. Before you speak, read «Said aloud»: if what you are about to say is already there in "
+             "substance — in other words, with the same figures, from another officer, or beginning with the same words — say nothing, the same picture again is the worst noise on a "
+             "bridge; say only what is NEW since the last line: a new contact, a loss, a number that crossed a line that matters. A good bridge in a crisis is a few clear voices, not "
+             "every voice at once: when lines are already waiting to be said, a new one is worth adding only if it matters more than all of them. "
+             "A vessel's distress call, convoy and traffic news and a port's call are Communications' alone. The first is one line (who, how far, what is after them); the ones that follow "
+             "while the Captain has not answered are logged on the comms console (`console_log`) or, if together they change the picture, told in ONE grouped line («two more merchants "
+             "are calling, on the log»). In a fight the Captain hears of such a call only when the Aquila can really do something about it now (in reach, in time); otherwise it is for the "
+             "log. "
+             "A voice over the radio that the Captain heard himself (an enemy commander on his channel, the admiral or a captain answering him, a net he asked to hear: it is in «Said aloud» "
+             "and in the recent events as «over the radio») is nobody's to repeat or sum up; an officer speaks after it only to add what the bridge knows and it did not say. Net traffic he "
+             "did not hear (the «net:» events) is its listener's: see the nets. A hail and a channel are Communications' (Martin): he alone says who is calling, if the Captain did not "
+             "hear it, and keeps the channel; no other officer relays a call or offers to answer it for the Captain. Within their own authority an officer may also act at once: with live "
+             "consoles, set a mode on their own console when their delegation is auto and it keeps the Captain's intent alive; on an older build, damage control, shield facing, point "
+             "defense and the radiators. To act, CALL the tool in this same turn — saying it without the tool call does nothing and misleads the Captain — and say what was done in one line "
+             "when it changes the fight (a launch, a new target for the guns, a squadron recalled); keeping a console alive inside the orders is the log's. What needs the Captain's word "
+             "(course changes on your own, a new offensive, leaving, breaking off, a channel with the enemy) is proposed instead — unless a standing order in force covers it.")
 NET_ASK = ("NET TRAFFIC (the «net:» event above): radio on a net that the Captain has NOT heard — it is not on the bridge's speaker; he reads the consoles' logs and the datapad. The "
            "officer who has the watch on that net decides, line by line, between two things. "
            "TELL HIM — one short `speak` line of their own (never the sender's words read back), and the log as well if they like — when: the event says [URGENT]; a line calls the "
@@ -552,6 +552,22 @@ NET_ASK = ("NET TRAFFIC (the «net:» event above): radio on a net that the Capt
            "in place, a bulkhead sealed, an ally holding. A turn of routine traffic has no `speak` call at all. "
            "What the Captain has already heard («Said aloud», in any words), what his own order just produced, and what the boards show are never told again; when lines are already "
            "waiting to be said, only what outweighs them is worth adding.")
+
+
+SYSTEM_CALLS = ("comms: distress call", "comms: fleet net news")       # (what the game and the March send to Communications: a vessel calling for help, the fleet net's news of the war)
+SYSTEM_CALL_ASK = ("SYSTEM CALL (the «comms:» event above): a vessel's call for help, or the fleet net's news of the war. It is Communications' (Martin) and it is NOT an alarm: a "
+                   "bridge that says every call aloud is a switchboard. Read «Said aloud» and the recent events first. "
+                   "THE FIRST of its kind (nothing like it was said in the last few minutes): ONE `speak` line from Communications — who, how far from us, what is after them — and the "
+                   "comms log as well if he likes. "
+                   "ANY LATER ONE while the Captain has not answered the first: `console_log` on the comms console (one telegraphic line in English) and NO `speak` — at most ONE grouped line "
+                   "(«two more merchants are calling, toward the Arsenal: they are on the log») when together they change what the Aquila should do. "
+                   "In a fight the Captain hears of a call only when the Aquila can really do something about it now (in reach, in time); otherwise it is for the log. "
+                   "Nobody else says it: the XO does not repeat Communications' line.")
+
+
+def system_calls_only(events: list[str]) -> bool:
+    """The news is only calls of the system to Communications (a distress call, the fleet net's news): they are asked by their own doctrine, alone."""
+    return bool(events) and all(e.startswith(SYSTEM_CALLS) for e in events)
 
 
 def net_ask(events: list[str]) -> str:
