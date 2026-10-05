@@ -21,6 +21,8 @@
                                        his chest not seen: a smaller target; crouched and lying not seen at all)
                                        --scenario fuzz [--class acheron] (on request): the marines go aboard each class's ship and a squad of theirs is given an order at random every fifteen seconds (any task, any room, any
                                        modifier): nobody off the plan, no number gone bad, the step as cheap as before, the same fight from the same seed (the robustness of the infantry orders on the plans they were not tuned on)
+                                       --scenario wreck [--class vigilant] (on request): the pieces of the wrecks (ABBORDAGGI-4, docs/ABBORDAGGI.md §15.4): every class's bow, middle, stern and whole hull as a place to board: her rooms and no way
+                                       across the cuts, the hatches she has and a torn end at each cut, her dead laid in her rooms, and 12 marines going through her with nobody to fight (they cut in, walk to her objective, hold it)
                                        --scenario fps (on request, no plan needed): the Captain's arms on the weapons against the mannequin's own
                                        animations (the sight on its place, the hands on the grips, what the picture holds at 16:9 and 16:10);
                                        --fpsposes FILE writes the engine's poses for the offline preview
@@ -284,11 +286,12 @@ ASSAULT_SETUPS = {
                     expect=[r"the war has left her \d+ of her people under arms", r"the Captain is aboard Wreck with the marines", r"Wreck is ours|boarding of Wreck has failed|have broken off|has gone quiet", r"the Captain is back aboard the Aquila"]),
     # the decks dressed (ABBORDAGGI-3): in a headless run the content has none of the kit's meshes, so every piece is the engine's cube (astra.board.dress 3) and everything the dressing makes in the world is made
     # and counted all the same: the instances of each kind, the boxes of the props, the lamps (and the lights that follow the Captain), the door signs, the fallen, the flames and sparks of the rooms the war burnt.
-    # (The Captain is aboard from about 11 220 s, or from about 11 600 s when the worker that reads the plan is slow: `astra.board.info` is asked all along, one of the answers is in the fight.)
+    # (The plan is read before the war runs on (a bench waits for the worker), so the timeline is the same on any machine: the boats leave at about 11 037 s, the Captain is aboard from 11 078 s and the fight is
+    # decided at about 11 215 s: `astra.board.info` is asked all along that, one of the answers is in the fight.)
     "out_dress": dict(doc="the Captain aboard a ship the war has shot up with her decks dressed (the kit's pieces as cubes): what the dressing made, counted by the boarding's info", seconds=12000,
                       exec=f"{_AQ};astra.war.spawn acheron mandate 0 -3 0 90 id=M1 name=Wreck static hold passive;{_NOFATE};astra.board.dress 3",
                       at="2=astra.board.strip M1|3=astra.war.fleet pound M1 port 70 12 kinetic|60=astra.war.fleet pound M1 port 70 10 explosive|11000=astra.board.disable M1|11000=astra.board.testcaptain 0 0 0|"
-                         "11001=astra.board.assault out M1 - 2 port - ride|11230=astra.board.info|11250=astra.board.info|11270=astra.board.info|11290=astra.board.info|11630=astra.board.info|11650=astra.board.info|11670=astra.board.info|11690=astra.board.info|11710=astra.board.info|11730=astra.board.info",
+                         "11001=astra.board.assault out M1 - 2 port - ride|11090=astra.board.info|11110=astra.board.info|11130=astra.board.info|11150=astra.board.info|11170=astra.board.info|11190=astra.board.info|11210=astra.board.info",
                       expect=[r"the Captain is aboard Wreck with the marines", r"decks dressed: \d+ rooms, \d+ kit instances \(\d+ wall, \d+ ceiling, \d+ floor, \d+ opening, \d+ prop, \d+ fallen\), \d+ lamps", r"the Captain is back aboard the Aquila"]),
     # a station is a place of the system (SPAZIO-VIVO's fixtures: Keeper Station, the Arsenal, a refinery, a mine), not a ship of this war: no boat is flown at it and none from it
     # (the war bench has no living space to make one: a ship is made a fixture, as the war sees them)
@@ -315,7 +318,7 @@ ASSAULT_SETUPS["out_join_late"] = dict(doc="the Captain says he comes when the b
                                        expect=[r"join refused: the Kestrels are already out of the bay.*no boat takes the Captain in flight\. When they are latched at her hatches the Chief can beam him aboard"])
 ASSAULT_SETUPS["out_recall"] = dict(doc="the boarding is called off with the marines on her decks: they come out by their hatches, then the boats let go and fly home with them", seconds=12000,
                                     exec=f"{_AQ};astra.war.spawn acheron mandate 0 -3 0 90 id=M1 name=Hulk static hold passive;{_NOFATE}",
-                                    at="11000=astra.board.disable M1|11001=astra.board.assault out M1 - 2 port|11215=astra.board.recall the_Captain called_off|11235=astra.board.info",
+                                    at="11000=astra.board.disable M1|11001=astra.board.assault out M1 - 2 port|11110=astra.board.recall the_Captain called_off|11150=astra.board.info",
                                     expect=[r"ok: the marines are called out of her decks: \d+ squads", r"the marines are called out of her decks: back to the boats by their hatches",
                                             r"the marines have broken off and are back in their boats|Hulk is ours", r"departed Kestrel 1", r"recovered Kestrel 1", r"is back in the boat bay: \d+ marines aboard"])
 # the infantry orders through the game's own entrance (ABBORDAGGI-4: `marine_order` with sweep, breach, take, ambush, escort_captain and what goes with them): the marines in two Kestrels at a hulk, ordered once
@@ -340,6 +343,30 @@ ASSAULT_SETUPS["out_orders_captain"] = dict(doc="the same with the Captain in th
                                             at="11000=astra.board.disable M1|11000=astra.board.testcaptain 0 0 0|11001=astra.board.assault out M1 - 2 port - ride|" + _orders_at(10, "Boarding_Alpha escort_captain") + "|11002=astra.board.order picture after=40",
                                             expect=[r"the Captain is aboard Hulk with the marines", r"order ok at \d+ s: Boarding Alpha: escort the Captain", r"picture at \d+ s: .*\"drill\":\"escorting the Captain",
                                                     r"snapshot at \d+ s: \{\"captain_aboard\":true,\"captain_with_marines\":true"])
+# a piece of a wreck (ABBORDAGGI-4, docs/ABBORDAGGI.md §15.4): the living space's bench world (the campaign's opening in the Aurelia system) loses a warship (`astra.space.lose`: ASN Vigilant, T-02, breaks up into
+# W-02B, W-02M and W-02S; the Mandate's T-11 loses her reactor and is one hull, W-11), the pieces are contacts of the plot, and the marines go through one. Nobody is alive aboard: nothing to fight, the dead to be found.
+_SPACE = "astra.space.reactions 0;astra.board.takeover_fatal 0"
+ASSAULT_SETUPS["out_wreck"] = dict(doc="the marines go through the middle section of a broken ship: her class's plan cut at the war's cuts, nobody alive aboard, her dead where people are; the boats cut in at her hatches, the objective is held, the boats home", seconds=700, runner="space",
+                                   exec=_SPACE, at="30=astra.space.lose T-02 breakup 1|45=astra.board.options 0|50=astra.board.assault out W-02M - 2 any",
+                                   expect=[r"options: .*\"id\":\"W-02M\",\"class\":\"wreck\",\"wreck\":true,\"part\":\"middle section\"", r"piece of the vigilant, middle section: \d+ of 187 rooms, \d+ portals, \d+ docks", r"order \d+: the Aquila launches 2 Kestrels \(24 marines\) at middle section of ASN Vigilant", r"docked Kestrel 1",
+                                           r"latched to middle section of ASN Vigilant at .* and cut in: 12 marines are through, going for .*nobody is alive aboard her: \d+ of her people lie dead",
+                                           r"the marines have gone through middle section of ASN Vigilant and hold .*nobody is alive aboard her; \d+ of her dead lie in her rooms", r"recovered Kestrel 1"])
+ASSAULT_SETUPS["out_wreck_ends"] = dict(doc="the bow of the broken ship has no hatch (the boat cuts in at her torn end: one boat, one way in); an objective a piece has not is refused with what she has; the stern has her bridge", seconds=600, runner="space",
+                                        exec=_SPACE, at="30=astra.space.lose T-02 breakup 1|50=astra.board.assault out W-02B - 2 any bridge|55=astra.board.assault out W-02B - 2 any",
+                                        expect=[r"the boarding of bow section of ASN Vigilant is off: bow section of ASN Vigilant has no 'bridge' left \(the bow part of her ship\): (she still has |name a room by its id)",
+                                                r"order \d+: the Aquila launches 1 Kestrel \(12 marines\) at bow section of ASN Vigilant, .*hatches tear_aft", r"the marines have gone through bow section of ASN Vigilant and hold ", r"recovered Kestrel 1"])
+ASSAULT_SETUPS["out_wreck_stern"] = dict(doc="the stern of the broken ship, for her bridge: one torn end to cut in at, and the bridge is hers", seconds=600, runner="space",
+                                         exec=_SPACE, at="30=astra.space.lose T-02 breakup 1|50=astra.board.assault out W-02S - 2 any bridge",
+                                         expect=[r"launches 1 Kestrel \(12 marines\) at stern section of ASN Vigilant", r"going for the bridge; nobody is alive aboard her", r"the marines have gone through stern section of ASN Vigilant and hold deck 1 section D \(Bridge\)", r"recovered Kestrel 1"])
+ASSAULT_SETUPS["out_wreck_whole"] = dict(doc="a freighter simply destroyed (T-07) is one burnt hull (W-07): the whole class plan, nobody alive, boarded as a ship", seconds=700, runner="space",
+                                         exec=_SPACE, at="30=astra.space.lose T-07 destroyed|50=astra.space.wrecks.contacts|55=astra.board.assault out W-07 - 2 any",
+                                         expect=[r"launches 2 Kestrels \(24 marines\) at wreck of ", r"the marines have gone through wreck of .* and hold .*nobody is alive aboard her; \d+ of her dead lie in her rooms", r"recovered Kestrel 1"])
+ASSAULT_SETUPS["out_wreck_ride"] = dict(doc="the Captain rides with the marines into a wreck's piece (a test Captain with no pawn): her decks made solid and dressed from the plan of the piece alone, her dead laid in them; the squads sweep her", seconds=800, runner="space",
+                                        exec=_SPACE + ";astra.board.dress 3",
+                                        at="30=astra.space.lose T-02 breakup 1|40=astra.board.testcaptain 0 0 0|50=astra.board.assault out W-02M - 2 any - ride|"
+                                           "148=astra.board.info|160=astra.board.order Boarding_Alpha sweep deck_3_section_C after=2|170=astra.board.info|185=astra.board.info|200=astra.board.order picture after=1|210=astra.board.info",
+                                        expect=[r"the Captain is aboard middle section of ASN Vigilant with the marines", r"decks dressed: \d+ rooms, \d+ kit instances \(\d+ wall, \d+ ceiling, \d+ floor, \d+ opening, \d+ prop, \d+ fallen\), \d+ lamps",
+                                                r"order ok at \d+ s: Boarding Alpha: clear the rooms of", r"picture at \d+ s: .*\"wreck\":true,\"wreck_part\":\"the middle section\",\"dead_aboard_this_piece\":\d+", r"the Captain is back aboard the Aquila"])
 # the pace of the whole operation at the distances a battle is fought at (ABBORDAGGI-4): the order, the muster, the flight, the cut in, the fight, the flight home
 for _km in (10, 20, 40, 80):
     ASSAULT_SETUPS[f"out_{_km}"] = dict(doc=f"the marines in two Kestrels at a hulk {_km} km away: how long from the order to the cut in, and the boats home", seconds=11900 + 4 * _km,
@@ -353,8 +380,13 @@ def _assault_run(a, name: str, setup: dict) -> dict:
     OUT.mkdir(parents=True, exist_ok=True)
     log = OUT / f"assault_{name}.log"
     out = OUT / f"assault_{name}.json"
-    args = [str(ENGINE), str(ROOT / "ASTRA.uproject"), "-run=AstraWarSim", f"-seconds={setup['seconds']}", "-step=0.1", "-every=50", f"-out={out}", f"-seed={a.seed}", f"-seeds=1",
-            f"-exec={setup['exec']}", f"-at={setup['at']}", "-nullrhi", "-unattended", "-nosound", "-nosplash", "-NoVerifyGC", "-stdout", "-FullStdOutLogOutput"]
+    if setup.get("runner") == "space":
+        # the living space's own bench world (the campaign's opening in the Aurelia system: the Aquila and her fleet, the traffic, and what the war leaves): the wrecks are made there (`astra.space.lose`)
+        args = [str(ENGINE), str(ROOT / "ASTRA.uproject"), "-run=AstraSpaceSim", f"-seconds={setup['seconds']}", "-step=0.1", "-every=50", f"-out={out}", f"-seed={a.seed}", "-system=Aurelia",
+                f"-exec={setup['exec']}", f"-at={setup['at']}", "-nullrhi", "-unattended", "-nosound", "-nosplash", "-NoVerifyGC", "-stdout", "-FullStdOutLogOutput"]
+    else:
+        args = [str(ENGINE), str(ROOT / "ASTRA.uproject"), "-run=AstraWarSim", f"-seconds={setup['seconds']}", "-step=0.1", "-every=50", f"-out={out}", f"-seed={a.seed}", f"-seeds=1",
+                f"-exec={setup['exec']}", f"-at={setup['at']}", "-nullrhi", "-unattended", "-nosound", "-nosplash", "-NoVerifyGC", "-stdout", "-FullStdOutLogOutput"]
     retries = max(0, getattr(a, "retries", 2))
     for attempt in range(1 + retries):
         with open(log, "w") as f:
@@ -423,7 +455,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     r = sub.add_parser("run")
-    r.add_argument("--scenario", default="all", help="all | map | rules | duel | squad | flank | board | orders (the marines' orders, on request only) | fps (the Captain's arms, on request only) | lean (the Captain's body in the fight: leaning out of cover, lying, a head over a wall; on request only) | fuzz (orders at random on every class's plan, on request only) | plans | attack (other ships' plans and the marines aboard one, on request only) | interior (every class's plan made solid and the simulation's routes walked through it, on request only) | war (a ship the war has shot at, boarded, on request only) | take | breach | sweep | ambush | hold | seal | drills (the infantry orders with and without, on request only) | escort (the Captain walking to a bridge with an escort, on request only) | dress (every class's decks dressed: instances and triangles for the ship, each deck and the ring round a Captain against the plain boxes, the soldiers' ways clear of the props, the doors, no one placed in a prop; on request only)")
+    r.add_argument("--scenario", default="all", help="all | map | rules | duel | squad | flank | board | orders (the marines' orders, on request only) | fps (the Captain's arms, on request only) | lean (the Captain's body in the fight: leaning out of cover, lying, a head over a wall; on request only) | fuzz (orders at random on every class's plan, on request only) | wreck (the pieces of every class's wrecks as places to board, on request only) | plans | attack (other ships' plans and the marines aboard one, on request only) | interior (every class's plan made solid and the simulation's routes walked through it, on request only) | war (a ship the war has shot at, boarded, on request only) | take | breach | sweep | ambush | hold | seal | drills (the infantry orders with and without, on request only) | escort (the Captain walking to a bridge with an escort, on request only) | dress (every class's decks dressed: instances and triangles for the ship, each deck and the ring round a Captain against the plain boxes, the soldiers' ways clear of the props, the doors, no one placed in a prop; on request only)")
     r.add_argument("--seed", type=int, default=1)
     r.add_argument("--seeds", type=int, default=20, help="how many fights of each kind (seeds seed .. seed+seeds-1)")
     r.add_argument("--boarders", type=int, default=0, help="board: the size of the boarding party of the first setup (default 10, one skiff)")

@@ -13,6 +13,7 @@
 #include "AstraFleetInterior.h"
 #include "AstraFleetPlan.h"
 #include "AstraWeapon.h"
+#include "AstraWrecks.h"
 #include "Animation/AnimSequence.h"
 #include "Animation/AttributesRuntime.h"
 #include "BonePose.h"
@@ -3981,6 +3982,203 @@ static void BoardScenarioFuzz(const FString& Only, int32 Seed, int32 Seeds, cons
 	}
 }
 
+// ================================================================================================================== the pieces of the wrecks (ABBORDAGGI-4)
+
+/** A piece of a broken ship is boarded (SPAZIO-VIVO's wreck contacts: the bow, the middle or the stern of a class, or her whole hull burnt dark). For every class and every part: the plan of the piece (her rooms, no way across the cuts,
+ *  the hatches she still has and a torn end at each cut), where her dead lie, and the marines going through her with nobody to fight: they cut in, walk to her objective and hold it. The numbers are those of the plans, not of a war. */
+static void BoardScenarioWreck(const FString& Only, int32 Seed, int32 Seeds, const FTuning& Tuning)
+{
+	TArray<FName> Classes;
+	AstraBoardPlans::ClassesWithPlans(Classes);
+	if (!Only.IsEmpty())
+	{
+		Classes = {FName(*Only)};
+	}
+	if (Classes.IsEmpty())
+	{
+		BCheck("wreck", false, TEXT("no plans in data/ship/plans"));
+		return;
+	}
+	int32 Rows = 0, Bad = 0, Empty = 0;
+	FString Why;
+	for (const FName& K : Classes)
+	{
+		const TSharedPtr<FBoardShipPlan> Whole = AstraBoardPlans::Load(K, Why);
+		if (!Whole.IsValid())
+		{
+			BCheck("wreck", false, FString::Printf(TEXT("%s: %s"), *K.ToString(), *Why));
+			++Bad;
+			continue;
+		}
+		int32 InParts = 0;
+		for (const uint8 Section : {(uint8)0, (uint8)1, (uint8)2, (uint8)255})
+		{
+			const TSharedPtr<FBoardShipPlan> P = AstraBoardPlans::LoadPiece(K, Section, Why);
+			const TCHAR* Part = Section == 0 ? TEXT("bow") : (Section == 1 ? TEXT("middle") : (Section == 2 ? TEXT("stern") : TEXT("whole")));
+			if (!P.IsValid())
+			{
+				++Empty;
+				BNote(FString::Printf(TEXT("  %-10s %-6s: no plan (%s)"), *K.ToString(), Part, *Why));
+				continue;
+			}
+			++Rows;
+			const FAstraBoardMap& M = *P->Map;
+			const int32 Total = Whole->Dmg->Comps.Num();
+			InParts += Section < 3 ? P->NumRooms() : 0;
+			// no way across the cuts
+			int32 Crossing = 0;
+			for (const FBoardPortal& Po : M.GetPortals())
+			{
+				Crossing += P->Has(Po.A) != P->Has(Po.B) ? 1 : 0;
+			}
+			// the hatches and the torn ends
+			int32 Hatches = 0, Torn = 0, StrayDocks = 0;
+			for (const FBoardShipPlan::FDock& D : P->Docks)
+			{
+				(D.Id.ToString().StartsWith(TEXT("tear_")) ? Torn : Hatches) += 1;
+				StrayDocks += P->Has(D.Comp) ? 0 : 1;
+			}
+			// where the marines go, and that every hatch has a way there
+			const int32 Cut = P->Docks.IsEmpty() ? INDEX_NONE : P->Docks[0].Comp;
+			const int32 Obj = AstraBoardPlans::PieceObjective(*P, Cut);
+			int32 NoWay = 0;
+			for (const FBoardShipPlan::FDock& D : P->Docks)
+			{
+				TArray<FVector> Pts;
+				float Len = 0.f;
+				FBoardRouteOptions Opt;
+				Opt.bThroughSealed = true;
+				NoWay += (Obj != INDEX_NONE && M.GetComps().IsValidIndex(D.Comp) && M.Route(M.Inset(D.Comp, D.Pos, 70.f), M.CentreOf(Obj), Pts, Opt, &Len)) ? 0 : 1;
+			}
+			// her dead: what her record would say of a ship that lost sixty of her crew and had twenty die of the blows, and a few of her bulkheads shut
+			AstraBoardScene::FWreckAboard Ab;
+			Ab.Name = TEXT("ASN Bench");
+			Ab.Killed = 20;
+			Ab.Lost = 40;
+			Ab.Complement = 200;
+			Ab.Share = AstraSpace::FWrecks::SectionShare(K, Section);
+			for (const FBoardPortal& Po : Whole->Map->GetPortals())
+			{
+				if (Po.Kind == FBoardPortal::EKind::Blast && Ab.SealedDoors.Num() < 4)
+				{
+					Ab.SealedDoors.Add(Whole->Dmg->Doors[Po.Door].Id);
+				}
+			}
+			for (int32 i = 0; i < Total; i += 7)
+			{
+				AstraBoardScene::FWreckAboard::FRoom R;
+				R.Comp = i;
+				R.Power = 0.f;
+				R.Air = (i % 3 == 0) ? 0.1f : 1.f;
+				R.bGutted = i % 11 == 0;
+				Ab.Rooms.Add(R);
+			}
+			FFleetSnapshot Snap;
+			AstraBoardScene::WreckInside(*P, Ab, Seed, Snap);
+			int32 DeadOff = 0;
+			for (const FFleetSnapshot::FHand& H : Snap.Fallen)
+			{
+				const bool bIn = P->Has(H.Comp) && M.GetComps().IsValidIndex(H.Comp) && M.GetComps()[H.Comp].Box.ExpandBy(FVector(1.0, 1.0, 400.0)).IsInside(H.PosCm);
+				DeadOff += bIn ? 0 : 1;
+			}
+			const bool bDeadOk = Snap.Fallen.Num() == Ab.DeadHere() && DeadOff == 0 && Snap.Hands.IsEmpty();
+			// the marines go through her: twelve in one boat at the first hatch, nobody to fight
+			int32 Took = 0, Ran = 0, Off = 0;
+			double TookS = 0.0, Lost = 0.0;
+			if (Obj != INDEX_NONE && !P->Docks.IsEmpty())
+			{
+				for (int32 s = 0; s < FMath::Max(2, Seeds / 3); ++s)
+				{
+					FAstraBoardSim Sim;
+					Sim.Init(P->Map.ToSharedRef(), Seed + s);
+					Sim.Tuning = Tuning;
+					Sim.Tuning.bEvacuate = true;
+					Sim.Tuning.HoldS = 120.f;
+					AstraBoardScene::FSpec Spec;
+					Spec.Attacker = ESide::Aquila;
+					Spec.Attackers = 12;
+					Spec.Dock = 0;
+					Spec.Objective = P->Dmg->Comps[Obj].Id.ToString();
+					Spec.bSweep = false;
+					Spec.Inside = &Snap;
+					Spec.PostShare = 0.f;
+					Spec.Roaming = 0;
+					Spec.MinPerPost = 0;
+					Spec.Seed = Seed + s;
+					const AstraBoardScene::FResult Sc = AstraBoardScene::Build(Sim, *P, Spec);
+					if (!Sc.bOk)
+					{
+						continue;
+					}
+					const FRunResult R = RunSim(Sim, 900.0);
+					++Ran;
+					Took += R.Outcome == EOutcome::AttackerTakes ? 1 : 0;
+					TookS += R.T;
+					Off += R.BadPos;
+					Lost += R.Book.Killed[0] + R.Book.Down[0];
+				}
+			}
+			const bool bOk = Crossing == 0 && StrayDocks == 0 && !P->Docks.IsEmpty() && Obj != INDEX_NONE && NoWay == 0 && bDeadOk && Ran > 0 && Took == Ran && Off == 0
+				&& (Section > 2 ? P->NumRooms() == Total : (P->NumRooms() > 0 && P->NumRooms() < Total));
+			Bad += bOk ? 0 : 1;
+			BNote(FString::Printf(TEXT("  %-10s %-6s: %3d of %3d rooms, %d hatches + %d torn ends, objective %-34s, %d dead laid (%d off their rooms), %d fights: taken %d, %.0f s, %.1f marines lost, %d off the plan%s%s"), *K.ToString(), Part,
+			                      P->NumRooms(), Total, Hatches, Torn, Obj != INDEX_NONE ? *M.Describe(Obj).Left(34) : TEXT("-"), Snap.Fallen.Num(), DeadOff, Ran, Took, Ran ? TookS / Ran : 0.0, Ran ? Lost / Ran : 0.0, Off,
+			                      Crossing ? *FString::Printf(TEXT(", %d ways cross the cut"), Crossing) : TEXT(""), NoWay ? *FString::Printf(TEXT(", %d hatches with no way to the objective"), NoWay) : TEXT("")));
+		}
+		// the three parts hold every room of the ship, each in one part
+		FString W2;
+		int32 Sum = 0;
+		for (const uint8 Section : {(uint8)0, (uint8)1, (uint8)2})
+		{
+			const TSharedPtr<FBoardShipPlan> P = AstraBoardPlans::LoadPiece(K, Section, W2);
+			Sum += P.IsValid() ? P->NumRooms() : 0;
+		}
+		// (a corridor that runs across a cut is in both its parts; a room the plan itself leaves with no way to the rest of the ship, or one the cuts cut off from its part, is in none)
+		int32 Reach = 0;
+		{
+			const FAstraBoardMap& WM = *Whole->Map;
+			const int32 N = Whole->Dmg->Comps.Num();
+			TArray<int32> Group;
+			Group.Init(-1, N);
+			int32 BestN = 0, Groups = 0;
+			for (int32 i = 0; i < N; ++i)
+			{
+				if (Group[i] >= 0)
+				{
+					continue;
+				}
+				int32 Count = 0;
+				TArray<int32> Stack({i});
+				Group[i] = Groups;
+				while (Stack.Num())
+				{
+					const int32 C = Stack.Pop();
+					++Count;
+					for (const int32 Pi : WM.GetComps()[C].Portals)
+					{
+						const int32 O = WM.GetPortals()[Pi].Other(C);
+						if (Group.IsValidIndex(O) && Group[O] < 0)
+						{
+							Group[O] = Groups;
+							Stack.Add(O);
+						}
+					}
+				}
+				BestN = FMath::Max(BestN, Count);
+				++Groups;
+			}
+			Reach = BestN;
+		}
+		BNote(FString::Printf(TEXT("  %-10s the three parts hold %d rooms of the %d she has (a long room is in two parts; a deck that reaches the rest of its part only across a cut is a part of its own, and is left: nobody can walk to it)"), *K.ToString(), Sum,
+		                      Whole->Dmg->Comps.Num()));
+		if (Sum < FMath::FloorToInt(0.8f * Reach) || Sum > FMath::CeilToInt(1.25f * Reach))
+		{
+			++Bad;
+		}
+	}
+	BCheck("wreck: every piece of every class", Rows > 0 && Bad == 0, FString::Printf(TEXT("%d pieces (%d parts of a class that has no rooms in them): their rooms, their ways in, their dead and the marines going through them"), Rows, Empty));
+}
+
 // ================================================================================================================== a ship the war has shot at (FLOTTA-VIVA's inside, then the marines)
 
 /** FLOTTA-VIVA's inside of a class's ship is shot at (so many blows, then a minute), its snapshot is taken as the host takes it, and the marines go aboard that ship: with the people the war left, where it
@@ -4159,7 +4357,7 @@ int32 UAstraBoardSimCommandlet::Main(const FString& Params)
 	FParse::Value(*Params, TEXT("-setup="), GSetup);
 	Scenario = Scenario.ToLower();
 	FRig Rig;
-	if (Scenario == TEXT("plans") || Scenario == TEXT("attack") || Scenario == TEXT("interior") || Scenario == TEXT("war") || Scenario == TEXT("dress") || Scenario == TEXT("escort") || Scenario == TEXT("fuzz"))      // (on request only: other ships' plans, the marines going aboard one, the plans made solid and dressed; no plan of the Aquila needed)
+	if (Scenario == TEXT("plans") || Scenario == TEXT("attack") || Scenario == TEXT("interior") || Scenario == TEXT("war") || Scenario == TEXT("dress") || Scenario == TEXT("escort") || Scenario == TEXT("fuzz") || Scenario == TEXT("wreck"))      // (on request only: other ships' plans, the marines going aboard one, the plans made solid and dressed; no plan of the Aquila needed)
 	{
 		FString Class;
 		FParse::Value(*Params, TEXT("-class="), Class);
@@ -4194,6 +4392,10 @@ int32 UAstraBoardSimCommandlet::Main(const FString& Params)
 		else if (Scenario == TEXT("fuzz"))
 		{
 			BoardScenarioFuzz(Class, Seed, Seeds, T);
+		}
+		else if (Scenario == TEXT("wreck"))
+		{
+			BoardScenarioWreck(Class, Seed, Seeds, T);
 		}
 		else
 		{

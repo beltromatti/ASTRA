@@ -201,6 +201,13 @@ TSharedRef<FJsonObject> UAstraBoardSubsystem::MarinesPicture() const
 	{
 		J->SetStringField(TEXT("ship_class"), Assault.TargetClassText);
 	}
+	if (Assault.bWreck && Mode == EMode::Remote)
+	{
+		// a piece of a broken ship: nobody alive aboard, nothing defends her; the squads search her and the dead they find are what there is to tell
+		J->SetBoolField(TEXT("wreck"), true);
+		J->SetStringField(TEXT("wreck_part"), Assault.WreckSection == 0 ? TEXT("the bow section") : (Assault.WreckSection == 1 ? TEXT("the middle section") : (Assault.WreckSection == 2 ? TEXT("the stern section") : TEXT("the whole hull"))));
+		J->SetNumberField(TEXT("dead_aboard_this_piece"), Assault.Wreck.DeadHere());
+	}
 	J->SetStringField(TEXT("breach"), BreachText);
 	J->SetStringField(TEXT("objective"), Map->Describe(Fight.Mission().Objective));
 	J->SetStringField(TEXT("objective_id"), CompId(Fight.Mission().Objective));

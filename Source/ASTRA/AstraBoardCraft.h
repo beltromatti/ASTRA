@@ -244,6 +244,10 @@ namespace AstraBoardCraft
 		int32 Side = 2;                  // 0 ASTRA, 1 Mandate, 2 neutral
 		bool bAlive = false, bDisabled = false, bCraft = false, bPlayer = false, bDerelict = false, bHasModel = false;
 		bool bFixture = false;           // a place of the system (a station, a refinery, a mine: SPAZIO-VIVO): not a ship that is fought over, boarded or boarded from
+		bool bWreck = false;             // a piece of a ship the war broke (SPAZIO-VIVO, AstraWrecks.h): a fixture and a derelict that the marines may go through (nobody is alive aboard, nobody can be fought for her)
+		uint8 WreckSection = 255;        // (a wreck) which part of her it is: 0 the bow, 1 the middle, 2 the stern, 255 her whole hull; her ClassKey is the class of the ship she was
+		FVector WreckPivotM = FVector::ZeroVector;   // (a wreck) the pivot the contact's Pos is (what the piece turns about), in the hull's frame (m): a hatch of her plan is at Pos + Att * (its hull place - the pivot)
+		int32 WreckSite = -1;            // (a wreck) her record in the space module
 		FVector Pos = FVector::ZeroVector;
 		FVector Vel = FVector::ZeroVector;
 		FQuat Att = FQuat::Identity;

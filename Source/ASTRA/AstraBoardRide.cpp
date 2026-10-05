@@ -229,6 +229,7 @@ bool UAstraBoardSubsystem::EnsureEnemyDecks(const FVector& NearPlanCm, int32 Max
 			}
 			bHulk = Dark * 2 > ScenePlan->Dmg->Comps.Num();
 		}
+		bHulk |= Assault.bWreck;                                  // (no power in a wreck: the red of the emergency strips, whatever the record says of her rooms)
 		Interior->Begin(ScenePlan, RemoteOffset, bHulk ? EAstraInteriorStyle::Emergency : EAstraInteriorStyle::Lit, Assault.bFromWar ? &Assault.Moods : nullptr, Assault.bFromWar ? &Assault.Fallen : nullptr);
 	}
 	Interior->EnsureAround(NearPlanCm, MaxRooms);

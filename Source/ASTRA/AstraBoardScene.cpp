@@ -233,6 +233,109 @@ void AstraBoardScene::CasualtiesOf(const FAstraBoardSim& Sim, ESide Side, TArray
 	}
 }
 
+int32 AstraBoardScene::ObjectiveOf(const FBoardShipPlan& Plan, const FString& Name, FString& OutLabel)
+{
+	return ScObjective(Plan, Name, OutLabel);
+}
+
+void AstraBoardScene::WreckInside(const FBoardShipPlan& Plan, const FWreckAboard& Aboard, int32 Seed, FFleetSnapshot& Out)
+{
+	Out = FFleetSnapshot();
+	if (!Plan.IsReady())
+	{
+		return;
+	}
+	const FAstraBoardMap& Map = *Plan.Map;
+	// every room of the piece, as the record has it when it lists her (a room not listed was as built); and nothing has power in a wreck, the rooms at her torn ends are open to space, and the blast that broke her holed a few more
+	TMap<int32, const FWreckAboard::FRoom*> Known;
+	for (const FWreckAboard::FRoom& R : Aboard.Rooms)
+	{
+		Known.Add(R.Comp, &R);
+	}
+	FRandomStream Holes(Seed * 2971 + 5);
+	for (int32 i = 0; i < Map.GetComps().Num(); ++i)
+	{
+		if (!Plan.Has(i))
+		{
+			continue;
+		}
+		FFleetSnapshot::FRoom Room;
+		Room.Comp = i;
+		if (const FWreckAboard::FRoom* const* R = Known.Find(i))
+		{
+			Room.Air = (*R)->Air;
+			Room.Hole = (*R)->Hole;
+			Room.Fire = (*R)->Fire;
+			Room.Smoke = (*R)->Smoke;
+			Room.Heat = (*R)->Heat;
+			Room.Wreck = (*R)->Wreck;
+			Room.bGutted = (*R)->bGutted;
+			Room.bLocked = (*R)->bLocked;
+		}
+		Room.Power = 0.f;
+		if (Plan.AtTornEnd(i, 400.f))
+		{
+			Room.Air = FMath::Min(Room.Air, 0.05f);
+			Room.Hole = FMath::Max(Room.Hole, 0.6f);
+		}
+		else if (Holes.FRand() < 0.12f)
+		{
+			Room.Air = FMath::Min(Room.Air, 0.25f);
+			Room.Hole = FMath::Max(Room.Hole, 0.2f);
+		}
+		Out.Rooms.Add(Room);
+	}
+	Out.SealedDoors = Aboard.SealedDoors;
+	Out.Killed = Aboard.Killed;
+	Out.LostWithShip = Aboard.Lost;
+	// nobody is alive aboard a wreck: her dead lie where people are (the rooms that hold the crew at work, the berthing and the messes; every room has a little weight, so that no room is spared by the tables alone)
+	const int32 Dead = Aboard.DeadHere();
+	if (Dead <= 0 || !Plan.Dmg.IsValid())
+	{
+		return;
+	}
+	TArray<int32> Rooms;
+	TArray<double> Cumulative;
+	double Total = 0.0;
+	for (int32 i = 0; i < Map.GetComps().Num(); ++i)
+	{
+		const FBoardComp& C = Map.GetComps()[i];
+		if (!Plan.Has(i) || !C.Box.IsValid || C.Box.GetSize().X < 200.0 || C.Box.GetSize().Y < 200.0)
+		{
+			continue;
+		}
+		const int32 Crew = Plan.Dmg->Comps.IsValidIndex(i) ? Plan.Dmg->Comps[i].Crew : 0;
+		Total += 1.0 + (double)Crew + (C.bCorridor ? 0.0 : 2.0);
+		Rooms.Add(i);
+		Cumulative.Add(Total);
+	}
+	if (Rooms.IsEmpty())
+	{
+		return;
+	}
+	FRandomStream Rng(Seed * 6151 + 29);
+	static const uint8 Roles[] = {(uint8)EFleetRole::Bridge, (uint8)EFleetRole::Engineering, (uint8)EFleetRole::DamageControl, (uint8)EFleetRole::Medical, (uint8)EFleetRole::Reserve, (uint8)EFleetRole::Reserve, (uint8)EFleetRole::Marine};
+	for (int32 k = 0; k < Dead; ++k)
+	{
+		const double Pick = Rng.FRand() * Total;
+		int32 Lo = 0;
+		while (Lo + 1 < Cumulative.Num() && Cumulative[Lo] < Pick)
+		{
+			++Lo;
+		}
+		const int32 Comp = Rooms[Lo];
+		FFleetSnapshot::FHand H;
+		H.Comp = Comp;
+		const FBox& B = Map.GetComps()[Comp].Box;
+		FVector P(FMath::Lerp(B.Min.X, B.Max.X, (double)Rng.FRandRange(0.12f, 0.88f)), FMath::Lerp(B.Min.Y, B.Max.Y, (double)Rng.FRandRange(0.12f, 0.88f)), B.Min.Z);
+		P = Map.Inset(Comp, P, 70.f);
+		P.Z = B.Min.Z;
+		H.PosCm = P;
+		H.Role = Roles[Rng.RandHelper(UE_ARRAY_COUNT(Roles))];
+		Out.Fallen.Add(H);
+	}
+}
+
 AstraBoardScene::FResult AstraBoardScene::Build(FAstraBoardSim& Sim, const FBoardShipPlan& Plan, const FSpec& Spec)
 {
 	FResult R;

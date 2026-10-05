@@ -10,7 +10,9 @@
 
 #include "AstraBoardCraft.h"
 #include "AstraBattleSubsystem.h"
+#include "AstraSpaceLife.h"
 #include "AstraWarClasses.h"
+#include "AstraWrecks.h"
 #include "ASTRA.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMeshActor.h"
@@ -258,12 +260,12 @@ bool UAstraBattleSubsystem::AssessBoarding(int32 CarrierId, int32 TargetId, FAss
 	Out.TargetName = T->Name;
 	Out.TargetClass = T->Class;
 	Out.HullFrac = T->HullMax > 0.f ? T->Hull / T->HullMax : 1.f;
-	Out.bTargetDisabled = T->bDisabled;
+	Out.bTargetDisabled = T->bDisabled || T->bWreck;                  // (a wreck has no power: no shield, no point defence, nothing to fight for her)
 	if (!T->bAlive)
 	{
 		Out.TargetWhy = TEXT("she is destroyed");
 	}
-	else if (T->bFixture)
+	else if (T->bFixture && !T->bWreck)
 	{
 		Out.TargetWhy = TEXT("she is a place of the system, not a ship in this war: nobody docks a boat at her");
 	}
@@ -271,7 +273,7 @@ bool UAstraBattleSubsystem::AssessBoarding(int32 CarrierId, int32 TargetId, FAss
 	{
 		Out.TargetWhy = TEXT("a craft cannot be boarded");
 	}
-	else if (!T->Dmg.bModel)
+	else if (!T->Dmg.bModel && !T->bWreck)
 	{
 		Out.TargetWhy = TEXT("she is not a ship with a hull that can be boarded");
 	}
@@ -427,6 +429,20 @@ bool UAstraBattleSubsystem::ShipFacts(int32 Id, FShipFacts& Out) const
 	Out.bDerelict = S->bDerelict;
 	Out.bHasModel = S->Dmg.bModel;
 	Out.bFixture = S->bFixture;
+	if (S->bWreck && Space)
+	{
+		// a piece of a broken ship: her class and her part are in the record the living space keeps of her, her pivot is what the contact's place is
+		const AstraSpace::FSite* Site = nullptr;
+		const AstraSpace::FPieceRec* Piece = Space->PieceOfContact(*S, &Site);
+		Out.bWreck = true;
+		if (Site && Piece)
+		{
+			Out.ClassKey = Site->ClassKey;
+			Out.WreckSection = Piece->Section;
+			Out.WreckPivotM = Piece->PivotLocal;
+			Out.WreckSite = Site->Id;
+		}
+	}
 	Out.Pos = S->Pos;
 	Out.Vel = S->Vel;
 	Out.Att = S->Att;
@@ -444,7 +460,7 @@ void UAstraBattleSubsystem::ListShipFacts(TArray<FShipFacts>& Out) const
 {
 	for (const FAstraBattleShip& S : Ships)
 	{
-		if (S.bAlive && !S.bCraft && !S.bGhost && !S.bFixture)         // (a place of the system is neither a carrier nor a target: it is not listed)
+		if (S.bAlive && !S.bCraft && !S.bGhost && (!S.bFixture || S.bWreck))         // (a place of the system is neither a carrier nor a target: it is not listed; a piece of a wreck is a target of the Aquila's marines)
 		{
 			FShipFacts F;
 			if (ShipFacts(S.Id, F))
@@ -654,7 +670,7 @@ bool UAstraBattleSubsystem::LaunchBoarding(const FLaunch& Req, FLaunchResult& Ou
 		Out.Why = TEXT("there is no such carrier");
 		return false;
 	}
-	if (!T || !T->bAlive || T->bCraft || T->bGhost || T->bFixture || !T->Dmg.bModel)
+	if (!T || !T->bAlive || T->bCraft || T->bGhost || (T->bFixture && !T->bWreck) || (!T->Dmg.bModel && !T->bWreck))
 	{
 		Out.Why = !T || !T->bAlive ? TEXT("the target is gone") : (T->bFixture ? TEXT("that is a place of the system, not a ship to dock a boat at") : TEXT("that is not a ship with a hull to board"));
 		return false;
@@ -808,7 +824,7 @@ void UAstraBattleSubsystem::TickBoardingLaunches(float Dt)
 		{
 			Cancel = TEXT("the target is gone");
 		}
-		else if (T->bFixture || C->bFixture)
+		else if ((T->bFixture && !T->bWreck) || C->bFixture)
 		{
 			Cancel = TEXT("a place of the system is no ship to dock a boat at");
 		}
