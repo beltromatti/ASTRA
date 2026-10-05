@@ -112,6 +112,12 @@ abbordaggi contro l'Aquila, chiesto da ABBORDAGGI).
   - i capitani nemici senza nome.
 
   Da bilanciare: l'Aquila esce quasi intatta dalla battaglia col grosso (98 %, zero missili).
+- **Il suono della battaglia**: la morte di una nave da guerra si sente in plancia, come un'onda grave nelle casse che i sensori rendono (sonificazione, non il suono dell'esplosione: STILE §9; `SW_Sensor_Kill`, sintetizzato da `tools/art/battle_cues.py`).
+- **Correzioni dalla quinta prova:**
+  - il «reactor breached» di una nave nemica non è più un avviso urgente (tagliava le chiamate dei comandanti, che si ripetevano);
+  - un avviso che la voce non fa in tempo a dire si legge come sottotitolo;
+  - un ordine per qualcosa che non è ancora successo è un ordine permanente.
+- **Pacchetto dell'app in costruzione** (development, 5/10 pomeriggio) con tutto ciò che è stato unito oggi.
 - **Quinta prova dell'apertura** (dopo la dottrina che si batte). Il Mandato attacca davvero.
   - Da ~325 s a ~420 s scontro vero, con siluri dei bombardieri, esche e scudi che cedono: Acheron, Hecate, Hypnos, Phlegethon e Styx distrutti.
   - Poi il Mandato si ritira «dopo aver combattuto» (morale 0, 26 % della forza persa). Warden Thale chiede la resa, poi una tregua per recuperare i naufraghi.
