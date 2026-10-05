@@ -393,6 +393,10 @@ bool UAstraBoardSubsystem::HandleCommand(const FString& Name, const TSharedPtr<F
 			Out->Values = Args->Values;
 		}
 		const FString Act = BdStr(Args, TEXT("action")).ToLower();
+		if (Act == TEXT("join") || Act == TEXT("captain_joins"))
+		{
+			return CaptainJoins(OutDetail);                  // the Captain goes with the marines after the order was given without him
+		}
 		if (Act == TEXT("call_off"))
 		{
 			Out->SetStringField(TEXT("action"), TEXT("end"));
@@ -423,12 +427,21 @@ bool UAstraBoardSubsystem::HandleCommand(const FString& Name, const TSharedPtr<F
 	if (Name == TEXT("boarding"))
 	{
 		const FString Action = BdStr(Args, TEXT("action")).ToLower();
+		if (Action == TEXT("join") || Action == TEXT("captain_joins"))
+		{
+			return CaptainJoins(OutDetail);
+		}
 		if (Action == TEXT("end") || Action == TEXT("stop") || Action == TEXT("cancel"))
 		{
 			if (Phase != EPhase::Active && !Assault.bOn)
 			{
 				OutDetail = TEXT("no boarding is on");
 				return false;
+			}
+			// our marines are on her decks: they are called out by their hatches and the boats let go when they are aboard (not at once, with them still in her corridors)
+			if (Assault.bOn && Assault.bRoster && !Assault.Spec.bDrill && WithdrawMarines(OutDetail))
+			{
+				return true;
 			}
 			// the recall and its reason: the bridge hears the ship that recalls her boats, and why (the minds give a reason with every order)
 			const FString By = BdStr(Args, TEXT("by")), Reason = BdStr(Args, TEXT("reason"));
@@ -800,6 +813,17 @@ namespace
 			const bool bOk = B->HandleCommand(A[0], J, D);
 			UE_LOG(LogASTRA, Log, TEXT("[Board] %s: %s"), bOk ? TEXT("ok") : TEXT("refused"), *D);
 			if (GEngine) { GEngine->AddOnScreenDebugMessage(-1, 6.f, bOk ? FColor::Green : FColor::Red, D); }
+		}));
+	FAutoConsoleCommandWithWorld BdCmdJoin(TEXT("astra.board.join"), TEXT("Testing: the Captain goes with the marines after the boarding was ordered without him, as the XO's board_ship join does: he rides in the first Kestrel if it has not left the bay, else the answer says what is left to him"),
+		FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* W)
+		{
+			if (UAstraBoardSubsystem* B = BdBoard(W))
+			{
+				FString D;
+				const bool bOk = B->CaptainJoins(D);
+				UE_LOG(LogASTRA, Log, TEXT("[Board] %s: %s"), bOk ? TEXT("join ok") : TEXT("join refused"), *D);
+				if (GEngine) { GEngine->AddOnScreenDebugMessage(-1, 8.f, bOk ? FColor::Green : FColor::Red, D); }
+			}
 		}));
 	FAutoConsoleCommandWithWorldAndArgs BdCmdRecall(TEXT("astra.board.recall"), TEXT("Testing: the boats are recalled with a reason, as a mind's recall comes: astra.board.recall <who, underscores for spaces> <the reason in words>"),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* W)
