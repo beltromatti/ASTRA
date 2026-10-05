@@ -37,7 +37,13 @@ Richiesta dell'utente: «una versione stabile con tutti i moduli e i lavori fatt
   - a metà partita (00:19 e 01:02): il garbage collector liberava i font dell'interfaccia sotto le etichette del finestrone. Ora i due font restano vivi (`AstraFonts.h`);
   - all'uscita (01:26 e 03:30): la cache dei piani delle navi veniva distrutta dopo il motore (`AstraFleetPlan.cpp`).
 
-  Provato: la raccolta forzata (`obj gc`) in battaglia e l'uscita pulita, senza nessun rapporto di crash.
+  Provato nel gioco di sviluppo e nell'app impacchettata: la raccolta forzata (`obj gc`) in battaglia e l'uscita pulita, senza nessun rapporto di crash.
+- **Gli ordini permanenti si eseguono** quando arriva il loro momento, con qualsiasi delega (`initiative.py` WATCH_ASK, `agent.py` STANDING_ASK,
+  `crew.py`).
+  - Prima: nell'app l'XO ripeteva ogni 8 s «i Falcon sono ancora in hangar» e Alpha non partiva.
+  - Ora: «Alpha all'attacco sul primo Acheron che esce dal Gate» viene registrato «in attesa», e all'uscita del T-40 Price lancia gli otto Falcon da solo («come ordinato»).
+- **L'app guidata dal banco di prova non si ferma più** dietro le altre finestre (`AstraMindSubsystem.cpp`; per il giocatore resta la pausa quando l'app non è in primo piano).
+- **Credito OpenRouter: 10,20 $** (le prove della chiusura ~1 $).
 
 **La prova finale (dev, mente vera, campagna nuova, 15 min da Capitano):**
 - briefing dell'XO, il Lethe, il Gate che cicla, gli ordini confermati in 1-5 s, l'ordine permanente di Price per Alpha;
@@ -59,7 +65,8 @@ Richiesta dell'utente: «una versione stabile con tutti i moduli e i lavori fatt
 3. **Coerenza della guerra raccontata:**
    - Rourke annuncia «F-M4 sta passando dal Gate» e poi «F-M4 è ancora a Thule»;
    - due ufficiali chiedono insieme se aprire il canale con un comandante che ha già parlato;
-   - Price chiede «come da ordine permanente?» prima di eseguirlo.
+   - con la delega «propone» al timone (quella di serie della campagna), l'XO insiste sulla rotta che aspetta il via del Capitano;
+   - sulla vista esterna la colonna dei contatti a destra si sovrappone a volte alle etichette delle navi.
 4. **Abbordaggi** (ABBORDAGGI.md §15.5):
    - la prova a mano di un relitto vero in campagna;
    - SPAZIO-VIVO che tiene sul piano il pezzo abbordato (`IsBoardingTarget`);
