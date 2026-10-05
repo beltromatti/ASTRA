@@ -1795,3 +1795,29 @@ python3 tools/war.py embed        # la tabella compilata nel gioco (AstraWarClas
 # poi ricompilare (Build.sh ASTRAEditor Mac Development -WaitMutex) e rifare la suite
 ```
 Il banco gira a −nullrhi (non apre finestre) e due processi al massimo; `Saved/War/` non è nel repo (le tabelle qui sopra sono le mie misure).
+
+### 11.13 The balance applied for the alpha (5 Oct, the lead)
+
+The user's report: "the shields stay at 100% while fires, breaches and falling armour spread under them". Two causes, both fixed in
+`AstraWarDamage.cpp`:
+- a full face let a heavy rail slug through (up to 58% of it). Now a face absorbs by its charge: `shield_full` 0.95 of a blow when full,
+  falling to the profile's share as it empties;
+- the buffer refilled a struck face at up to 600 points/s whenever tactical re-allocated (the face looked full until the whole pool was
+  gone). Now `shield_shift` is 0.08: a face under fire visibly goes down (84%, 66%, 64% in play) and the untouched faces keep their charge.
+
+The Mandate now hunts the flagship and reaches her: `prize` 0.6 (`AstraWarGroups.cpp`) and the rails of Styx 30 km, Lethe 24 km, Acheron
+38 km (`data/war/classes.json`, embedded). This is BATTAGLIA-3's recommended combination (§11.12).
+
+Bench (`tools/war.py classes --scen st,op,mb2,mb3,ss --seeds 4 --tag FIN`, executors only, no Captain, no minds: the hardest case):
+
+| battle | Aquila alive | Aquila hull (alive) | Mandate warships lost |
+|---|---|---|---|
+| the Aquila alone against the strike group | 4 of 4 | 33% | 2.0 |
+| the opening (Solm, picket, Aquila) | 3 of 4 | 53% | 12.5 |
+| the main body, the Aquila 14 km behind the line | 4 of 4 | 60% | 11.5 |
+| the main body, 20 km behind the line (where the user kept her: 98% before) | 4 of 4 | 80% | 11.8 |
+| Styx against Styx | - | - | 0.25 each (no longer a dead stalemate) |
+
+In play (the real opening, minds on, the Captain's orders at 160 s): the vanguard's fire drops the Aquila's faces to 64-84% and they recover;
+the hull takes a few points (99%); the Mandate loses 2-5 ships and withdraws. The later waves (8-16 ships hunting the flagship) are where she
+takes real damage. Still open: the equal duels (Styx against Styx) are slow; `tools/war.py chase` must be redone (§11.12).

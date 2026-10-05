@@ -47,9 +47,11 @@ class Role:
 # every measurement (median first token ~0.37 s), Modal the steady second (docs/bench/llm_2026-09-28_0227.md).
 _DS = ("together", "modal")
 ROLES: dict[str, Role] = {r.name: r for r in (
-    Role("crew", DEEPSEEK, _DS, max_tokens=450, temperature=0.4, first_token_s=3.0,
+    Role("crew", DEEPSEEK, _DS, max_tokens=450, temperature=0.4, first_token_s=3.0, fallback="crew_backup",
          note="the Captain's turns and the officers' reports: quality and Italian first"),
-    Role("watch", DEEPSEEK, _DS, max_tokens=300, temperature=0.4, first_token_s=5.0,
+    Role("crew_backup", "openai/gpt-oss-120b", None, (("effort", "low"),), max_tokens=450, temperature=0.4, first_token_s=6.0,
+         note="the crew when DeepSeek stalled twice (5 Oct: a Captain's order was lost to two stalls in a row): another model, any provider"),
+    Role("watch", DEEPSEEK, _DS, max_tokens=300, temperature=0.4, first_token_s=5.0, fallback="crew_backup",
          note="the initiative watch: adjust the consoles, at most two short lines"),
     Role("router", DEEPSEEK, _DS, max_tokens=16, temperature=0.0, first_token_s=1.2,
          note="who is the Captain talking to (only the cases the rules cannot settle)"),
@@ -181,6 +183,7 @@ async def chat(llm: OpenRouter, role_name: str, *, messages: list[dict[str, Any]
     if comp.error and retry and not fired and not comp.content.strip():
         log.warning("%s: %s — trying again", role_name, comp.error[:120])
         kw["first_token_timeout"] = (kw["first_token_timeout"] or 3.0) * 2
+        kw["providers"] = None                              # (any provider of the model this time: the first ones stalled or failed)
         comp = await llm.chat(messages=messages, tools=tools, tool_choice=tool_choice, on_tool_call=watched, **kw)
         LEDGER.add(role_name, kw["model"], comp)
     if comp.error and r.fallback and not fired and not comp.content.strip():

@@ -207,7 +207,7 @@ void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 	static AstraWar::FTuneVar KBreak[2] = {AstraWar::FTuneVar(TEXT("break_a"), 1.f), AstraWar::FTuneVar(TEXT("break_m"), 1.f)};          // the losses a group bears before it breaks, times this (0: never)
 	static AstraWar::FTuneVar KFlankRatio(TEXT("flank_ratio"), 0.9f);      // the strength ratio (ours over theirs) from which the group flanks by itself
 	static AstraWar::FTuneVar KRange[2] = {AstraWar::FTuneVar(TEXT("range_ai_a"), 1.f), AstraWar::FTuneVar(TEXT("range_ai_m"), 1.f)};
-	static AstraWar::FTuneVar KPrize(TEXT("prize"), 0.3f);               // the groups' hunt for the Aquila (0..1; 0.3 since 5 Oct: the flagship behind the line no longer came out untouched): the distance to her does not count against her as a focus, and she is worth more (BATTAGLIA-3, stage 6)
+	static AstraWar::FTuneVar KPrize(TEXT("prize"), 0.6f);               // the groups' hunt for the Aquila (0..1; 0.6 since 5 Oct, with the Mandate's longer rails: the flagship at 24 km behind the line came out untouched): the distance to her does not count against her as a focus, and she is worth more (BATTAGLIA-3, stage 6)
 	// --- who is in it and where
 	TArray<FAstraBattleShip*, TInlineAllocator<12>> M;
 	for (const int32 Id : G.Members)
