@@ -4,6 +4,12 @@ Qui scrivo solo ciò che **non posso fare io** (per regole di sicurezza: creare 
 
 ## Aperte
 
+### 2026-10-05 — Credito OpenRouter quasi finito: 3,84 $ residui (16,16 $ usati su 20)
+Le tue partite di stanotte hanno speso circa 1,8 $ (70 minuti, l'equipaggio, gli alleati, i comandanti nemici, l'ammiraglio). Con 3,84 $
+restano un paio d'ore di gioco con la mente accesa, più le prove dei moduli nuovi (le tengo al minimo e quasi tutte senza modelli). Io
+non posso ricaricare (niente pagamenti): quando puoi, una ricarica su openrouter.ai (Credits). Intanto VOCI-3 riduce anche il costo per ora
+(meno battute, meno turni inutili).
+
 ### 2026-09-28 — Autorizzare l'account Epic nell'editor per i MetaHuman (una volta, 1 minuto) — ORA PRIORITARIO (fase F3: umani realistici per tutti)
 Per trasformare l'equipaggio da manichini a **MetaHuman** realistici, Unreal usa il servizio Epic di *auto-rigging* dei volti:
 richiede che tu autorizzi una volta il tuo account Epic nell'editor (io non posso accedere né concedere autorizzazioni).
