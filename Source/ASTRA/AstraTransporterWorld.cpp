@@ -91,6 +91,8 @@ namespace
 	{
 		static const TArray<TPair<FString, FString>> A = {
 		    {TEXT("kestrel bay"), TEXT("assault shuttle bay")}, {TEXT("kestrel"), TEXT("assault shuttle bay")}, {TEXT("boat bay"), TEXT("assault shuttle bay")},
+		    {TEXT("kestrel deck"), TEXT("assault shuttle bay")}, {TEXT("kestrel hangar"), TEXT("assault shuttle bay")}, {TEXT("hangar kestrel"), TEXT("assault shuttle bay")},
+		    {TEXT("ponte kestrel"), TEXT("assault shuttle bay")}, {TEXT("baia kestrel"), TEXT("assault shuttle bay")}, {TEXT("kestrel shuttle bay"), TEXT("assault shuttle bay")},
 		    {TEXT("shuttle bay"), TEXT("assault shuttle bay")}, {TEXT("assault bay"), TEXT("assault shuttle bay")}, {TEXT("launch bay"), TEXT("assault shuttle bay")},
 		    {TEXT("baia"), TEXT("assault shuttle bay")}, {TEXT("hangar deck"), TEXT("flight deck")}, {TEXT("ponte di volo"), TEXT("flight deck")}, {TEXT("hangar"), TEXT("flight deck")},
 		    {TEXT("captains quarters"), TEXT("captains quarters")}, {TEXT("quarters"), TEXT("captains quarters")}, {TEXT("alloggi"), TEXT("captains quarters")},
@@ -1392,12 +1394,23 @@ bool UAstraTransporterSubsystem::ResolveEnd(const FString& Text, bool bDest, con
 		return false;
 	}
 	const FAstraLifeMap& Map = L->Sim().GetMap();
-	// the deck and the section said with the room ("deck 8 armory", "the armory on deck 8", "ponte otto" is the bridge's to translate), then the words that name it
-	FString Name = Q;
+	// the deck and the section said with the room ("deck 8 armory", "the armory on deck 8", "ponte otto" is the bridge's to translate), then the words that name it;
+	// a part in brackets is where the room is ("the Assault-Shuttle Bay (Deck 8, Port Passage section B)"): its deck and section count, its other words are not the name
+	FString Name = Q, Where;
+	if (int32 Open = INDEX_NONE; Name.FindChar(TEXT('('), Open))
+	{
+		const int32 Close = Name.Find(TEXT(")"), ESearchCase::CaseSensitive, ESearchDir::FromStart, Open);
+		Where = Name.Mid(Open + 1, Close == INDEX_NONE ? MAX_int32 : Close - Open - 1);
+		Name = (Name.Left(Open) + TEXT(" ") + (Close == INDEX_NONE ? FString() : Name.Mid(Close + 1))).TrimStartAndEnd();
+	}
 	int32 DeckWant = INDEX_NONE;
 	TCHAR SectionWant = 0;
 	for (const TCHAR* DeckWord : {TEXT("deck "), TEXT("ponte ")})
 	{
+		if (const int32 InWhere = Where.Find(DeckWord); InWhere != INDEX_NONE && XpFirstNumber(Where.Mid(InWhere + FCString::Strlen(DeckWord))) != INDEX_NONE)
+		{
+			DeckWant = XpFirstNumber(Where.Mid(InWhere + FCString::Strlen(DeckWord)));
+		}
 		const int32 Cut = Name.Find(DeckWord);
 		if (Cut != INDEX_NONE && XpFirstNumber(Name.Mid(Cut + FCString::Strlen(DeckWord))) != INDEX_NONE)
 		{
@@ -1411,6 +1424,10 @@ bool UAstraTransporterSubsystem::ResolveEnd(const FString& Text, bool bDest, con
 	}
 	for (const TCHAR* SecWord : {TEXT("section "), TEXT("sezione ")})
 	{
+		if (const int32 InWhere = Where.Find(SecWord); InWhere != INDEX_NONE && InWhere + FCString::Strlen(SecWord) < Where.Len() && FChar::IsAlpha(Where[InWhere + FCString::Strlen(SecWord)]))
+		{
+			SectionWant = FChar::ToUpper(Where[InWhere + FCString::Strlen(SecWord)]);
+		}
 		const int32 Cut = Name.Find(SecWord);
 		const int32 At = Cut + FCString::Strlen(SecWord);
 		if (Cut != INDEX_NONE && At < Name.Len() && FChar::IsAlpha(Name[At]) && (At + 1 == Name.Len() || FChar::IsWhitespace(Name[At + 1])))

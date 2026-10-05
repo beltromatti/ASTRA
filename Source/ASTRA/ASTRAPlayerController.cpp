@@ -11,6 +11,8 @@
 #include "Widgets/Input/SEditableTextBox.h"
 #include "Framework/Application/SlateApplication.h"
 #include "Engine/GameViewportClient.h"
+#include "Engine/Engine.h"
+#include "Misc/CommandLine.h"
 #include "Engine/Font.h"
 #include "AstraArmory.h"
 #include "AstraCampaign.h"
@@ -69,6 +71,12 @@ UAstraInputSet* AASTRAPlayerController::GetInputSet()
 void AASTRAPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
+	// the engine's own debug lines on the screen ("Preparing Animation Sequences (1)" over a boarding, 5 Oct) are not the player's: off in a game the
+	// player runs, kept for the test bench (-astra_harness) and the editor
+	if (GEngine && !GIsEditor && !FParse::Param(FCommandLine::Get(), TEXT("astra_harness")))
+	{
+		GEngine->bEnableOnScreenDebugMessages = false;
+	}
 	if (IsLocalPlayerController())
 	{
 		GetWorldTimerManager().SetTimerForNextTick([this]()
