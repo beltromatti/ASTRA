@@ -70,7 +70,7 @@ void UAstraWarFX::Smoke(const FVector& Pos, const FVector& Vel, float Radius, fl
 	{
 		return;                              // the smoke is thick enough already, or too far to be more than a dot that no light picks out
 	}
-	if (FPuff* P = AddPuff(Pos, Vel * 0.8f + FMath::VRand() * Radius * 0.12f, Life, Radius * 0.5f, Radius * 1.5f, FLinearColor(0.5f, 0.48f, 0.46f), 70.f, LSmoke, Delay))
+	if (FPuff* P = AddPuff(Pos, Vel * 0.8f + FMath::VRand() * Radius * 0.12f, Life, Radius * 0.5f, Radius * 1.5f, FLinearColor(0.5f, 0.48f, 0.46f), ASTRA_FX_TUNE("smoke", 55.f), LSmoke, Delay))
 	{
 		P->P1 = Dark;
 		P->P2 = 0.4f;                       // an ember glow inside it, fading
@@ -81,7 +81,7 @@ void UAstraWarFX::Smoke(const FVector& Pos, const FVector& Vel, float Radius, fl
 void UAstraWarFX::Shockwave(const FVector& Pos, const FVector& Vel, float Radius, float Life, const FLinearColor& Col, float Delay)
 {
 	// the blast wave: an expanding shell seen as a bright ring at its limb (a sphere, so it is a ring from any side)
-	if (FPuff* P = AddPuff(Pos, Vel, Life, Radius * 0.12f, Radius, Col, 140.f, LShock, Delay))
+	if (FPuff* P = AddPuff(Pos, Vel, Life, Radius * 0.12f, Radius, Col, ASTRA_FX_TUNE("wave", 90.f), LShock, Delay))
 	{
 		P->P2 = 0.f;
 	}
@@ -92,24 +92,30 @@ void UAstraWarFX::Explosion(const FVector& Pos, const FVector& Vel, float Radius
 	const float R = FMath::Max(Radius, 2.f);
 	const float P = FMath::Clamp(Power, 0.15f, 3.f);
 	const float K = FMath::Clamp(Density, 0.2f, 2.f);
+	const float Bright = ASTRA_FX_TUNE("blast", 1.f);             // everything of a blast, together
+	// What an explosion has to be, seen from a bridge at 5 km and through a telescope that frames the wreck at x8 (5 Oct: a reactor was a flat white screen for half a second and a
+	// white-orange cloud with no inside for two more): a flash that is brief, a fire with a hot core and a cooler body whose brightness stays under the white of the exposure so that the
+	// billows show, dark smoke that gives the fire its edges, a wave, a few hundred metres of sparks and the chunks that carry them. Added together (it is additive) a few dozen
+	// intensities of 200 make a screen of 5000: the body of the fire is kept near the white of the exposure (EV100 6.6: about 116) and the white is left to the core.
 	// the flash: white, round, with the anamorphic streak, brief
-	if (FPuff* F0 = AddPuff(Pos, Vel, 0.3f + 0.22f * P, 0.4f * R, 1.3f * R, FxWhite, 460.f * FMath::Sqrt(P), LGlow, Delay))
+	if (FPuff* F0 = AddPuff(Pos, Vel, 0.12f + 0.12f * P, 0.4f * R, 1.1f * R, FxWhite, ASTRA_FX_TUNE("flash", 420.f) * FMath::Sqrt(P) * Bright, LGlow, Delay))
 	{
 		F0->P1 = 1.f;
 	}
 	// the fireball: billows of fire from the flipbook, a little apart, living a second or two
 	const int32 Billows = FMath::Clamp(FMath::RoundToInt((1.f + 1.6f * P) * K * FMath::Max(0.4f, Room(LFire))), 1, 5);
+	const float FireInten = ASTRA_FX_TUNE("fire", 85.f) * Bright;
 	for (int32 i = 0; i < Billows; ++i)
 	{
 		const FVector Off = FMath::VRand() * R * 0.22f * (float)i;
 		if (FPuff* B = AddPuff(Pos + Off, Vel + Off * 0.6f, (1.5f + 1.0f * P) * FMath::FRandRange(0.8f, 1.2f), 0.4f * R, R * FMath::FRandRange(0.8f, 1.15f),
-		                       FxFire, 190.f, LFire, Delay + 0.05f * i))
+		                       FxFire, FireInten, LFire, Delay + 0.05f * i))
 		{
 			B->P1 = FMath::FRand();
 		}
 	}
 	// the halo that lingers a moment and the sparks it throws
-	AddPuff(Pos, Vel, 1.0f + 0.5f * P, R, 2.0f * R, FLinearColor(1.f, 0.5f, 0.18f), 22.f, LGlow, Delay);
+	AddPuff(Pos, Vel, 1.0f + 0.5f * P, R, 2.0f * R, FLinearColor(1.f, 0.5f, 0.18f), ASTRA_FX_TUNE("halo", 12.f) * Bright, LGlow, Delay);
 	SparkBurst(Pos, FVector::UpVector, 3.f, 12 + (int32)(34 * P), 30.f, 90.f + 70.f * P, 0.7f, 2.0f, 9.f + 5.f * P, FxMetal, 260.f, Vel);
 	// smoke, and the blast wave of a big one
 	const int32 Puffs_ = FMath::Max(1, FMath::RoundToInt((1.f + 2.5f * P) * K));          // (each one asks the smoke's room in Smoke())
@@ -128,7 +134,7 @@ void UAstraWarFX::Explosion(const FVector& Pos, const FVector& Vel, float Radius
 		AddDebris(Pos + FMath::VRand() * R * 0.3f, Vel + FMath::VRand() * FMath::FRandRange(15.f, 40.f + 40.f * P), R * FMath::FRandRange(0.02f, 0.06f), bAstra, FMath::FRandRange(9.f, 18.f));
 	}
 	// the flash lights up what is near it
-	AddLight(Pos, 0.3f + 0.35f * P, R * 9.f, 6500.f * R * R * FMath::Sqrt(P), FLinearColor(1.f, 0.72f, 0.42f), Vel, Delay);
+	AddLight(Pos, 0.3f + 0.35f * P, R * 9.f, ASTRA_FX_TUNE("light", 4000.f) * R * R * FMath::Sqrt(P), FLinearColor(1.f, 0.72f, 0.42f), Vel, Delay);
 }
 
 // ------------------------------------------------------------------------------------------------------------------ blows
@@ -328,13 +334,21 @@ void UAstraWarFX::OnAquilaBreach(const FVector& ReactorPos, float Radius, const 
 		return;
 	}
 	const float R = FMath::Max(Radius, 120.f);
+	const float Bright = ASTRA_FX_TUNE("blast", 1.f);
 	Explosion(ReactorPos, Vel, R, true, 2.4f, 0.f);
-	if (FPuff* F0 = AddPuff(ReactorPos, Vel, 1.0f, 0.8f * R, 2.8f * R, FxWhite, 900.f, LGlow))
+	if (FPuff* F0 = AddPuff(ReactorPos, Vel, 0.3f, 0.3f * R, 1.2f * R, FxWhite, ASTRA_FX_TUNE("reactor_flash", 380.f) * 1.6f * Bright, LGlow))
 	{
 		F0->P1 = 1.f;
 	}
 	Shockwave(ReactorPos, Vel, R * 5.f, 2.4f, FLinearColor(1.f, 0.85f, 0.6f), 0.05f);
-	AddLight(ReactorPos, 1.4f, R * 14.f, 6.e9f, FLinearColor(1.f, 0.85f, 0.65f), Vel);
+	AddLight(ReactorPos, 1.2f, R * 14.f, ASTRA_FX_TUNE("reactor_light", 4.e9f) * 1.5f, FLinearColor(1.f, 0.85f, 0.65f), Vel);
+	FBlastView BV;
+	BV.Pos = ReactorPos;
+	BV.Radius = 1.3f * R;
+	BV.ShipId = 0;
+	BV.bAstra = true;
+	BV.bReactor = true;
+	Blasts.Add(BV);
 }
 
 void UAstraWarFX::OnShipDisabled(const FAstraBattleShip& S)
@@ -391,22 +405,31 @@ bool UAstraWarFX::OnShipDestroyed(FAstraBattleShip& S, const FAstraDeathEvent& E
 		ShipFx.Remove(S.Id);
 	}
 	S.Actor = nullptr;
+	const float Bright = ASTRA_FX_TUNE("blast", 1.f);
 	if (bReactor)
 	{
-		// the reactor lets go: a flash and a ball of fire that swallow the ship, the blast wave, and the pieces thrown out of it
+		// the reactor lets go: a short white flash, a ball of fire whose hot heart cools into billows along the whole length of the hull, the blast wave, a ring of smaller blasts as
+		// the loose ends of the ship go one after another for a second and a half, and the pieces thrown out of it (MakePieces)
 		Explosion(Centre, S.Vel, R * 0.95f, bAstra, 2.0f, 0.f);
-		if (FPuff* W = AddPuff(Centre, S.Vel, 0.9f, 0.7f * R, 1.7f * R, FxWhite, 950.f, LGlow))
+		if (FPuff* W = AddPuff(Centre, S.Vel, 0.2f, 0.25f * R, 0.9f * R, FxWhite, ASTRA_FX_TUNE("reactor_flash", 380.f) * Bright, LGlow))
 		{
 			W->P1 = 1.f;
 		}
-		AddPuff(Centre, S.Vel, 3.4f, 0.5f * R, 1.4f * R, FLinearColor(1.f, 0.55f, 0.2f), 230.f, LFire);
+		AddPuff(Centre, S.Vel, 2.8f, 0.3f * R, 1.0f * R, FLinearColor(1.f, 0.55f, 0.2f), ASTRA_FX_TUNE("fire", 85.f) * 1.3f * Bright, LFire);
 		for (int32 i = 0; i < 6; ++i)
 		{
 			const FVector P = Centre + S.Att.GetForwardVector() * FMath::FRandRange(-0.8f, 0.8f) * R;
-			AddPuff(P, S.Vel, FMath::FRandRange(1.6f, 3.2f), 0.2f * R, FMath::FRandRange(0.4f, 0.8f) * R, FxFire, 200.f, LFire, 0.1f + 0.18f * i);
+			if (FPuff* B = AddPuff(P, S.Vel, FMath::FRandRange(1.6f, 3.2f), 0.2f * R, FMath::FRandRange(0.4f, 0.8f) * R, FxFire, ASTRA_FX_TUNE("fire", 85.f) * Bright, LFire, 0.1f + 0.18f * i))
+			{
+				B->P1 = FMath::FRand();
+			}
 		}
 		Shockwave(Centre, S.Vel, R * 4.2f, 2.3f, FLinearColor(1.f, 0.85f, 0.6f), 0.05f);
-		AddLight(Centre, 1.3f, R * 12.f, 7.e9f * FMath::Square(R / 400.f + 0.3f), FLinearColor(1.f, 0.88f, 0.7f), S.Vel);
+		for (int32 i = 0; i < 7; ++i)
+		{
+			Explosion(Centre + FMath::VRand() * R * FMath::FRandRange(0.5f, 1.1f), S.Vel, R * FMath::FRandRange(0.08f, 0.18f), bAstra, 0.5f, 0.25f + 0.2f * i);
+		}
+		AddLight(Centre, 1.0f, R * 12.f, ASTRA_FX_TUNE("reactor_light", 4.e9f) * FMath::Square(R / 400.f + 0.3f), FLinearColor(1.f, 0.88f, 0.7f), S.Vel);
 	}
 	else
 	{
@@ -414,20 +437,28 @@ bool UAstraWarFX::OnShipDestroyed(FAstraBattleShip& S, const FAstraDeathEvent& E
 		const FVector At = E.BreakPoint;
 		const FVector Axis = E.BreakAxis.IsNearlyZero() ? S.Att.GetForwardVector() : E.BreakAxis;
 		const float Cut = FMath::Clamp(R * 0.3f, 25.f, 160.f);
-		if (FPuff* W = AddPuff(At, S.Vel, 0.55f, 0.4f * Cut, 1.5f * Cut, FLinearColor(1.f, 0.85f, 0.55f), 620.f, LGlow))
+		if (FPuff* W = AddPuff(At, S.Vel, 0.3f, 0.4f * Cut, 1.5f * Cut, FLinearColor(1.f, 0.85f, 0.55f), ASTRA_FX_TUNE("cut_flash", 520.f) * Bright, LGlow))
 		{
 			W->P1 = 1.f;
 		}
-		AddPuff(At, S.Vel, 2.2f, 0.4f * Cut, 1.2f * Cut, FxFire, 200.f, LFire);
+		AddPuff(At, S.Vel, 2.2f, 0.4f * Cut, 1.2f * Cut, FxFire, ASTRA_FX_TUNE("fire", 85.f) * 1.2f * Bright, LFire);
 		SparkBurst(At, Axis, 1.6f, 36, 30.f, 160.f, 0.8f, 2.4f, 14.f, FxMetal, 280.f, S.Vel);
 		SparkBurst(At, -Axis, 1.6f, 36, 30.f, 160.f, 0.8f, 2.4f, 14.f, FxMetal, 280.f, S.Vel);
 		Shockwave(At, S.Vel, R * 1.1f, 1.4f, FLinearColor(1.f, 0.7f, 0.4f), 0.04f);
-		AddLight(At, 0.9f, R * 6.f, 1.4e9f * FMath::Square(R / 400.f + 0.3f), FLinearColor(1.f, 0.72f, 0.45f), S.Vel);
+		AddLight(At, 0.9f, R * 6.f, ASTRA_FX_TUNE("break_light", 1.e9f) * FMath::Square(R / 400.f + 0.3f), FLinearColor(1.f, 0.72f, 0.45f), S.Vel);
 		for (int32 i = 0; i < 4; ++i)
 		{
 			Explosion(Centre + Axis * FMath::FRandRange(-0.7f, 0.7f) * R + FMath::VRand() * R * 0.1f, S.Vel, R * FMath::FRandRange(0.12f, 0.26f), bAstra, 0.6f,
 			          0.25f + 0.45f * i);
 		}
 	}
+	// (the main viewscreen's director may frame it: GetBlasts)
+	FBlastView BV;
+	BV.Pos = bReactor ? Centre : E.BreakPoint;
+	BV.Radius = (bReactor ? 1.3f : 0.9f) * R;
+	BV.ShipId = S.Id;
+	BV.bAstra = bAstra;
+	BV.bReactor = bReactor;
+	Blasts.Add(BV);
 	return true;
 }

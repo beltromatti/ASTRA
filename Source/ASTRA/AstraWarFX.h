@@ -65,13 +65,16 @@ struct FAstraFxHit
 	bool bSectorFell = false;                 // this blow took the sector to nothing
 };
 
+/** A number the look of the effects hangs on: its default, or what `astra.war.tune fx_<name> <value>` set since (the war's own live tuning table: no build, no restart). */
+#define ASTRA_FX_TUNE(NAME, DEFAULT) ([]() -> float { static AstraWar::FTuneVar V(TEXT("fx_" NAME), (DEFAULT)); return V.Get(); }())
+
 namespace AstraFx
 {
 	constexpr int32 Stride = 12;              // floats of per-instance custom data (colour 0-2, intensity 3, age 4, P1 5, P2 6, seed 7, width 8, length 9)
 
 	/** Capacity of each layer (instances) and of the particle lists: the budget of the effects. */
 	constexpr int32 CapDarts = 1500, CapTubes = 1200, CapGlows = 700, CapFires = 200, CapSmokes = 220, CapPlumes = 220, CapDebris = 140;
-	constexpr int32 CapPuffs = 900, CapSparks = 1800, CapBeams = 360, CapDebrisSim = CapDebris, CapPieces = 36;
+	constexpr int32 CapPuffs = 900, CapSparks = 1800, CapBeams = 360, CapDebrisSim = CapDebris, CapPieces = 36, CapWakes = 160;
 	constexpr int32 MaxLights = 8;
 	constexpr float GlowK = 1.7f;             // a glow's soft falloff reaches ~0.6 of its sphere: spheres are drawn this much larger than the glow they stand for
 
@@ -146,6 +149,10 @@ namespace AstraFx
 		FVector Offset = FVector::ZeroVector;  // the muzzle's offset from the true path at birth (m), fading to zero
 		float OffsetTau = 0.25f;
 		FVector Last = FVector::ZeroVector;    // where it was drawn last (its head)
+		FVector Start = FVector::ZeroVector;   // where its path began: the muzzle (system frame)
+		FVector WakeTail = FVector::ZeroVector;// the far end of the wake it drew last (a slug's wake: Wake below), system frame
+		float WakeKappa = 0.f;                 // and its decay
+		bool bWake = false;                    // it has drawn a wake
 		FVector Hist[TrailPts];                // where the trail has been (system frame), newest first
 		int32 HistN = 0;
 		float SampleAcc = 0.f;
@@ -162,6 +169,28 @@ namespace AstraFx
 		uint8 Style = 1;
 		FLinearColor Col = FLinearColor::White;
 		uint8 Seed = 0;
+	};
+
+	/** A big explosion, as the main viewscreen's director may want to know it (UAstraWarFX::GetBlasts). */
+	struct FBlastView
+	{
+		FVector Pos = FVector::ZeroVector;     // system frame, m
+		float Radius = 0.f;                    // m: the fireball's
+		float Age = 0.f;                       // s since it went
+		int32 ShipId = -1;
+		bool bAstra = false;
+		bool bReactor = false;                 // the reactor went (else the hull broke apart)
+	};
+
+	/** The wake a slug left when it ended (it struck, it missed, it ran out of life): the line it drew, hanging there and fading as it would have if the slug had gone on. */
+	struct FWake
+	{
+		FVector Tail = FVector::ZeroVector, Head = FVector::ZeroVector;   // system frame
+		float Age = 0.f;
+		float Kappa = 2.f;                     // the decay along it: e^-Kappa at the tail against 1 at the head
+		float Width = 1.8f;                    // m
+		float Seed = 0.f;
+		FLinearColor Col = FLinearColor::White;
 	};
 
 	/** One ripple of a shield: where a blow landed on it and how it spreads. */
@@ -342,6 +371,11 @@ public:
 	/** Lets one ship's piece go (its actor is destroyed): the wrecks module draws it from its own record from this frame on. Nothing happens if the effects no longer hold it. */
 	void ReleasePiece(int32 ShipId, uint8 Section);
 
+	// ---- for the main viewscreen's director (read only)
+	/** The big explosions of the last seconds (a ship's death: the reactor going, the hull breaking): where, how big, how long ago. A shot that cuts to a death can frame the fireball (the
+	 *  camera that zooms on a piece inside a fireball sees only the cloud) and hold on it for as long as it burns. Nothing in the war reads them. */
+	void GetBlasts(TArray<AstraFx::FBlastView>& Out) const { Out = Blasts; }
+
 	// ---- the console (AstraWarFXTest.cpp)
 	void Stats(FString& Out) const;
 	/** Runs what astra.fx.* asked for since the last frame. */
@@ -383,6 +417,8 @@ private:
 	TArray<AstraFx::FTrack> Tracks;
 	TArray<int32> FreeTracks;
 	TArray<AstraFx::FGhost> Ghosts;
+	TArray<AstraFx::FWake> Wakes;
+	TArray<AstraFx::FBlastView> Blasts;
 	TMap<int32, AstraFx::FShipFx> ShipFx;
 	TArray<AstraFx::FPiece> Pieces;
 	TArray<AstraFx::FDebris> Debris;
@@ -412,6 +448,8 @@ private:
 	float Intensity = 1.f;        // astra.fx.intensity
 	float Density = 1.f;          // astra.fx.density: how many particles (0.25..2)
 	float LightScale = 1.f;       // astra.fx.lights
+	float WakeGain = 1.f;         // astra.fx.wake: the brightness of the line a slug draws behind it (0 none)
+	float MuzzleGain = 1.f;       // astra.fx.muzzle: the size of the flash at a gun's mouth
 
 	// ---- internals (AstraWarFX.cpp)
 	bool LoadAssets();

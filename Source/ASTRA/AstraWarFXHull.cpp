@@ -1120,6 +1120,19 @@ void UAstraWarFX::DrawDrives()
 				*X = FTransform(FQuat::Identity, F.ToWorld(Back), FVector(R * 2.f));
 				Fill(D, Core, 110.f * Intensity * (0.35f + 0.65f * Thrust), 0.f, 0.f, 0.f, (float)(S.Id & 255) / 255.f, R * 2.f, 0.f);
 			}
+			// and the streak of its exhaust, along its heading (a wing that turns hard draws arcs across the sky): where a dogfight is, near enough to be seen as more than a point
+			if (WakeGain > 0.f && Dist2 < FMath::Square(14000.0))
+			{
+				const float Len = FMath::Clamp(30.f + 260.f * Thrust, 30.f, 320.f);
+				const float Wd = FMath::Clamp(S.Radius * 0.28f, 0.8f, 2.6f);
+				const FVector Fwd = F.DirToWorld(S.Att.GetForwardVector());           // (to the nozzle: the bright end of the streak)
+				const FVector BackW = F.ToWorld(Back);
+				if (float* Dw = Tubes.Next(X))
+				{
+					*X = FTransform(FQuat::FindBetweenNormals(FVector::ZAxisVector, Fwd), BackW - Fwd * (Len * 50.0), FVector(Wd, Wd, Len));
+					Fill(Dw, Core, 85.f * Intensity * WakeGain * (0.3f + 0.7f * Thrust), 0.f, 5.f, 2.4f, (float)(S.Id & 255) / 255.f, Wd, Len);
+				}
+			}
 			continue;
 		}
 		if (!T || T->NumBells == 0)

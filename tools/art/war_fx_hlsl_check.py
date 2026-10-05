@@ -25,8 +25,8 @@ F, F2, F3, F4 = "float", "float2", "float3", "float4"
 SNIPPETS = {
     "MINSIZE": (H.MINSIZE, F3, [("RadW", F3), ("WPrel", F3), ("TanHalf", F2), ("ViewSz", F2), ("MinPx", F)]),
     "MINSIZE_PLUME": (H.MINSIZE_PLUME, F3, [("RadW", F3), ("WPrel", F3), ("TanHalf", F2), ("ViewSz", F2), ("MinPx", F), ("LZ", F)]),
-    "DART": (H.DART, F3, [("Fr", F), ("LZ", F), ("Col", F3), ("Inten", F), ("Age", F), ("Style", F), ("P2", F), ("Seed", F), ("Tm", F)]),
-    "TUBE": (H.TUBE, F3, [("NW", F3), ("CamV", F3), ("LP", F3), ("LenM", F), ("Col", F3), ("Inten", F), ("Age", F), ("Style", F), ("P2", F), ("Seed", F), ("Tm", F)]),
+    "DART": (H.DART, F3, [("NW", F3), ("CamV", F3), ("LP", F3), ("AxisW", F3), ("Col", F3), ("Inten", F), ("Age", F), ("Style", F), ("P2", F), ("Seed", F), ("Tm", F)]),
+    "TUBE": (H.TUBE, F3, [("NW", F3), ("CamV", F3), ("LP", F3), ("AxisW", F3), ("LenM", F), ("Col", F3), ("Inten", F), ("Age", F), ("Style", F), ("P2", F), ("Seed", F), ("Tm", F)]),
     "GLOW": (H.GLOW, F3, [("Fr", F), ("VN", F3), ("Col", F3), ("Inten", F), ("Age", F), ("Kind", F), ("Seed", F), ("Tm", F)]),
     "FIRE_UV": (H.FIRE_UV, F4, [("VN", F3), ("Age", F), ("Seed", F)]),
     "FIRE_W": (H.FIRE_W, F, [("Age", F)]),

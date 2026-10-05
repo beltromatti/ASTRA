@@ -202,9 +202,9 @@ def glow_shade(xy, ndv, col, inten, age, kind, seed=0.3, tm=1.0):
         core = np.exp(-q * q)
         p2 = r / 0.28
         psf = 1.0 / (1.0 + p2 * p2) ** 1.4
-        sh = np.exp(-ay_ * 18.0) * np.exp(-ax_ * 2.2)
+        sh = np.exp(-ay_ * 18.0) * np.exp(-ax_ * 4.5)
         sv = np.exp(-ax_ * 30.0) * np.exp(-ay_ * 4.0) * 0.35
-        out = lerp(col, white, saturate(core * 1.4)[..., None]) * (core * 1.6 + psf * 0.5 + (sh + sv) * 0.8)[..., None] * (fade ** 1.6) * rim[..., None]
+        out = lerp(col, white, saturate(core * 1.4)[..., None]) * (core * 1.6 + psf * 0.5 + (sh + sv) * 0.6)[..., None] * (fade ** 1.6) * rim[..., None]
     elif kind == 2:
         q = r / 0.14
         psf = 1.0 / (1.0 + q * q) ** 1.5

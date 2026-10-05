@@ -61,6 +61,30 @@ Le prove fatte senza il motore: `tools/art/war_fx_shader_preview.py` (porta nump
 immagini in `docs/progressi/vfx/`), `tools/art/war_fx_hlsl_check.py` (ogni snippet Custom-node compilato con il DXC del motore,
 11 su 11).
 
+## 2bis. Come si illumina una cosa sottile (VFX-2, 5/10: perché il fuoco «non si vedeva»)
+
+Un dardo, un fascio, una scia, una scintilla sono cilindri lunghi e sottili. La prima versione li illuminava con il Fresnel (quanto la superficie
+guarda l'occhio), che su un cilindro vale al massimo **sin θ**, con θ l'angolo fra la vista e l'asse: **visti da dietro o lungo la linea di tiro un
+dardo era un disco nero e un fascio un alone appena percettibile** (`tools/art/war_fx_view_angles.py` li disegna da 90° a 0°, vecchio contro nuovo).
+Ma tutte le telecamere che vedono «il nostro fuoco» stanno dietro o lungo la linea di tiro: lo schermo principale (a 1 km dal ponte, davanti alla
+prua), il ponte, la ripresa «ASN AQUILA · FIRING ON ...» che sta sulla scia dei cannoni. Ora (`war_fx_hlsl.py`, DART e TUBE):
+
+- il profilo trasversale è quello della canna **normalizzato per sin θ** (1 sulla linea di mezzo della striscia, 0 sul bordo, qualunque angolo; il
+  minimo 0,12 evita che gli ultimi gradi esplodano);
+- i **dischi di testa e di coda** sono ombreggiati come dischi (tondi, luminosi al centro): di faccia un dardo è un bagliore tondo della sua larghezza;
+- ciò che corre lungo l'asse (la coda che sfuma, le estremità, il decadimento di una scia) vale **solo quanto l'asse sta di traverso alla vista**
+  (`side`, da sin θ) e si media via quando non lo è: niente sparisce dietro il proprio scorcio;
+- il dardo è un fuso (la sagoma si assottiglia alle punte) solo di lato; i dardi sono cilindri (non più sfere allungate: una sfera allungata vista di
+  punta è un ago), come i tubi.
+
+Il fatto che il dardo sia visibile non basta: a 12 km/s la scheggia è un punto che attraversa il cielo in pochi fotogrammi. Quello che dice
+dove va il fuoco è la **scia** (§5): una linea dal cannone alla scheggia, luminosa alla testa e spenta alla coda (stile 5 del tubo).
+
+Nota sullo schermo principale (`AstraViewscreen.cpp`, del lead): quando è puntato su un bersaglio con ingrandimento forte, **taglia con il piano vicino i
+tre quarti del percorso verso il soggetto** (per non avere velivoli enormi e sfocati). È giusto per i velivoli, ma toglie anche tutto il volo delle
+schegge: restano gli ultimi 7,5 km su 30 (0,6 s su 2,5 s di volo). Le schegge nell'inquadratura «ASN AQUILA · FIRING ON ...» (che non taglia) si vedono
+dal cannone al bersaglio.
+
 ## 3. I file
 
 | File | Cosa contiene |
