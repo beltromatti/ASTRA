@@ -199,10 +199,20 @@ struct FAstraBattleShip
 	float GunHeat = 0.f;                 // guns: seconds until it may fire again
 	float SensorKm = 45.f;               // reach of its own sensors at full health
 	float LaserDamage = 18.f, LaserCd = 5.f, LaserRange = 4000.f;
+	// gunnery (AstraWarGunnery.cpp, docs/GUERRA.md): how true the guns shoot. The fire control's standing error (m, across the line of sight, wandering with the
+	// time it takes the tracking to settle) is what the range makes of TrackMrad; a shot is aimed at the lead point plus it, plus the scatter of the guns
+	float LaserFalloff = 0.6f;           // what a laser still carries at the end of its range
+	float TrackMrad = 2.f;               // milliradians of tracking error (the class's fire control)
+	float DispMrad = 0.15f;              // milliradians of scatter in the guns themselves
+	FVector AimErr = FVector::ZeroVector;
+	int32 AimTarget = -1;                // the ship the standing error belongs to (a new target starts a new one)
+	float AimAge = 0.f;                  // seconds the tracking has been on it
 	EAstraFate DeathHow = EAstraFate::Alive;
 	// the Captain's wing and its radio (AstraWarCraft.cpp, docs/VOLO.md): a craft that flies his wing has a name on the flight net, and what happens to it is told
 	FString Radio;                       // "Eagle 2" (empty: an ordinary craft, told only in its squadron's reports)
 	int32 LastHitBy = -1;                // the craft or ship whose blow struck it last: a kill is credited to them
+	uint8 LastHitKind = 0;               // what that blow was (EAstraHitKind) and from how far it was fired (m; -1: unknown): the bench's books of who kills whom, with what
+	float LastHitRangeM = -1.f;
 	int32 RadioHullStep = 0;             // how far its hull has been called on the radio (0 sound, 1 under 70 %, 2 under 35 %)
 	int32 RadioTarget = -1;              // the bandit it last called as engaged
 	float RadioT = -100.f;               // when it last called an engagement
@@ -236,6 +246,8 @@ struct FAstraProjectile
 	int8 OwnerSide = -1;                 // the side that fired it (0 ASTRA, 1 Mandate)
 	bool bDecoyChecked = false;          // a missile coming at the Aquila meets her decoys once, on its terminal run
 	int32 FxSlot = -1;                   // what the visual effects keep of it (its trail, where it was drawn from): UAstraWarFX
+	float FireRangeM = 0.f;              // the distance to its target when it left the muzzle (the bench's accuracy by range)
+	bool bCounted = false;               // the bench's books have it as a shot fired
 	UPROPERTY() TObjectPtr<AStaticMeshActor> Actor = nullptr;
 	UPROPERTY() TObjectPtr<AStaticMeshActor> Trail = nullptr;   // guided weapons: the exhaust streak behind
 };
@@ -560,6 +572,9 @@ public:
 	void PlayerInternalDamage(float Hull) { if (Ships.Num()) { AddHullDelta(Ships[0], -Hull); } }
 
 	float PlayerHullFraction() const { return Ships.Num() ? Ships[0].Hull / Ships[0].HullMax : 1.f; }
+	/** Where the Aquila's heat came from, in points of her heat gauge since the battle began (the bench reads them: what a fight put into her, and by what). */
+	struct FHeatBooks { float Rail = 0.f, Laser = 0.f, Cells = 0.f, Soak = 0.f, Recharge = 0.f; };
+	FHeatBooks HeatBooks;
 	/** Weapon reach as the plot may show it (km; 0 = none or unknown). */
 	struct FWeaponRanges
 	{
@@ -583,6 +598,13 @@ public:
 		float TargetRangeKm = 0.f;
 	};
 	FFireControl GetFireControl() const;
+	/** The tactical officer's pick among the hostile warships the Aquila holds a firm track on: the best of them for her guns now (AstraWarGunnery.cpp). What a ship is worth, how battered it is, what her
+	 *  rails will land on it from here, whether it is firing at her and whether the fleet's groups beside her are on it (concentrated fire), with a preference for the one she has. Current is the
+	 *  contact she is on now ("" none); OnlyFiringAtUs keeps to those that have her in their sights; MaxKm (0: her rails' reach, with the cells' beyond it counting for little) bounds the choice.
+	 *  Returns the contact id, or "" when there is none. */
+	FString AdviseTarget(const FString& Current, bool bOnlyFiringAtUs = false, double MaxKm = 0.0) const;
+	/** How many missiles make a salvo that point defence cannot stop (about 2 plus 1.6 for each channel the target still has), 3 to 8; 6 when its class is not known. */
+	int32 MissilesToSaturate(const FString& ContactId) const;
 	/** One ship as the Aquila knows it now (fog of war applied): what the stations' executors and the main viewscreen use.
 	 *  (AstraBattleQueries.cpp) */
 	struct FContactView
@@ -682,6 +704,36 @@ public:
 	/** Deaths since the last call (a reactor breach, a breakup with its section and axis, a ship left disabled): for the
 	 *  effects and the splitting of the mesh. */
 	void ConsumeDeathEvents(TArray<FAstraDeathEvent>& Out);
+	/** What a fight did that the director of the main viewscreen may want to cut to (BATTAGLIA-3): a shot of the Aquila's that struck, a ship that lost a section, a system or a turret, a shield
+	 *  face that fell. Read with ConsumeFightEvents() (the queue keeps the last 96). Positions are the system frame's, in metres. (AstraWarDamage.cpp) */
+	struct FFightEvent
+	{
+		enum class EKind : uint8 { PlayerHit, SectionGutted, SystemOut, MountOut, ShieldFell };
+		EKind Kind = EKind::PlayerHit;
+		float Time = 0.f;                      // the battle clock
+		int32 ShipId = -1;
+		FString ContactId, Name, Class;        // the ship it happened to
+		bool bAstra = false;                   // that ship is on the Aquila's side
+		bool bByPlayer = false;                // the blow was the Aquila's (the last to strike that ship)
+		bool bKnown = false;                   // the Aquila holds a firm track on that ship (what the fog lets a picture of it show)
+		uint8 Section = 0;                     // 0 bow, 1 mid, 2 stern
+		uint8 Face = 0;                        // 0 bow, 1 stern, 2 port, 3 starboard, 4 dorsal, 5 ventral
+		int32 System = -1;                     // SystemOut: 0 engines, 1 sensors, 2 hangar, 3 bridge, 4 reactor, 5 point defence
+		float Damage = 0.f, Through = 0.f;     // PlayerHit: the blow, and the part of it the shield did not stop
+		FVector Pos = FVector::ZeroVector;     // where it struck (PlayerHit, ShieldFell) or about where on the ship it happened
+	};
+	void ConsumeFightEvents(TArray<FFightEvent>& Out);
+	/** The Aquila's fire as the main viewscreen's director wants it: what her guns last fired at and how long ago, and the last of her shots that struck. bFiringNow is true while a gun of hers
+	 *  (a rail, a laser, a missile cell) has fired in the last 2.5 s: a fire-control order that waits for a target out of reach is not firing (FFireControl::Target says only that the order stands). */
+	struct FPlayerFireState
+	{
+		FString ShotTarget;                    // the contact id her guns last fired at ("" none yet)
+		float ShotAgeS = 1e9f;                 // seconds since
+		bool bFiringNow = false;
+		FString HitTarget;                     // the contact id of the ship her last striking shot hit
+		float HitAgeS = 1e9f;                  // seconds since
+	};
+	FPlayerFireState GetPlayerFireState() const;
 	// --- ABBORDAGGI-2 (AstraBoardCraft.cpp, docs/brief/ABBORDAGGI-2.md): the boarding craft are craft of the battle; the host of the boarding (UAstraBoardSubsystem) asks for them and reads what happens
 	/** Boats leave a carrier for a target, each for its hatch (Req.Docks are in the target's frame). False, and why, when it cannot be (the carrier has no boat free, her hangar is out, the target is gone). */
 	bool LaunchBoarding(const AstraBoardCraft::FLaunch& Req, AstraBoardCraft::FLaunchResult& Out);
@@ -970,9 +1022,25 @@ private:
 	void FireRail(FAstraBattleShip& From, FAstraBattleShip& To, float Spread);
 	void FireMissile(FAstraBattleShip& From, FAstraBattleShip& To);
 	void FireLaser(FAstraBattleShip& From, FAstraBattleShip& To);
+	// --- gunnery (AstraWarGunnery.cpp): the intercept, the fire control's error, what a range is worth, keeping a friend out of the line of fire
+	/** Where a slug of this speed fired now meets a target that holds its velocity, as a direction in the shooter's own frame and the time it takes; false when it cannot be solved (a straight line to it stands in). */
+	bool SolveIntercept(const FAstraBattleShip& From, const FVector& TargetPos, const FVector& TargetVel, double Speed, FVector& OutDir, double& OutT) const;
+	/** What the gunners aim at on a ship (its hull's middle) and the velocity they go by (what the shooter's side holds of it). */
+	void FireSolutionOf(const FAstraBattleShip& From, const FAstraBattleShip& To, FVector& OutPos, FVector& OutVel) const;
+	/** The fire control's miss at this range, m (one standard deviation across the line of sight): the class's tracking, a hurt sensor suite, a jammer. */
+	float TrackSigmaM(const FAstraBattleShip& From, double RangeM) const;
+	/** Keeps the tracking error of a ship on its target: it wanders, settles, and starts again from further out on a new one. */
+	void TickAimError(FAstraBattleShip& S, const FAstraBattleShip* T, float Dt);
+	/** One slug's aim: the direction of its velocity relative to the shooter and its time of flight, the error and the scatter in. */
+	bool AimShot(FAstraBattleShip& From, const FAstraBattleShip& To, double Speed, float ExtraSpread, FVector& OutDir, double& OutT);
+	/** The share of its slugs a ship expects to land on that target from that range (the cross-section it shows against the miss), and the same for a ship of the middle size. */
+	float ExpectedHitFraction(const FAstraBattleShip& From, const FAstraBattleShip& To, double RangeM) const;
+	float ReferenceHitFraction(const FAstraBattleShip& From, double RangeM) const;
+	/** Is a ship of the shooter's own side in the line of fire to this point? */
+	bool LineOfFireFouled(const FAstraBattleShip& From, const FVector& AimPos) const;
 	/** A blow lands: FromDir is the direction of travel, HitPos where it strikes the hull; Kind says what it is (and so how
 	 *  shields and armour take it); SourceId is the ship that fired (-1: none). */
-	void ApplyHit(FAstraBattleShip& To, const FVector& FromDir, float Damage, const FVector& HitPos, EAstraHitKind Kind, int32 SourceId);
+	void ApplyHit(FAstraBattleShip& To, const FVector& FromDir, float Damage, const FVector& HitPos, EAstraHitKind Kind, int32 SourceId, float FireRangeM = -1.f);
 	void Destroy(FAstraBattleShip& S, EAstraHitKind Cause = EAstraHitKind::Internal, EAstraFate How = EAstraFate::Destroyed, uint8 Section = 0);
 
 	// --- the hierarchy and the minds (AstraWarKnowledge.cpp, AstraWarShipAI.cpp, AstraWarGroups.cpp, AstraWarCraft.cpp)
@@ -995,7 +1063,8 @@ private:
 	/** Does this side hold that ship on its sensors now (or a moment ago); where it believes it is. */
 	bool Knows(int32 SideIdx, const FAstraBattleShip& T) const;
 	FVector KnownPos(int32 SideIdx, const FAstraBattleShip& T) const;
-	double ShipDps(const FAstraBattleShip& S, double RangeM) const;
+	/** What a ship's guns do a second at a range, what they will land of it (against that target, or against a ship of the middle size) and what the weapons that reach carry. */
+	double ShipDps(const FAstraBattleShip& S, double RangeM, const FAstraBattleShip* Vs = nullptr) const;
 	float Readiness(const FAstraBattleShip& S) const;
 	bool CanEngage(const FAstraBattleShip& S, const FAstraBattleShip& O) const;
 	FAstraBattleGroup* FindGroup(int32 Id);
@@ -1096,8 +1165,10 @@ private:
 	float HangarFactor(const FAstraBattleShip& S) const;
 	void AddHullDelta(FAstraBattleShip& S, float Delta);
 	void SetHullFraction(FAstraBattleShip& S, float Frac);
-	void ApplyHitLump(FAstraBattleShip& To, const FVector& FromDir, float Damage, const FVector& HitPos, EAstraHitKind Kind, int32 SourceId);
-	void ApplyHitModel(FAstraBattleShip& To, const FVector& FromDir, float Damage, const FVector& HitPos, EAstraHitKind Kind, int32 SourceId);
+	void ApplyHitLump(FAstraBattleShip& To, const FVector& FromDir, float Damage, const FVector& HitPos, EAstraHitKind Kind, int32 SourceId, float FireRangeM = -1.f);
+	void ApplyHitModel(FAstraBattleShip& To, const FVector& FromDir, float Damage, const FVector& HitPos, EAstraHitKind Kind, int32 SourceId, float FireRangeM = -1.f);
+	/** The bench's books of a ship's end: who killed it, with what blow, from how far, and whether it was breaking off. */
+	void NoteKillStats(const FAstraBattleShip& S, EAstraFate How);
 	float StructureDamage(FAstraBattleShip& S, int32 Sec, float Amount, EAstraDamageType Type, const FVector& N, int32 F);
 	void DamageInside(FAstraBattleShip& S, int32 Sec, float Taken, float SystemMul, const FVector& N, int32 F);
 	void OnSectionGutted(FAstraBattleShip& S, int32 Sec);
@@ -1106,8 +1177,14 @@ private:
 	void TickShields(FAstraBattleShip& S, float Dt);
 	void TickDamageState(FAstraBattleShip& S, float Dt);
 	int32 BearingBarrels(const FAstraBattleShip& S, EAstraMountKind Kind, const FVector& AimDir) const;
-	void FireMounts(FAstraBattleShip& S, FAstraBattleShip& T, double Dist);
+	/** The mounts of a ship fire on a target, each in its own time and within its field of fire. The Aquila's fire control hands in what it has been told to fire (Budget, in mount shots). */
+	struct FFireBudget { int32 Rail = 0, Laser = 0; };
+	void FireMounts(FAstraBattleShip& S, FAstraBattleShip& T, double Dist, FFireBudget* Budget = nullptr);
 	TArray<FAstraDeathEvent> DeathEvents;
+	TArray<FFightEvent> FightEvents;
+	void NoteFightEvent(const FAstraBattleShip& S, FFightEvent::EKind Kind, uint8 Section, uint8 Face, int32 System, const FVector& Pos, float Damage = 0.f, float Through = 0.f);
+	float PlayerShotAt = -1e9f, PlayerHitAt = -1e9f;                 // the battle clock when her guns last fired and when a shot of hers last struck
+	FString PlayerShotTarget, PlayerHitTarget;
 	void BreakCeasefire(const FAstraBattleShip& Victim);
 	/** The Mandate commander's ship is gone (destroyed or jumped out): the next captain in line takes over and calls. */
 	void OnCommanderLost(const FAstraBattleShip& Old, const TCHAR* How);

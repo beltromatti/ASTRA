@@ -1,0 +1,8 @@
+{
+  "_doc": "BATTAGLIA-3: the opening's strike group without the 7th Fleet: the Aquila (held at rest at the origin, bow to +x) against a Kharon Mandate cruiser and three destroyers in a wedge coming in from 60 km. Four ships against one: what a long gun and a good helm can do alone. See duel_aq_styx.json.",
+  "aquila": {"at_km": [0, 0, 0], "heading": 0, "speed": 0},
+  "mandate": [
+    {"name": "Strike Group Solm", "formation": "wedge", "at_km": [60, 0, 0], "heading": 180, "spacing_km": 1.8, "objective_km": [0, 0, 0],
+     "ships": [{"class": "acheron", "n": 1, "name": "Acheron"}, {"class": "styx", "n": 3}]}
+  ]
+}

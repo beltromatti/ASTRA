@@ -19,23 +19,35 @@ namespace
 }
 
 // ---------------------------------------------------------------------------------------------- what a ship can do
-double UAstraBattleSubsystem::ShipDps(const FAstraBattleShip& S, double RangeM) const
+double UAstraBattleSubsystem::ShipDps(const FAstraBattleShip& S, double RangeM, const FAstraBattleShip* Vs) const
 {
 	double Dps = 0.0;
 	const float Power = FMath::Clamp(PowerFactorOf(S), 0.f, 1.5f);
+	// what the guns will land at this range (against that target, or a ship of the middle size): the fire control's miss grows with the range
+	float Hit = -1.f;
 	for (const FAstraMount& M : S.Mounts)
 	{
 		if (M.Fit() < 0.2f)
 		{
 			continue;
 		}
-		if (M.Kind == EAstraMountKind::Rail && S.RailDamage > 0.f && RangeM < S.RailRange)
+		const bool bRail = M.Kind == EAstraMountKind::Rail && S.RailDamage > 0.f && RangeM < S.RailRange;
+		const bool bLaser = M.Kind == EAstraMountKind::Laser && S.LaserDamage > 0.f && RangeM < S.LaserRange;
+		if (!bRail && !bLaser)
 		{
-			Dps += M.Barrels * S.RailDamage / FMath::Max(1.f, S.RailCd) * M.Fit();
+			continue;
 		}
-		else if (M.Kind == EAstraMountKind::Laser && S.LaserDamage > 0.f && RangeM < S.LaserRange)
+		if (Hit < 0.f)
 		{
-			Dps += M.Barrels * S.LaserDamage / FMath::Max(1.f, S.LaserCd) * M.Fit();
+			Hit = Vs ? ExpectedHitFraction(S, *Vs, RangeM) : ReferenceHitFraction(S, RangeM);
+		}
+		if (bRail)
+		{
+			Dps += M.Barrels * S.RailDamage / FMath::Max(0.5f, S.RailCd) * M.Fit() * Hit;
+		}
+		else
+		{
+			Dps += M.Barrels * S.LaserDamage * FMath::Lerp(1.f, S.LaserFalloff, (float)(RangeM / FMath::Max(S.LaserRange, 1.f))) / FMath::Max(0.5f, S.LaserCd) * M.Fit() * Hit;
 		}
 	}
 	if (S.Missiles > 0 && RangeM > 2500.0 && RangeM < S.MissileRange)
@@ -337,6 +349,7 @@ void UAstraBattleSubsystem::ThinkShip(FAstraBattleShip& S, float DtT)
 		S.bFleeing = true;
 		S.Mode = EAstraShipMode::Evade;
 		Report(FString::Printf(TEXT("sensors: %s is badly damaged and breaking off, heading away from the fight"), *KnownLabel(S)));
+		Stats.NoteRetreat(Time, Me, FString::Printf(TEXT("ship %s: too damaged (hull %.0f%%)"), *S.ContactId, 100.f * HullF), 1);
 		ThinkWithdraw(S, G);
 		return;
 	}
@@ -346,13 +359,17 @@ void UAstraBattleSubsystem::ThinkShip(FAstraBattleShip& S, float DtT)
 	const FVector Dir = T ? ToT / FMath::Max(1.0, Dist) : S.Att.GetForwardVector();
 	// --- where it wants to be
 	FVector Goal = S.Pos, GoalVel = FVector::ZeroVector;
-	float Pref = S.RailRange > 0.f ? S.RailRange * 0.62f : 3000.f;
+	float Pref = S.RailRange > 0.f ? S.RailRange * 0.55f : 3000.f;
+	if (const AstraWar::FShipClass* Cl = S.ClassKey.IsNone() ? nullptr : AstraWar::FindClass(S.ClassKey); Cl && Cl->RangeMaxKm > 0.f)
+	{
+		Pref = 0.5f * (Cl->RangeMinKm + Cl->RangeMaxKm) * 1000.f;                   // the band its class's armament likes (data/war/classes.json)
+	}
 	if (G && G->EngageRange > 0.f)
 	{
 		Pref = G->EngageRange;
 	}
-	if (S.Stance == 1) { Pref = 1800.f; }
-	else if (S.Stance == 2) { Pref = FMath::Clamp(S.RailRange * 0.9f, 5000.f, 9000.f); }
+	if (S.Stance == 1) { Pref = FMath::Max(1500.f, 0.5f * S.LaserRange); }          // the commander's close: knife range for the beams
+	else if (S.Stance == 2) { Pref = S.RailRange * 0.9f; }                          // standoff: as far as the guns still reach
 	const FVector Side = FVector::CrossProduct(Dir, FVector::UpVector).GetSafeNormal();
 	if (S.Stance == 3 && T)
 	{

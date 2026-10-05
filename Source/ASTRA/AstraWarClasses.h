@@ -40,6 +40,9 @@ namespace AstraWar
 		float LaserDamage = 18.f, LaserCd = 5.f, LaserRange = 4000.f;
 		int32 PDChannels = 2;
 		float PDRange = 2000.f;
+		float LaserFalloff = 0.6f;                      // what a laser beam still carries at the end of its range (the energy spreads): 1 at the muzzle
+		float TrackMrad = 2.f;                          // the fire control's tracking error, milliradians (its sensors: the lower the better); the miss it makes at a range is this times the range
+		float DispMrad = 0.15f;                         // the guns' own scatter, milliradians
 		uint8 SysSection[NumSystems] = {SecStern, SecBow, SecMid, SecMid, SecMid, EverySection};
 		float RangeMinKm = 4.f, RangeMaxKm = 6.5f;      // the range its armament likes
 		TArray<FMountDef> Mounts;

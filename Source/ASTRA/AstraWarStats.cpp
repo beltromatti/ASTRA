@@ -14,6 +14,98 @@ namespace
 	{
 		return FMath::RoundToDouble(V * Scale) / Scale;
 	}
+
+	const TCHAR* const WeaponNames[FAstraWarStats::NumWeapons] = {TEXT("rail"), TEXT("laser"), TEXT("missile"), TEXT("torpedo"), TEXT("rocket"), TEXT("cannon")};
+	const double BucketKm[FAstraWarStats::NumRangeBuckets] = {0.0, 2.0, 5.0, 10.0, 15.0, 20.0, 30.0, 40.0, 50.0, 70.0};   // the lower edge of each range bucket
+	constexpr int32 MaxFireBins = 7200;                 // two hours of battle
+}
+
+int32 FAstraWarStats::RangeBucket(double RangeM)
+{
+	const double Km = RangeM / 1000.0;
+	int32 B = 0;
+	for (int32 i = 1; i < NumRangeBuckets; ++i)
+	{
+		B = Km >= BucketKm[i] ? i : B;
+	}
+	return B;
+}
+
+int32 FAstraWarStats::WeaponOf(EAstraHitKind K)
+{
+	switch (K)
+	{
+	case EAstraHitKind::Rail: return WRail;
+	case EAstraHitKind::Laser: return WLaser;
+	case EAstraHitKind::Missile: return WMissile;
+	case EAstraHitKind::Torpedo: return WTorpedo;
+	case EAstraHitKind::Rocket: return WRocket;
+	default: return WCannon;
+	}
+}
+
+void FAstraWarStats::NoteFire(float Time, int32 SideIdx, int32 Weapon, double RangeM, bool bCapitalShooter)
+{
+	if (SideIdx < 0 || SideIdx > 1)
+	{
+		return;
+	}
+	++AccShots[SideIdx][Weapon][RangeBucket(RangeM)];
+	if (bCapitalShooter)
+	{
+		const int32 Bin = (int32)FMath::Max(0.f, Time);
+		if (Bin < MaxFireBins)
+		{
+			if (FireBins.Num() <= Bin)
+			{
+				FireBins.SetNumZeroed(Bin + 1);
+			}
+			FireBins[Bin] |= (uint8)(1 << SideIdx);
+		}
+	}
+}
+
+void FAstraWarStats::NoteHit(float Time, int32 ShooterSide, int32 VictimSide, int32 Weapon, double FireRangeM, float Damage)
+{
+	if (ShooterSide >= 0 && ShooterSide <= 1)
+	{
+		const int32 B = RangeBucket(FireRangeM);
+		++AccHits[ShooterSide][Weapon][B];
+		AccDamage[ShooterSide][Weapon][B] += Damage;
+	}
+	if (VictimSide >= 0 && VictimSide <= 1)
+	{
+		const int32 Bin = (int32)FMath::Max(0.f, Time);
+		if (Bin < MaxFireBins)
+		{
+			if (FireBins.Num() <= Bin)
+			{
+				FireBins.SetNumZeroed(Bin + 1);
+			}
+			FireBins[Bin] |= (uint8)(4 << VictimSide);
+		}
+	}
+}
+
+void FAstraWarStats::NoteKill(const FKill& K)
+{
+	if (Kills.Num() < 1024)
+	{
+		Kills.Add(K);
+	}
+}
+
+void FAstraWarStats::NoteRetreat(float Time, int32 SideIdx, const FString& What, int32 Ships)
+{
+	if (Retreats.Num() < 256)
+	{
+		FRetreat R;
+		R.T = Time;
+		R.Side = (int8)SideIdx;
+		R.What = What;
+		R.Ships = Ships;
+		Retreats.Add(R);
+	}
 }
 
 void FAstraWarStats::NoteFocus(int32 SideIdx, int32 TargetId, double Damage)
@@ -136,6 +228,84 @@ TSharedRef<FJsonObject> FAstraWarStats::ToJson() const
 		Fo->SetNumberField(FString::Printf(TEXT("%s_windows"), SideNames[s]), FocusWindows[s]);
 	}
 	R->SetObjectField(TEXT("focus"), Fo);
+	// the fight log: the chart of the fire second by second, the accuracy at each range, who killed whom, who broke off
+	{
+		TSharedRef<FJsonObject> F = MakeShared<FJsonObject>();
+		FString Bins;
+		Bins.Reserve(FireBins.Num());
+		for (const uint8 B : FireBins)
+		{
+			Bins.AppendChar(TEXT("0123456789abcdef")[B & 15]);
+		}
+		F->SetStringField(TEXT("bins"), Bins);
+		TArray<TSharedPtr<FJsonValue>> Edges;
+		for (int32 b = 0; b < NumRangeBuckets; ++b)
+		{
+			Edges.Add(MakeShared<FJsonValueNumber>(BucketKm[b]));
+		}
+		F->SetArrayField(TEXT("range_buckets_km"), Edges);
+		TSharedRef<FJsonObject> Acc = MakeShared<FJsonObject>();
+		for (int32 s = 0; s < 2; ++s)
+		{
+			TSharedRef<FJsonObject> Side = MakeShared<FJsonObject>();
+			for (int32 w = 0; w < NumWeapons; ++w)
+			{
+				TArray<TSharedPtr<FJsonValue>> Sh, Hi, Da;
+				int32 Total = 0;
+				for (int32 b = 0; b < NumRangeBuckets; ++b)
+				{
+					Sh.Add(MakeShared<FJsonValueNumber>(AccShots[s][w][b]));
+					Hi.Add(MakeShared<FJsonValueNumber>(AccHits[s][w][b]));
+					Da.Add(MakeShared<FJsonValueNumber>(Round(AccDamage[s][w][b], 10.0)));
+					Total += AccShots[s][w][b];
+				}
+				if (Total > 0)
+				{
+					TSharedRef<FJsonObject> Wp = MakeShared<FJsonObject>();
+					Wp->SetArrayField(TEXT("shots"), Sh);
+					Wp->SetArrayField(TEXT("hits"), Hi);
+					Wp->SetArrayField(TEXT("damage"), Da);
+					Side->SetObjectField(WeaponNames[w], Wp);
+				}
+			}
+			Acc->SetObjectField(SideNames[s], Side);
+		}
+		F->SetObjectField(TEXT("accuracy"), Acc);
+		F->SetNumberField(TEXT("friendly_hits_astra"), FriendlyHits[0]);
+		F->SetNumberField(TEXT("friendly_hits_mandate"), FriendlyHits[1]);
+		TArray<TSharedPtr<FJsonValue>> Ks;
+		for (const FKill& K : Kills)
+		{
+			TSharedRef<FJsonObject> J = MakeShared<FJsonObject>();
+			J->SetNumberField(TEXT("t"), Round(K.T, 10.0));
+			J->SetStringField(TEXT("victim_side"), K.VictimSide == 0 ? TEXT("astra") : TEXT("mandate"));
+			J->SetStringField(TEXT("victim"), K.VictimClass.ToString());
+			J->SetNumberField(TEXT("victim_tier"), K.VictimTier);
+			J->SetBoolField(TEXT("victim_craft"), K.bVictimCraft);
+			J->SetStringField(TEXT("killer_side"), K.KillerSide == 0 ? TEXT("astra") : (K.KillerSide == 1 ? TEXT("mandate") : TEXT("none")));
+			J->SetStringField(TEXT("killer"), K.bKillerAquila ? FString(TEXT("aquila")) : K.KillerClass.ToString());
+			J->SetBoolField(TEXT("killer_aquila"), K.bKillerAquila);
+			J->SetBoolField(TEXT("killer_craft"), K.bKillerCraft);
+			J->SetBoolField(TEXT("fleeing"), K.bFleeing);
+			J->SetStringField(TEXT("weapon"), WeaponNames[FMath::Clamp<int32>(K.Weapon, 0, NumWeapons - 1)]);
+			J->SetStringField(TEXT("how"), ShipFateNames[FMath::Clamp<int32>(K.How, 0, 5)]);
+			J->SetNumberField(TEXT("range_km"), Round(K.KillRangeKm, 10.0));
+			Ks.Add(MakeShared<FJsonValueObject>(J));
+		}
+		F->SetArrayField(TEXT("kills"), Ks);
+		TArray<TSharedPtr<FJsonValue>> Rs;
+		for (const FRetreat& Rt : Retreats)
+		{
+			TSharedRef<FJsonObject> J = MakeShared<FJsonObject>();
+			J->SetNumberField(TEXT("t"), Round(Rt.T, 10.0));
+			J->SetStringField(TEXT("side"), Rt.Side == 0 ? TEXT("astra") : TEXT("mandate"));
+			J->SetStringField(TEXT("what"), Rt.What);
+			J->SetNumberField(TEXT("ships"), Rt.Ships);
+			Rs.Add(MakeShared<FJsonValueObject>(J));
+		}
+		F->SetArrayField(TEXT("retreats"), Rs);
+		R->SetObjectField(TEXT("fight"), F);
+	}
 	// what the simulation costs
 	TSharedRef<FJsonObject> P = MakeShared<FJsonObject>();
 	P->SetNumberField(TEXT("ticks"), Ticks);

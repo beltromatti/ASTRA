@@ -123,6 +123,47 @@ struct FAstraWarStats
 	double PhaseMax[NumPhases] = {};
 	int32 PeakShips = 0, PeakCraft = 0, PeakProjectiles = 0;
 
+	// --- the fight log (BATTAGLIA-3): how continuous the fire is, how accurate it is at each range, who kills whom, who breaks off and when.
+	// The weapons that hurt a warship: a railgun slug, a capital ship's laser, a missile, a bomber's torpedo, a strike fighter's rocket, a craft's cannon.
+	enum EWeapon : int32 { WRail = 0, WLaser, WMissile, WTorpedo, WRocket, WCannon, NumWeapons };
+	static constexpr int32 NumRangeBuckets = 10;          // range of the shot, km: 0-2, 2-5, 5-10, 10-15, 15-20, 20-30, 30-40, 40-50, 50-70, 70+
+	static int32 RangeBucket(double RangeM);
+	static int32 WeaponOf(EAstraHitKind K);
+	int32 AccShots[2][NumWeapons][NumRangeBuckets] = {};  // by the shooter's side: shots fired at a warship (rails, lasers, torpedoes, rockets: each slug or beam; missiles: each one launched)
+	int32 AccHits[2][NumWeapons][NumRangeBuckets] = {};   // the ones that struck a warship (counted at the range they were fired from)
+	double AccDamage[2][NumWeapons][NumRangeBuckets] = {};// what those hits carried before the shields (the blow's own damage)
+	int32 FriendlyHits[2] = {0, 0};                        // a slug that struck a ship of its own side (it was in the line of fire)
+	TArray<uint8> FireBins;                               // one byte per second of battle: 1 ASTRA warship fired, 2 Mandate warship fired, 4 a blow struck an ASTRA warship, 8 a blow struck a Mandate warship
+	void NoteFire(float Time, int32 SideIdx, int32 Weapon, double RangeM, bool bCapitalShooter);
+	void NoteHit(float Time, int32 ShooterSide, int32 VictimSide, int32 Weapon, double FireRangeM, float Damage);
+	struct FKill
+	{
+		float T = 0.f;
+		int8 VictimSide = -1;                             // 0 ASTRA, 1 Mandate
+		int8 VictimTier = 0;
+		FName VictimClass;
+		bool bVictimCraft = false;
+		int8 KillerSide = -1;
+		FName KillerClass;                                // a warship's class, or the craft's kind (fighter, bomber, drone)
+		bool bKillerAquila = false;
+		bool bKillerCraft = false;
+		bool bFleeing = false;                            // it was breaking off when it died
+		uint8 Weapon = 0;                                 // the blow that finished it
+		uint8 How = 0;                                    // EAstraFate
+		float KillRangeKm = -1.f;                         // from the killer, when known
+	};
+	TArray<FKill> Kills;
+	struct FRetreat
+	{
+		float T = 0.f;
+		int8 Side = -1;
+		FString What;                                     // "group Vanguard: it is being beaten" / "ship T-31: too hurt"
+		int32 Ships = 0;
+	};
+	TArray<FRetreat> Retreats;
+	void NoteKill(const FKill& K);
+	void NoteRetreat(float Time, int32 SideIdx, const FString& What, int32 Ships);
+
 	void NoteTick(double Ms)
 	{
 		for (int32 p = 0; p < NumPhases; ++p)

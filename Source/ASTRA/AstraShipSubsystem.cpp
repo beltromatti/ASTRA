@@ -3425,6 +3425,7 @@ void UAstraShipSubsystem::UpdateAlertVisuals(float DeltaTime)
 		FlickerTime -= DeltaTime;
 		LightLevel *= 0.35f + 0.65f * (FMath::FRand() > 0.45f ? 1.f : 0.f);
 	}
+	RailDrawGap = FMath::Max(0.f, RailDrawGap - DeltaTime);
 	if (RailDraw > 0.f)
 	{
 		// the rails charge: a quick sag (to about 60%) and a slower recovery over half a second
