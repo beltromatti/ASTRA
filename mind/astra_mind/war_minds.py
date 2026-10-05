@@ -597,13 +597,18 @@ _DOCTRINE_HEAD = """How a fleet fights (what your officers and your own years ha
 _RANGE_WEDGE = """- Range is the main lever. The closer, the more of your rounds strike and the more of theirs: between equals it is a trade, and the side that
   chooses where it is fought wins it. Stand off where your guns outreach theirs and theirs do not reach you; close where the enemy outranges you, fast,
   so as not to be shot at for minutes on the way in (the ASTRA's capital ships outrange yours: the Aquila strikes seven rounds in ten at 20-30 km, where
-  a Styx barely reaches: a group that stands off against her loses slowly; cut inside her band or keep out of her reach). Against a clearly heavier
-  enemy stand off or withdraw; against a clearly beaten one (most of its ships under a third of their hull) close and finish it.
+  a Styx barely reaches: a group that stands off against her loses slowly; cut inside her band or keep out of her reach). Measured between equal forces
+  against an enemy that keeps the reflexes' range (about 15 km): with five or six ships a side, the side that closes to 8-10 km wins by about one ship
+  in six, and the one that holds long (25 km) loses; with three a side the range changes nothing that can be told. Closing makes the fight shorter and
+  bloodier for both. Against a clearly heavier enemy stand off or withdraw; against a clearly beaten one (most of its ships under a third of their hull)
+  close and finish it.
 """
 
 _RANGE_LINE = """- Range and formation are the levers. The closer, the more of your rounds strike and the more of theirs: between equals it is a trade, and the
   side that chooses where it is fought wins it. Stand off where your guns outreach theirs; close fast where the enemy outranges you (the Aquila strikes
-  seven rounds in ten at 20-30 km, where a Styx barely reaches). A LINE ABREAST (`formation` line) brings every gun to bear at the same distance; a
+  seven rounds in ten at 20-30 km, where a Styx barely reaches). Between equal forces of five or six ships, against an enemy that keeps the reflexes'
+  range (about 15 km), closing to 8-10 km wins by about one ship in six; with three a side range changes nothing that can be told. A LINE ABREAST
+  (`formation` line) brings every gun to bear at the same distance; a
   WEDGE's rear sits several km behind its tip and may be out of reach; a COLUMN is for transit (the ships behind never fire). Against a clearly heavier
   enemy stand off or withdraw; against a clearly beaten one (most of its ships under a third of their hull) close and finish it.
 """
