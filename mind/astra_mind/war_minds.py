@@ -884,7 +884,8 @@ class WarMinds:
                  captain: Callable[[str, str, str], Awaitable[Any]] | None = None) -> None:
         self.llm = llm
         self.say = say
-        self.transmit = transmit or say
+        # (the Mandate's words on the channel: with no `transmit` of its own, the bench's `say` takes them, without the voice stage's keywords)
+        self.transmit = transmit or (lambda key, text, lang, tone, **kw: say(key, text, lang, tone))
         self.execute = execute
         self.intel = intel                               # what Mandate intelligence knows of how the Aquila's captain fights (style.py)
         self.lang = lang
@@ -1467,7 +1468,11 @@ class WarMinds:
                     self.journal("mandate", cmd.name, f"said on the channel: {text[:200]}")
                     spoke.append(text)
                     rec["lines"] += 1
-                    await self.transmit(cmd.key, text, lang, str(a.get("tone", "cold")))
+                    key = cmd.key
+
+                    async def rethink(t: str, waited: float, cut_after: str) -> str | None:
+                        return await self.rethink_transmission(key, t, waited, cut_after, lang)
+                    await self.transmit(cmd.key, text, lang, str(a.get("tone", "cold")), rethink=rethink)
                 return
             if call.name == "report":
                 self._report(mind, a)
@@ -1710,6 +1715,46 @@ class WarMinds:
         comp = await models.chat(self.llm, COMMANDER_ROLE, messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
                                  tools=[say_tool([cmd.key], LANG_NAMES.get(self.lang(), self.lang())), NO_CHANGE], tool_choice="auto", on_tool_call=on_call, max_tokens=140)
         mind.stats["cost"] += comp.cost
+        return " ".join(said) if said else None
+
+    async def rethink_transmission(self, key: str, text: str, waited_s: float, cut_after: str, lang: str) -> str | None:
+        """A Mandate commander thinks again about what they were saying to the Captain over the open channel, when the Aquila's bridge cut it
+        off (an alarm, an officer, the Captain) or it waited: what they say now, or None. Without it the rest of a demand of surrender came
+        out again 40 s later, after the battle was won and she had ordered the withdrawal herself (5 Oct)."""
+        mind = next((m for m in self.minds.values() if m.commander is not None and m.seat.side == "mandate" and m.commander.key == key), None)
+        if mind is None or mind.commander is None:
+            return text
+        view = self._view("mandate", self.state)
+        if view is None:
+            return text
+        cmd = mind.commander
+        admiral = self.minds.get("mandate/admiral")
+        system = system_prompt(mind.seat, cmd, self.where(self.state), cmd.mission, admiral_name=(admiral.commander.name if admiral and admiral.commander else ""),
+                               channel_open=True, ops=self.ops, formation=self.formation_doctrine)
+        heard = (f" They heard only «{cut_after}»: then their bridge cut in (an alarm, an officer, their Captain), and the rest did not reach them."
+                 if cut_after else "")
+        ask = (f"{waited_s:.0f} seconds ago you were saying to the ASTRA Captain over the open channel: «{text}».{heard} The battle has moved on "
+               "(the picture above is now). If it still fits what is happening and what your ships are doing, transmit it now as it stands: updated, "
+               "short, without saying again what they already heard. If it no longer fits (the fight turned, your side is withdrawing, it was said "
+               "already), call no_change.")
+        user = (f"WHAT YOU HAVE DECIDED AND SAID, AND WHAT YOU HEARD (your log, newest last)\n{self.recall('mandate')}\n\n"
+                f"{picture('mandate', mind.seat.kind, mind.seat.group, view, self.state, None, self.clock())}\n\n{ask} "
+                f"The Captain's language is {LANG_NAMES.get(lang, lang)}.")
+        said: list[str] = []
+        CURRENT.set(mind)
+        CURRENT_VIEW.set((view, self.state))
+
+        async def on_call(call: ToolCall) -> None:
+            if call.name == "transmit" and str((call.arguments() or {}).get("text") or "").strip():
+                said.append(str(call.arguments()["text"]).strip())
+
+        comp = await models.chat(self.llm, mind.seat.role, messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
+                                 tools=[TRANSMIT, NO_CHANGE], tool_choice="auto", on_tool_call=on_call, max_tokens=160)
+        mind.stats["cost"] += comp.cost
+        if said:
+            self.journal("mandate", cmd.name, f"said again on the channel: {' '.join(said)[:200]}")
+        else:
+            self.journal("mandate", cmd.name, f"let go of what the Captain did not hear: {text[:120]}")
         return " ".join(said) if said else None
 
     def _captain_keys(self, mind: Mind) -> set[str]:

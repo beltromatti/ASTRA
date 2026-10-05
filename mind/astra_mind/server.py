@@ -22,7 +22,7 @@ import sys
 import time
 import wave
 from pathlib import Path
-from typing import Any
+from typing import Any, Awaitable, Callable
 
 from lingua import Language, LanguageDetectorBuilder
 
@@ -311,9 +311,11 @@ class Mind:
         for ws in dead:
             self.clients.discard(ws)
 
-    async def _say_external(self, speaker: str, text: str, lang: str, tone: str) -> None:
+    async def _say_external(self, speaker: str, text: str, lang: str, tone: str, *,
+                            rethink: Callable[[str, float, str], Awaitable[str | None]] | None = None) -> None:
         """Voices from outside the bridge that speak TO the Captain (a Mandate commander on the channel, Fleet command calling, the port's control, the board of inquiry): heard
-        by the crew too. What is said to him is addressed to him: it is never lost to the queue (speech.py: `addressed`)."""
+        by the crew too. What is said to him is addressed to him: it is never lost to the queue (speech.py: `addressed`). `rethink`: whoever said it thinks again when
+        the bridge cut it off or it waited (a Mandate commander: war_minds.rethink_transmission); without one, the rest of it is said as it stands."""
         if self.game is not None:
             who = EXTERNAL_SPEAKERS.get(speaker, (speaker, ""))[0]
             self.game.events.append(f"over the radio, {who}: {text}")
@@ -321,7 +323,7 @@ class Mind:
             self.exchange.heard(self.enemy.contact, text)    # (an exchange is going on: comms knows what they just said)
         elif speaker == ADMIRAL["key"]:
             self.exchange.heard("fleet", text)
-        await self.voice.say(speaker, text, lang, tone, addressed=True)
+        await self.voice.say(speaker, text, lang, tone, addressed=True, rethink=rethink)
 
     async def _ally_say(self, speaker: str, text: str, lang: str, tone: str, *, urgent: bool = False, answer: bool = False,
                         topic: str | None = None, to: str = "aquila") -> None:

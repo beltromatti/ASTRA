@@ -280,6 +280,31 @@ class MandateSeatsTests(Fixture):
         self.assertIn("transmit", self.llm.calls[1]["tools"])
         self.assertIn("A channel with the ASTRA captain is OPEN", self.llm.calls[1]["system"])
 
+    async def test_a_transmission_the_bridge_cut_off_is_thought_again_by_whoever_said_it(self) -> None:
+        """5 October: Warden Thale's demand of surrender, cut off by the bridge's warnings, came out again (the rest of it) 40 s later, after the battle was won and she had
+        ordered the withdrawal herself. What a Mandate commander says on the channel goes with a re-think of their own: they say it again as it stands, or let it go."""
+        sent: list[dict[str, Any]] = []
+
+        async def transmit(speaker: str, text: str, lang: str, tone: str, **k: Any) -> None:
+            sent.append({"speaker": speaker, "text": text, **k})
+        self.minds.transmit = transmit
+        self.minds.channel = lambda contact: contact == "M-01"
+        self.llm.policy = ScriptPolicy([("transmit", {"text": "Capitano, vi offro la resa.", "tone": "cold"})])
+        st = mandate_state([VANGUARD()], ENEMIES())
+        await self.feed(st)
+        await self.feed(st, 9)
+        self.assertEqual((sent[0]["speaker"], sent[0]["text"]), ("solm", "Capitano, vi offro la resa."))
+        rethink = sent[0]["rethink"]
+        self.llm.policy = ScriptPolicy([("no_change", {"reason": "we are withdrawing"})])
+        self.assertIsNone(await rethink("Capitano, vi offro la resa.", 40.0, "Capitano,"))
+        ask = self.llm.calls[-1]
+        self.assertEqual(ask["tools"], ["transmit", "no_change"])
+        self.assertIn("40 seconds ago", ask["user"])
+        self.assertIn("They heard only «Capitano,»", ask["user"])
+        self.assertIn("let go of what the Captain did not hear", self.minds.recall("mandate"))
+        self.llm.policy = ScriptPolicy([("transmit", {"text": "La mia offerta resta: la resa.", "tone": "cold"})])
+        self.assertEqual(await rethink("Capitano, vi offro la resa.", 9.0, ""), "La mia offerta resta: la resa.")
+
 
 class ToolsTests(Fixture):
     sides = ("mandate", "astra")
