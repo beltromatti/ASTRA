@@ -75,6 +75,23 @@ CAPTAIN_OFF = "boarding: the Captain is off the other ship's decks (carried out)
 CAPTAIN_HOME = "boarding: the Captain is back aboard the Aquila: the boat bay on Deck 8"
 CAPTAIN_BOAT = "boarding: the Captain was in the boat: it was destroyed (shot down by the point defence of Hulk)"
 
+# the infantry orders' news (AstraBoardDrills.cpp: a squad's drill moves on; AstraBoardSim.cpp: a door a squad shut is cut, overridden, opened again)
+DRILL_NEWS = {
+    "stacked": ("boarding: Reaction 1 is stacked at deck 4 section C (Berthing Lobby), ready to go in", False, False),
+    "charge": ("boarding: Reaction 1 is setting a charge on the bulkhead at deck 2 section G (Spine)", False, False),
+    "charged": ("boarding: Reaction 1 charged the bulkhead at deck 2 section G (Spine)", False, False, "charge"),
+    "sync": ("boarding: Reaction 2: all of sync 1000 are at their doors: in together", False, False),
+    "going_in": ("boarding: Reaction 1 is going in at deck 4 section C (Berthing Lobby)", False, False),
+    "cleared": ("boarding: Reaction 1 has cleared deck 4 section C (Berthing Lobby)", True, False),
+    "swept": ("boarding: Reaction 1 has swept deck 4 section C: 4 rooms clear", True, True),
+    "sprung": ("boarding: Reaction 2 has sprung the ambush at deck 7 section D (Starboard Passage) (found: they open fire)", True, True),
+    "ambush_off": ("boarding: Reaction 2 gives up the ambush at deck 7 section D (Starboard Passage): nobody came; they hold it with their fire free", True, False),
+    "no_way": ("boarding: Reaction 1 has no way to deck 4 section C (Berthing Lobby)", True, True),
+    "sealed_behind": ("boarding: Reaction 1 closed the bulkhead at deck 7 section D (Starboard Passage) behind them", False, False),
+    "cut": ("boarding: the Mandate overrode the bulkhead at deck 2 section G (Spine)", True, False),
+}
+OPENED_AGAIN = "boarding: the bulkhead at deck 2 section G (Spine) was opened again"
+
 PICTURE: dict[str, Any] = {
     "elapsed_s": 74, "breach": PLACE, "breach_open": True, "objective": "deck 7 section B (Main Engineering)", "objective_id": "engineering",
     "squads": [
@@ -202,6 +219,15 @@ class Classification(unittest.TestCase):
             self.assertIsNotNone(k, text)
             self.assertEqual((k.name, k.take, k.wake, k.call), (kind, take, wake, call), text)
 
+    def test_the_infantry_orders_news_is_the_nets_own(self) -> None:
+        # what changes the Captain's picture wakes the net (a room cleared, a place swept, an ambush sprung or given up, no way in); the steps between stay in the log
+        for label, (text, wake, call, *name) in DRILL_NEWS.items():
+            k = mm.classify(text)
+            self.assertIsNotNone(k, text)
+            self.assertEqual((k.name, k.take, k.wake, k.call), (name[0] if name else label, True, wake, call), text)
+        k = mm.classify(OPENED_AGAIN)
+        self.assertEqual((k.name, k.take, k.wake), ("sealed_behind", True, False))
+
     def test_what_must_be_called_aloud(self) -> None:
         for text in (CONTACT, DEAD, BEATEN):
             self.assertTrue(mm.classify(text).call, text)
@@ -271,13 +297,34 @@ class GameContract(unittest.TestCase):
             self.assertIsNotNone(k, text)
             self.assertNotEqual(k.name, "other", f"the game tells «{text}» and the marine net's table does not know it")
 
+    def test_every_drill_news_the_game_tells_is_one_the_table_knows(self) -> None:
+        drills = (SRC / "AstraBoardDrills.cpp").read_text(encoding="utf-8")
+        sim = (SRC / "AstraBoardSim.cpp").read_text(encoding="utf-8")
+        found = re.findall(r'Announce\(\w+, FString::Printf\(TEXT\("((?:[^"\\]|\\.)*)"\)', drills)                                  # a squad's drill moves on
+        found += re.findall(r'Emit\(EEvent::(?:Sealed|Cut),[^;]*?TEXT\("((?:[^"\\]|\\.)*)"\)', drills)                            # a door shut behind a squad, a charge
+        found += re.findall(r'TEXT\("(%s (?:cut through|overrode) the bulkhead at %s|the bulkhead at %s was opened again)"\)', sim)       # a shut door cut, overridden, opened again
+        self.assertGreaterEqual(len(found), 12)
+        for fmt in found:
+            text = "boarding: " + _filled(fmt)
+            text = text.replace("boarding: Sample overrode", "boarding: the Mandate overrode").replace("boarding: Sample cut through", "boarding: the Mandate cut through")
+            k = mm.classify(text)
+            self.assertIsNotNone(k, text)
+            self.assertNotEqual(k.name, "other", f"the game tells «{text}» and the marine net's table does not know it")
+            self.assertTrue(k.take, text)                                                # (a drill's news is the marines' own: the bridge's report turn does not say it)
+
+    def test_the_boarding_snapshot_says_where_the_captain_is(self) -> None:
+        # the keys the minds read to know whether the Captain is with the marines (VOCI-3: who hears him on the marine net)
+        src = (SRC / "AstraBoardMind.cpp").read_text(encoding="utf-8")
+        self.assertIn('SetBoolField(TEXT("captain_aboard"), bCaptainAboard)', src)
+        self.assertIn('SetBoolField(TEXT("captain_with_marines"), bCaptainAboard || Ride != ERide::None)', src)
+
     def test_the_picture_is_what_the_game_writes(self) -> None:
         src = (SRC / "AstraBoardMind.cpp").read_text(encoding="utf-8")
         fields = set(re.findall(r'(?:SetStringField|SetNumberField|SetBoolField|SetArrayField|SetObjectField)\(TEXT\("([a-z_]+)"\)', src))
         read = {"elapsed_s", "breach", "breach_open", "objective", "objective_id", "squads", "name", "able", "down", "dead", "still_arming_or_waking", "doing", "under_orders", "in_contact",
                 "leader", "leader_id", "leader_gender", "where", "where_id", "note", "hostiles_known", "count", "age_s", "bulkheads", "id", "between", "sealed", "likely_approach",
                 "objective_entrances", "default_ambush", "id_a", "id_b", "captain", "strength_pct", "recent", "active", "marines", "boarders_known_losses", "down_or_dead",
-                "left_ship", "hostiles", "armed", "role", "ship", "ship_class", "defenders_known_losses", "direction"}
+                "left_ship", "hostiles", "armed", "role", "ship", "ship_class", "defenders_known_losses", "direction", "drill", "in_a_sync", "fire_held", "seal_behind", "objective_doors"}
         self.assertEqual(read - fields, set())
         for row in PICTURE["squads"]:                                              # the fixture has what the game writes, nothing it does not
             self.assertLessEqual(set(row), fields)
@@ -395,6 +442,33 @@ class Prompts(unittest.IsolatedAsyncioTestCase):
         self.assertIn("withdraw", mm.TASKS)
         bulk = next(t for t in mm.TOOLS if t["function"]["name"] == "bulkheads")["function"]["description"]
         self.assertIn("only while the marines DEFEND", bulk)
+
+    def test_the_prompt_teaches_the_infantry_orders_with_the_games_numbers(self) -> None:
+        s = mm.system_prompt()
+        for needle in ("THE INFANTRY ORDERS", "take:", "breach:", "sweep:", "ambush:", "escort_captain", "seal_behind", "21 times in 32", "15 times in", "87 times", "66", "What does not work: spreading a squad thin"):
+            self.assertIn(needle, s)
+        for task in ("sweep", "breach", "take", "ambush", "escort_captain"):
+            self.assertIn(task, mm.TASKS)
+        order = next(t for t in mm.TOOLS if t["function"]["name"] == "order")["function"]
+        props = order["parameters"]["properties"]
+        for k in ("fire", "seal_behind", "cover", "sync", "inside"):
+            self.assertIn(k, props)
+        self.assertEqual(props["fire"]["enum"], ["held", "free"])
+        self.assertEqual(order["parameters"]["required"], ["by", "squad", "task"])
+        self.assertIn("deck 7 section D", props["place"]["description"])
+
+    def test_the_board_shows_what_each_squads_drill_is_doing(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            bed = Bed(tmp)
+            st = ship_state()
+            st["_marines"]["squads"][0].update({"doing": "take", "under_orders": True, "drill": "taking deck 4 section C (Berthing Lobby): stacked at the door (waiting for the squads of its sync)", "in_a_sync": True})
+            st["_marines"]["squads"][1].update({"doing": "ambush", "drill": "hidden at deck 7 section D (Starboard Passage), fire held, 31 s", "fire_held": True})
+            st["_marines"]["objective_doors"] = [{"id": "d7_door_eng_1", "between": "deck 7 section F (Main Engineering lobby) | deck 7 section F (Main Engineering)", "sealed": True}]
+            bed.m.feed(st)
+            board = bed.m._board(st, "en")
+            for needle in ("doing: take (under orders; in a sync: its doors and another squad's, in together); drill: taking deck 4 section C (Berthing Lobby): stacked at the door",
+                           "drill: hidden at deck 7 section D (Starboard Passage), fire held, 31 s", "the objective's own doors (what a breach names): d7_door_eng_1 between", "SEALED"):
+                self.assertIn(needle, board)
 
     def test_the_marines_attacking_read_the_assault_not_the_defence(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -905,6 +979,19 @@ class Orders(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(r["ok"])
         self.assertEqual(self.bed.commands, [("marine_order", {"squad": "Reaction 1", "task": "hold", "place": "d7_corridor_B1", "note": "the way into Engineering"}, "reyes")])
 
+    async def test_the_infantry_orders_reach_the_game_with_what_goes_with_them(self) -> None:
+        await self.m._command("order", {"by": "reyes", "squad": "all", "task": "take", "place": "deck 7 section D", "sync": "Go", "reason": "the junction before Engineering"})
+        await self.m._command("order", {"by": "reyes", "squad": "Reaction 2", "task": "AMBUSH", "place": "corridor_5b", "fire": "Held", "cover": "d7_corridor_B1"})
+        await self.m._command("order", {"by": "reyes", "squad": "Reaction 1", "task": "withdraw", "seal_behind": True})
+        await self.m._command("order", {"by": "reyes", "squad": "Reaction 1", "task": "hold", "place": "d7_corridor_B1", "inside": "true", "seal_behind": False})
+        await self.m._command("order", {"by": "reyes", "squad": "Reaction 2", "task": "escort_captain"})
+        sent = [c[1] for c in self.bed.commands]
+        self.assertEqual(sent, [{"squad": "all", "task": "take", "place": "deck 7 section D", "note": "the junction before Engineering", "sync": "go"},
+                                {"squad": "Reaction 2", "task": "ambush", "place": "corridor_5b", "fire": "held", "cover": "d7_corridor_B1"},
+                                {"squad": "Reaction 1", "task": "withdraw", "seal_behind": True},
+                                {"squad": "Reaction 1", "task": "hold", "place": "d7_corridor_B1", "inside": True},
+                                {"squad": "Reaction 2", "task": "escort_captain"}])                   # (what is not said is not sent: a false flag is no flag)
+
     async def test_a_squad_by_its_key_goes_to_the_game_by_its_name(self) -> None:
         await self.m._command("order", {"by": "reyes", "squad": "marine_reaction_2", "task": "FALL_BACK", "place": "captain"})
         self.assertEqual(self.bed.commands[0][1], {"squad": "Reaction 2", "task": "fall_back", "place": "captain"})
@@ -981,6 +1068,33 @@ class Orders(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([c[0] for c in self.bed.commands], ["marine_order"])
         self.assertEqual([l["text"] for l in self.bed.lines], ["Con lei, Capitano."])
         self.assertEqual(len(self.bed.llm.requests), 1)                                             # (no second look: it all went through)
+
+
+class Rethink(unittest.IsolatedAsyncioTestCase):
+    """The speech floor asks a person to think again about a line that waited: a model that fails gives the line back as it stands (that is not the marine's word that it no longer matters)."""
+
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.bed = Bed(self.tmp.name)
+        self.m = self.bed.m
+        self.m.feed(ship_state())
+
+    def tearDown(self) -> None:
+        self.tmp.cleanup()
+
+    async def test_a_model_that_fails_gives_the_line_back_as_it_stands(self) -> None:
+        self.bed.llm.error = "provider down"
+        self.assertEqual(await self.m.rethink("reyes", "Reaction Due ha preso il bivio.", 14.0, "", "it"), "Reaction Due ha preso il bivio.")
+        self.assertEqual(await self.m.rethink("marine_reaction_2", "Contatto, sei ostili.", 9.0, "Contatto", "it"), "Contatto, sei ostili.")
+
+    async def test_a_marine_who_says_it_again_or_lets_it_go_is_believed(self) -> None:
+        self.bed.llm.replies = [[("say", {"speaker": "reyes", "text": "Reaction Due tiene il bivio, tre ostili a terra.", "tone": "calm"})]]
+        self.assertEqual(await self.m.rethink("reyes", "Reaction Due ha preso il bivio.", 14.0, "", "it"), "Reaction Due tiene il bivio, tre ostili a terra.")
+        self.bed.llm.replies = [[("stay_quiet", {"reason": "the Captain has it"})]]
+        self.assertIsNone(await self.m.rethink("reyes", "Reaction Due ha preso il bivio.", 14.0, "", "it"))
+
+    async def test_a_line_of_someone_who_is_not_on_the_net_is_left_as_it_is(self) -> None:
+        self.assertEqual(await self.m.rethink("marine_nobody_9", "Dove siete?", 12.0, "", "it"), "Dove siete?")
 
 
 class CaptainTalk(unittest.IsolatedAsyncioTestCase):

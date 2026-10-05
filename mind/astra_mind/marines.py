@@ -7,7 +7,8 @@ people, answer him when he speaks to them, carry out his orders, and take their 
 (party "marines"): the router decides which of the Captain's words go out on it, and the bridge's officers say nothing about what is theirs.
 
 What they can do is what the game lets them do, and nothing else: `order` is the game's `marine_order` (a task for one squad or all: hold, advance, assault, fall_back,
-follow_captain, rescue_captain, stand_down), `bulkheads` is its `lockdown` (seal or open pressure bulkheads), `say` is a radio voice, `remember` keeps what a person would
+withdraw, follow_captain, rescue_captain, the infantry orders sweep, breach, take, ambush and escort_captain, stand_down; with what goes with them: fire held, seal behind,
+the place covered, a sync), `bulkheads` is its `lockdown` (seal or open pressure bulkheads), `say` is a radio voice, `remember` keeps what a person would
 carry for weeks. The code carries facts and runs the pulses (docs/ARCHITETTURA.md §1bis): it never reads the Captain's words for a keyword and never cuts or checks what the
 model says; the model decides who speaks, what is ordered and whether to stay quiet. A game event wakes a pulse after a short settle, a state that has had no news for a while
 wakes one too (the commander's chance to act on his own), and the Captain's words never wait. The prompt is long and stable (the provider's cache covers it); what changes
@@ -58,7 +59,7 @@ EXCHANGE_S = 25.0               # somebody on the net called the Captain this lo
 AFTERMATH_S = 75.0              # the net stays open this long after the fight (the Captain asks for the count, thanks them)
 
 TONES = ("calm", "focused", "urgent", "tense", "dry", "warm", "grim")
-TASKS = ("hold", "advance", "assault", "fall_back", "withdraw", "follow_captain", "rescue_captain", "stand_down")
+TASKS = ("hold", "advance", "assault", "fall_back", "withdraw", "follow_captain", "rescue_captain", "sweep", "breach", "take", "ambush", "escort_captain", "stand_down")
 
 
 # ------------------------------------------------------------------------------------------------ the people
@@ -146,6 +147,20 @@ _KINDS: tuple[tuple[re.Pattern[str], Kind], ...] = tuple((re.compile(p, re.I), k
     (r"^boarding: .+ is down, wounded, at ", Kind("down", True)),
     (r"^boarding: .+, wounded, has been carried back to the boat by ", Kind("casualty_out", False, wake=False)),      # (a wounded marine carried out to his boat: he is alive and off the ship; the log only)
     (r"^boarding: the Mandate cut through the bulkhead", Kind("cut", True)),
+    (r"^boarding: the (?:Mandate|marines) overrode the bulkhead at ", Kind("cut", True)),                # (a door a squad shut behind it: the ship's own people override it)
+    (r"^boarding: the bulkhead at .+ was opened again", Kind("sealed_behind", True, wake=False)),
+    # the infantry orders (AstraBoardDrills.cpp): a squad's drill tells where it is; what changes the Captain's picture wakes the net, the steps in between stay in the log
+    (r"^boarding: .+ is stacked at .+, ready to go in", Kind("stacked", True, wake=False)),
+    (r"^boarding: .+ is setting a charge on the bulkhead at ", Kind("charge", True, wake=False)),
+    (r"^boarding: .+ charged the bulkhead at ", Kind("charge", True, wake=False)),
+    (r"^boarding: .+: all of sync \d+ are at their doors: in together", Kind("sync", True, wake=False)),
+    (r"^boarding: .+ is going in at ", Kind("going_in", True, wake=False)),
+    (r"^boarding: .+ has cleared ", Kind("cleared", True)),
+    (r"^boarding: .+ has swept ", Kind("swept", True, call=True)),
+    (r"^boarding: .+ has sprung the ambush at ", Kind("sprung", True, call=True)),
+    (r"^boarding: .+ gives up the ambush at ", Kind("ambush_off", True)),
+    (r"^boarding: .+ has no way to ", Kind("no_way", True, call=True)),
+    (r"^boarding: .+ closed the bulkhead at .+ behind them", Kind("sealed_behind", True, wake=False)),
     (r"^boarding: .+ is breaking off", Kind("retreat", True)),
     (r"^boarding: the marines have reached the Captain", Kind("rescue", True)),
     (r"^boarding: the Captain is down", Kind("captain_down", False)),
@@ -210,14 +225,24 @@ ORDER = _fn("order", "Give a squad (or several) an order: it takes effect at onc
                      "Reyes orders any squad, a squad leader only his own. hold: take the corners of the place and hold it · advance: go there in column, taking cover if "
                      "they meet the enemy on the way · assault: rush there and fight at it (fast, and costly) · fall_back: pull back there and hold · withdraw: (the marines are "
                      "boarding a ship) leave her by the hatch the squad came in by, back into the boat · follow_captain: stay with the "
-                     "Captain wherever he goes · rescue_captain: go to the Captain, cover him and carry him out if he is down · stand_down: back to their own drill (the default "
-                     "ambush when defending, the way to the objective when attacking), the order is lifted.", {
+                     "Captain wherever he goes · rescue_captain: go to the Captain, cover him and carry him out if he is down · "
+                     "INFANTRY ORDERS: sweep: clear the rooms of a place one after the other (stacked at each door, in together, held, reported) · take: stack at a room's door and go in "
+                     "together, clear it and hold it from inside (several squads given one take go in at the same moment, each by its own door) · breach: go in through a door "
+                     "(a sealed bulkhead is charged first: nine seconds, loud) · ambush: hidden in the corners of a place with the fire held, all at once when the enemy is in the killing ground · "
+                     "escort_captain: a man ahead of the Captain, two at his sides, the rest behind, walking and shooting with him (he must be in the fight) · "
+                     "stand_down: back to their own drill (the default ambush when defending, the way to the objective when attacking), the order is lifted.", {
     "by": {"type": "string", "description": "who gives the order: `reyes`, or the key of a squad from the board (marine_reaction_1)"},
     "squad": {"type": "string", "description": "a squad's name from the board (Reaction 1), or `all`, `reaction`, `watch`, `reserve`"},
     "task": {"type": "string", "enum": list(TASKS)},
     "place": {"type": "string", "description": "where: a place id from the board (where_id, the likely approach, the ways into Main Engineering, the default ambush), `captain` "
-                                               "for wherever the Captain is now, or a room's name or kind when it is not on the board (medbay, hangar: the game finds it or lists "
-                                               "what fits); leave it out for follow_captain, rescue_captain and stand_down"},
+                                               "for wherever the Captain is now, a deck's section as «deck 7 section D» (sweep clears its rooms), or a room's name or kind when it is not on the board "
+                                               "(medbay, hangar: the game finds it or lists what fits); for breach also a door's id (the board's objective_doors and bulkheads); "
+                                               "leave it out for follow_captain, rescue_captain, escort_captain and stand_down"},
+    "fire": {"type": "string", "enum": ["held", "free"], "description": "held: nobody fires until the squad is found or told (an ambush is held by itself); free is the default"},
+    "seal_behind": {"type": "boolean", "description": "with fall_back, withdraw or advance: the last man of the squad shuts every pressure bulkhead behind them (four seconds at its console): the enemy must cut or override it"},
+    "cover": {"type": "string", "description": "a place the squad covers with its fire (a place id from the board): the squad faces that place's doors, while another squad goes in there"},
+    "sync": {"type": "string", "description": "squads given the same word (`go`, `a`) go through their doors at the same moment, each by a door of its own; several squads on one take or breach are in sync by themselves, `no` says they are not"},
+    "inside": {"type": "boolean", "description": "with hold: the corners of the room itself, none of the corridors outside its doors"},
     "reason": {"type": "string", "description": "one sentence in English, for the log"}},
     ["by", "squad", "task"])
 
@@ -259,7 +284,7 @@ THE FIGHT, AS EVERYONE IN THE DETACHMENT KNOWS IT
   their posts) and the reserve (off-duty marines who wake, dress and arm, and join as they come). Left to themselves the squads go to the default ambush (the board names it: the
   opening on the boarders' way where the marines can hold from the corners), take cover, peek and suppress, and flank when they can; they do not give ground by themselves. The
   board says what each squad is doing and whether it is under orders.
-- Orders (`order`) are carried out at once and stand until changed: hold, advance, assault, fall_back, follow_captain, rescue_captain, stand_down (the tool says what each does). A place is
+- Orders (`order`) are carried out at once and stand until changed: hold, advance, assault, fall_back, withdraw, follow_captain, rescue_captain, the infantry orders below, stand_down (the tool says what each does). A place is
   named by its id from the board (where a squad is, the boarders' likely approach, the ways into Main Engineering, the default ambush) or `captain` for wherever the Captain is.
   A place the board does not list can still be named by what it is ("medbay", "Main Engineering", "hangar"): the game finds the room, or lists the ones that fit so that you can name one by its id.
   Bulkheads (`bulkheads`): a sealed one splits the section and buys time, and cuts off whoever is behind it, your own squads included.
@@ -291,6 +316,37 @@ WHEN THE MARINES BOARD A SHIP (the board says `role: attacking`: the Aquila's ma
 - `bulkheads` is for defending the Aquila: another ship's are not yours to seal. `hold` at a place the squad has taken, `advance` toward the next, `assault` into defenders in cover costs marines (at
   two to one, or to relieve a squad), `fall_back` to a place on your own way, `withdraw` out of the ship. What the Captain asks of the Major in an assault is the commander's trade: the objective,
   the risks, when to get out; Reyes advises, the Captain decides.
+
+THE INFANTRY ORDERS (the game's simulation measured each one, with the order and without it, on the same rooms: these are its numbers; they are what a commander knows of his own men)
+- take: the squad stacks beside the room's door with the door held shut (nobody inside sees them), goes in a man every 0.7 s, each to his corner, and holds the room from inside. Six marines against
+  six guards at their posts: the room was taken 21 times in 32 against 10 for a squad that walks in, for 3.2 marines lost against 4.9; against guards waiting at the door 29 in 32 against 16, 0.7
+  lost against 4.1. Squads given one take go in at the same moment by doors of their own (sync): the room cannot cover both. It costs the wait (nine seconds more than each by itself) and wins
+  the room when the guards are many (21 in 32 against 16, in a room with two doors). Only worth it where there is a door to go through.
+- breach: take for a door that is shut. A sealed pressure bulkhead is charged first: nine seconds against the torches' twenty-two, and everyone near hears it, so whoever is behind it is alerted and the
+  nearest are stunned for a moment: the surprise is lost, fourteen seconds are gained (the room taken in 23 s against 37) for the same marines lost. Name the door by its id (the board lists the
+  objective's doors) or the room beyond it.
+- sweep: the rooms of a place one after the other, a deck's section as «deck 7 section D» or one room: stacked at each door, in together, the room held until nothing has been seen in it for four
+  seconds, reported, the next. Four rooms off a corridor took 80 s against 74 for walking down it, and then 39 times in 48 the squad stood with three or more on their feet against 26, the guards left
+  alive behind it were 0.3 against 1.4, the marines lost 2.0 against 2.9. For when what is behind the doors matters more than the minute.
+- ambush: the corners of a place, the men hidden (seen only from within four and a half metres), the fire held; all at once when the enemy is within eleven metres in sight of half the squad, or
+  when one of them is found or hit; the first volley is a third better and the enemy is startled. Twelve marines at a junction on the boarders' way: against twelve boarders the ambush won 15 times in
+  24 against 6 for the same marines holding with their fire free, for 7.3 marines lost against 9.7; against eight it won as often and ended thirty seconds sooner. It waits three minutes at most;
+  if nobody comes they hold the place with their fire free. It needs the enemy to come by the place (the board's likely approach and default ambush are where he does): an ambush on a room he does not use
+  is a squad out of the fight.
+- escort_captain (only with the Captain in the fight): a man ahead of him who looks past every opening, two at his sides, the rest behind; they walk and shoot with him, and when he stands they take
+  the corners round him. On a walk from the hatch to a ship's bridge, where the guns of the ship lay on him before any other man, the Captain was hit 87 times with six marines escorting against 154
+  alone; the squad kept within ten metres of him 83% of the way (one only told to follow him: 64%), and it cost 1.1 of the six on the way. He may still stand in a doorway and be shot; the escort
+  is the best he can have, not a wall.
+- seal_behind (with fall_back, withdraw or advance): the last man of the squad stays four seconds at each pressure bulkhead they go through and shuts it behind them, never on a man in the doorway; the
+  boarders' torches cut a shut one in about twenty seconds, a ship's own people override it in ten, his own side opens it again in four. Three bulkheads shut behind a squad put the boarders on it 66
+  seconds later (first contact at 135 s against 69). A delay, not a wall: to reach the corners at Engineering, the boats, the Captain.
+- fire (`held`: nobody fires until the squad is found or told), cover (a place the squad covers with its fire while another goes in there: it faces that place's doors), inside (hold the room itself,
+  none of the corridors outside its doors) shape what a squad does with the rest.
+- What does not work: spreading a squad thin. A man at every opening of a deck's section was tried and lost twelve marines for one or two of the boarders; twelve marines holding a whole deck's section
+  against sixteen boarders won 3 times in 8, holding Main Engineering itself 8 in 8, and with no order at all 0 in 8 and the twelve dead. When the Captain says «hold the line» he means the place the
+  enemy must come to: hold that place (with `cover` on the way he comes if the squad is to face it), and keep the squads together on the road.
+- The board shows each squad's drill («stacked at the door», «2 rooms cleared, 3 to go», «hidden, fire held, 40 s»): say it as a leader would, never read it out. These orders end by themselves (a sweep
+  is done, a room taken is held, an ambush sprung is a hold): the squad reports and holds where it is until it is given another.
 
 WHEN YOU SPEAK
 - Only when something happens to your marines or to the fight, or when the Captain speaks to you. Silence is normal: when the board shows what the Captain can see and nothing needs
@@ -344,18 +400,18 @@ Each time you are called you read the net and the boards and answer ONLY with to
 # [brackets] is filled from the news and the boards, and no example ends with a tail the others could share)
 _RADIO = {
     "it": ('"Reaction Uno: contatto, [n] ostili a [place]. Teniamo." · "Reyes: [name] è a terra a [place]. Reaction Due prende [place]." · "Reyes: chiudo [place]. A loro servono [n] secondi a paratia." · '
-           '"[leader]: ci muoviamo, Capitano."',
+           '"[leader]: ci muoviamo, Capitano." · "[leader]: in fila alla porta, pronti." · "[leader]: [place] libero." · "Reaction Due: imboscata scattata, [n] allo scoperto." · "Reyes: chiusa dietro di noi, Capitano. A loro servono [n] secondi."',
            '"Ricevuto, Capitano." da solo · "Tutte le unità marine, si segnala la presenza di forze ostili nella zona." · ripetere al Capitano il suo stesso ordine · '
            'chiudere ogni chiamata con la stessa coda ("in attesa di ordini") · un nome, un numero o un luogo che le lavagne e le notizie non danno'),
     "en": ('"Reaction One: contact, [n] hostiles at [place]. We hold." · "Reyes: [name] is down at [place]. Reaction Two takes [place]." · "Reyes: sealing [place]. They need [n] seconds a door." · '
-           '"[leader]: moving, Captain."',
+           '"[leader]: moving, Captain." · "[leader]: stacked at the door, ready." · "[leader]: [place] clear." · "Reaction Two: ambush sprung, [n] of them in the open." · "Reyes: shut behind us, Captain. They need [n] seconds."',
            '"Understood, Captain." alone · "All marine units, be advised that hostile forces have been detected in the vicinity." · repeating the Captain\'s own order back to him · '
            'ending every call with the same tail ("standing by") · a name, a number or a place that the boards and the news do not give'),
-    "es": ('"Reaction Uno: contacto, [n] hostiles en [place]. Aguantamos." · "Reyes: [name] está caído en [place]. Reaction Dos toma [place]." · "Reyes: cierro [place]. Necesitan [n] segundos por mamparo."',
+    "es": ('"Reaction Uno: contacto, [n] hostiles en [place]. Aguantamos." · "Reyes: [name] está caído en [place]. Reaction Dos toma [place]." · "Reyes: cierro [place]. Necesitan [n] segundos por mamparo." · "[leader]: listos en la puerta." · "[leader]: [place] despejado." · "Reaction Dos: emboscada lanzada, [n] a campo abierto."',
            '"Entendido, Capitán." solo · un parte largo y formal · repetir al Capitán su propia orden · cerrar cada llamada con la misma cola · un nombre, un número o un lugar que no dan las pizarras'),
-    "fr": ('"Reaction Un : contact, [n] hostiles à [place]. On tient." · "Reyes : [name] est à terre à [place]. Reaction Deux prend [place]." · "Reyes : je ferme [place]. Il leur faut [n] secondes par cloison."',
+    "fr": ('"Reaction Un : contact, [n] hostiles à [place]. On tient." · "Reyes : [name] est à terre à [place]. Reaction Deux prend [place]." · "Reyes : je ferme [place]. Il leur faut [n] secondes par cloison." · "[leader] : prêts à la porte." · "[leader] : [place] dégagé." · "Reaction Deux : embuscade déclenchée, [n] à découvert."',
            '"Compris, Capitaine." seul · un compte rendu long et formel · répéter au Capitaine son propre ordre · finir chaque appel par la même queue · un nom, un chiffre ou un lieu que les tableaux ne donnent pas'),
-    "de": ('"Reaction Eins: Kontakt, [n] Feindliche bei [place]. Wir halten." · "Reyes: [name] ist verwundet bei [place]. Reaction Zwei nimmt [place]." · "Reyes: ich schließe [place]. Sie brauchen [n] Sekunden pro Schott."',
+    "de": ('"Reaction Eins: Kontakt, [n] Feindliche bei [place]. Wir halten." · "Reyes: [name] ist verwundet bei [place]. Reaction Zwei nimmt [place]." · "Reyes: ich schließe [place]. Sie brauchen [n] Sekunden pro Schott." · "[leader]: bereit an der Tür." · "[leader]: [place] frei." · "Reaction Zwei: Hinterhalt ausgelöst, [n] im Freien."',
            '"Verstanden, Kapitän." allein · eine lange, förmliche Meldung · dem Kapitän seinen eigenen Befehl wiederholen · jeden Ruf mit demselben Schwanz beenden · ein Name, eine Zahl oder ein Ort, die die Tafeln nicht geben'),
 }
 
@@ -711,10 +767,12 @@ class MarineMinds:
                 tag.append("in contact")
             if s.get("still_arming_or_waking"):
                 tag.append(f"{_n(s['still_arming_or_waking'])} still arming or waking")
+            if s.get("in_a_sync"):
+                tag.append("in a sync: its doors and another squad's, in together")
             at = f"at {s['where']} [id {s['where_id']}]" if s.get("where_id") else "(no one able to place)"
             said = spoken(str(s["name"]), lang)
             lines.append(f"  - {key} — {s['name']}" + (f" (said \"{said}\")" if said != s["name"] else "") + f"; leader {s.get('leader') or 'none left'}: {_n(s.get('able'))} able, {_n(s.get('down'))} down, {_n(s.get('dead'))} dead; {at}; "
-                         f"doing: {s.get('doing', '?')}" + (f" ({'; '.join(tag)})" if tag else "") + (f"; note: {s['note']}" if s.get("note") else ""))
+                         f"doing: {s.get('doing', '?')}" + (f" ({'; '.join(tag)})" if tag else "") + (f"; drill: {s['drill']}" if s.get("drill") else "") + (f"; note: {s['note']}" if s.get("note") else ""))
         if not self.squads:
             lines.append("  (none yet)")
         hs = pic.get("hostiles_known") or []
@@ -728,6 +786,9 @@ class MarineMinds:
         en = pic.get("objective_entrances") or []
         if en:
             lines.append((" the ways into the objective: " if attack else " the ways into Main Engineering: ") + "; ".join(f"{a.get('name')} [id {a.get('id')}]" for a in en))
+        od = pic.get("objective_doors") or []
+        if od:
+            lines.append(" the objective's own doors (what a breach names): " + "; ".join(f"{d.get('id')} between {d.get('between')}: {'SEALED' if d.get('sealed') else 'open'}" for d in od))
         am = pic.get("default_ambush")
         if isinstance(am, dict):
             lines.append(f" the default ambush (where the drill sends the squads): {am.get('between')} [ids {am.get('id_a')}, {am.get('id_b')}]")
@@ -1034,6 +1095,14 @@ class MarineMinds:
                 args["place"] = str(a["place"]).strip()
             if a.get("reason"):
                 args["note"] = str(a["reason"]).strip()[:160]
+            for k in ("fire", "cover", "sync"):                                              # (what goes with the infantry orders: the game reads them as given)
+                if a.get(k) not in (None, ""):
+                    args[k] = str(a[k]).strip().lower() if k != "cover" else str(a[k]).strip()
+            for k in ("seal_behind", "inside"):
+                if isinstance(a.get(k), bool) and a[k]:
+                    args[k] = True
+                elif isinstance(a.get(k), str) and a[k].strip().lower() in ("true", "yes", "1"):
+                    args[k] = True
             return await self.execute("marine_order", args, by or REYES.key)
         except asyncio.TimeoutError:
             return {"ok": False, "detail": "no response from the game"}
@@ -1077,6 +1146,8 @@ class MarineMinds:
         comp = await models.chat(self.llm, ROLE, messages=[{"role": "system", "content": self.system}, {"role": "user", "content": user}], tools=[SAY, STAY_QUIET],
                                  tool_choice="auto", on_tool_call=on_call, max_tokens=140)
         self._spent.append((self.clock(), comp.cost))
+        if comp.error and not said:
+            return text                         # (the model failed: that is not the marine's word that the line no longer matters; it is said as it stands)
         return " ".join(said) if said else None
 
     # ------------------------------------------------------------------------------------------------ measures
