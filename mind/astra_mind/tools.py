@@ -242,8 +242,27 @@ GROUP_ORDER = _fn("group_order", "XO: the Captain's DIRECT ORDER to one of our b
     "formation": {"type": "string", "enum": ["line", "wedge", "column", "screen"]}},
     ["group", "order"])
 
-ALL_TOOLS = [SPEAK, STANDING] + SHIP_TOOLS
+# The officers' silent tool and the Captain's speaker for the radio nets (both the mind's own: nothing goes to the ship, docs/protocollo_voce.md §5ter, astra_mind/nets.py)
+CONSOLE_LOG = _fn("console_log", "Write ONE line on a console's log, silently: nobody hears it. It shows on that console and on the Captain's datapad (the log page), where he reads "
+                                 "it whenever he wants. It is for what is routine or already on the boards and changes nothing the Captain must do now: a range that moved, a "
+                                 "rearm complete, a fire put out, a repair team's progress, an ally's new position or heading, net traffic you will not relay, what you set on your "
+                                 "own console on your own initiative. Not for what he must hear (that is `speak`: a danger, a decision, an answer, a loss) and not for an order he "
+                                 "gave (the board shows it). Telegraphic and in English, it is the ship's record, about 100 characters at most; `notice` only for the few lines "
+                                 "worth a glance. Call it in the same turn as, or instead of, `speak`.", {
+    "station": {"type": "string", "enum": ["xo", "helm", "ops", "tactical", "comms", "sensors", "engineering", "flight"], "description": "the console whose log it is: your own"},
+    "text": {"type": "string", "description": "the line, e.g. \"T-11 range 49.5 km, opening\", \"Alpha rearmed, 8 ready\", \"Praetorian holding the screen at 4.5 km\""},
+    "kind": {"type": "string", "enum": ["routine", "notice"], "description": "routine (the default) or notice (worth a glance)"}}, ["station", "text"])
+
+NET_SPEAKER = _fn("net_speaker", "Put a radio net on the bridge's speaker, or take it off. Only when the Captain asks (\"put the flight net on the speaker\", \"voglio sentire la "
+                                "flotta\", \"togli la rete di volo\"): the net's voices are then heard as they speak, nobody relays them, until he says to take it off. With the net "
+                                "off the speaker, the officer who has the watch on it (Comms the fleet net, Flight Control the flight net, the XO the marines) tells him what he "
+                                "must know and the rest is on the logs. The flight net is his own radio while he is in a cockpit or on the flight deck.", {
+    "net": {"type": "string", "enum": ["fleet", "flight", "marines"]},
+    "on": {"type": "boolean", "description": "true: on the speaker; false: off it"}}, ["net", "on"])
+
+ALL_TOOLS = [SPEAK, STANDING, CONSOLE_LOG, NET_SPEAKER] + SHIP_TOOLS
 SHIP_TOOL_NAMES = {t["function"]["name"] for t in SHIP_TOOLS} | {"group_order", "lift_go"}
+SILENT_TOOLS = {"console_log"}               # tools that are no action to read back to the Captain: a turn that only wrote the log needs no "what was done"
 
 
 def lift_tool(lift: Any) -> dict[str, Any]:
@@ -288,7 +307,7 @@ _OWNER = {"set_course": "helm", "set_throttle": "helm", "intercept": "helm", "tr
           "launch_decoys": "tactical", "holo_display": "sensors", "end_transmission": "comms", "cease_fire": "tactical",
           "fleet_request": "comms", "set_radiators": "engineering", "vent_heat": "engineering",
           "dismiss_visitor": "captain", "abandon_ship": "xo", "group_order": "xo", "crew_locate": "ops", "transporter": "ops", "lift_go": "computer", "eagle_recover": "flight",
-          "issue_weapon": "xo", "board_ship": "xo"}
+          "issue_weapon": "xo", "board_ship": "xo", "net_speaker": "comms", "console_log": "xo"}
 LEGACY_INITIATIVE = {"dispatch_damage_control", "set_shields", "set_point_defense", "set_radiators", "launch_decoys"}
 
 
@@ -339,7 +358,7 @@ def _tools_for_build(state: dict[str, Any] | None) -> ToolSet:
     hidden: set[str] = set()
     for s in avail:
         hidden |= SUPERSEDED.get(s, set())
-    tools: list[dict[str, Any]] = [SPEAK, STANDING, station_model.tool_schema(avail)]
+    tools: list[dict[str, Any]] = [SPEAK, STANDING, CONSOLE_LOG, NET_SPEAKER, station_model.tool_schema(avail)]
     if has_groups(state):
         tools.append(GROUP_ORDER)
     for t in SHIP_TOOLS:

@@ -1637,7 +1637,7 @@ class WarMinds:
             self.deliver("astra", to, Message(self.clock(), speaker.key, text, urgent=True))
         # (no topic: the voice stage lets two sentences of one captain join in one breath, and two captains of a group speak both; a line that waited
         # too long is thought again by whoever was to say it, see `rethink`)
-        await self.say(speaker.key, text, lang, str(a.get("tone", "calm")), urgent=urgent, answer=answer)
+        await self.say(speaker.key, text, lang, str(a.get("tone", "calm")), urgent=urgent, answer=answer, to=to)
         return True
 
     # ------------------------------------------------------------------------------------------------ a line that waited

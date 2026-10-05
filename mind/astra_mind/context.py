@@ -357,12 +357,12 @@ def describe(ctx: Context, titles: dict[str, str] | None = None) -> str:
         if ch.muted:
             parts.append(f"A channel with {who} is open but MUTED: nothing the Captain says reaches them.")
         elif ch.kind == "flight":
-            parts.append(f"The flight net is live ({who}; the bridge hears it, and so do you): what the Captain says TO a pilot, a squadron, the CAG or the Chief of the Deck goes "
-                         "out on it (Martin lets it through) and they answer for themselves, and carry out the orders for their squadrons. Whatever is for them is theirs: you "
-                         "hear every word and say nothing about it — Price too, unless the words are for him or for Flight Control. What is meant for the bridge is yours.")
+            parts.append(f"The flight net is live ({who}; you hear the Captain's every word): what the Captain says TO a pilot, a squadron, the CAG or the Chief of the Deck goes "
+                         "out on it (Martin lets it through) and they answer him themselves, directly, and carry out the orders for their squadrons. Whatever is for them is theirs: you "
+                         "say nothing about it — Price too, unless the words are for him or for Flight Control. What is meant for the bridge is yours.")
         elif ch.kind == "marines":
-            parts.append(f"The marine net is live ({who}; the bridge hears it, and so do you): what the Captain says TO Major Reyes, the marines, a squad or its sergeant, or about "
-                         "the boarders, the bulkheads and the fight inside the hull, goes out on it (Martin lets it through) and they answer for themselves, and carry out the "
+            parts.append(f"The marine net is live ({who}; you hear the Captain's every word): what the Captain says TO Major Reyes, the marines, a squad or its sergeant, or about "
+                         "the boarders, the bulkheads and the fight inside the hull, goes out on it (Martin lets it through) and they answer him themselves, directly, and carry out the "
                          "orders for their squads and the doors. Whatever is for them is theirs: you hear every word and say nothing about it — Tactical and the XO included, unless "
                          "the words are for them. What is meant for the bridge (the ship, the guns, the helm) is yours.")
         else:
