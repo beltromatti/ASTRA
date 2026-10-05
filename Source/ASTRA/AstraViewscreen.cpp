@@ -1,5 +1,6 @@
 #include "AstraViewscreen.h"
 #include "AstraWarFX.h"
+#include "Sound/SoundBase.h"
 #include "Engine/Engine.h"
 #include "ASTRA.h"
 #include "AstraShipSubsystem.h"
@@ -424,6 +425,21 @@ void AAstraViewscreen::Direct(float Dt)
 		if (!Seen.Contains(KV.Key) && B->WasDestroyed(KV.Key) && FVector::Dist(KV.Value.Key, B->PlayerPos()) < 150000.0)
 		{
 			Deaths.Add({KV.Key, KV.Value.Value, KV.Value.Key, Now});
+			// the bridge's speakers render the death the sensors see: a deep swell, quieter the farther it was (in the vacuum there is no other sound of it);
+			// two deaths in a breath are one swell
+			const double Km = FVector::Dist(KV.Value.Key, B->PlayerPos()) / 1000.0;
+			if (Now - KillCueAt > 1.2)
+			{
+				if (!KillCue)
+				{
+					KillCue = LoadObject<USoundBase>(nullptr, TEXT("/Game/ASTRA/Audio/SW_Sensor_Kill.SW_Sensor_Kill"));
+				}
+				if (KillCue)
+				{
+					KillCueAt = Now;
+					UGameplayStatics::PlaySound2D(this, KillCue, (float)FMath::Clamp(1.0 - Km / 110.0, 0.3, 1.0), FMath::FRandRange(0.94f, 1.04f));
+				}
+			}
 		}
 	}
 	// warships that are new on the plot (not at the first look: everything is new then)

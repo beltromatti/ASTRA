@@ -62,6 +62,9 @@ private:
 	UPROPERTY() TObjectPtr<UMaterialInstanceDynamic> FillMid;   // the sensor fill on the capture (M_ASTRA_ViewscreenFill)
 	UPROPERTY() TObjectPtr<UFont> Mono;
 	UPROPERTY() TObjectPtr<UFont> Title;
+	/** A warship's death as the bridge's speakers render what the sensors see (tools/art/battle_cues.py: in the vacuum nothing else is heard). */
+	UPROPERTY() TObjectPtr<class USoundBase> KillCue;
+	double KillCueAt = -100.0;
 
 	// the shot: what the camera frames, where it is, how wide
 	enum class EShot : uint8 { Forward, Contact, Group, Point, Ship, Swarm, Broadside, Off };
