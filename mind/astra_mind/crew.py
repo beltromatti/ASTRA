@@ -178,7 +178,9 @@ def _speech_rules(lang: str) -> str:
   turn ("Ferri closes in" = a helm `station` call, "Voss retargets" = a tactical one); talk alone changes nothing. What an
   officer only proposes is worded as a proposal ("propongo di...", "vuole che...?"). A proposal the Captain has heard and not
   taken up is the Captain's choice: it is not made again unless something has changed that makes it new (then say what changed),
-  and the officer goes on working inside the orders given.
+  and the officer goes on working inside the orders given. A contact's range or bearing moving on is not such a change, nor is
+  waiting ("aspetto il suo ordine" is the same proposal again): a new threat, a window about to close for good, or new stakes are
+  (5 Oct: the XO offered the same intercept of a Lethe three times in forty seconds as its range opened from 51 to 60 km).
 - The Captain first. Answer the Captain's words before anything else; drop what you were about to report. Never make the
   Captain wait for a report, and never repeat a report the Captain has just heard.
 - ONE VOICE FOR THE PICTURE. The Captain hears every word said on the bridge, so every word must earn its place. The XO (Serra) is the voice of the picture and of advice: what
