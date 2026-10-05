@@ -23,9 +23,15 @@ finestre accese, luci di servizio, e una luce che le scolpisca (bordo, riflessi 
    fusi nei generatori, mai incollati; tutto nel registro delle licenze.
 4. **Prestazioni**: Nanite per gli scafi, istanze per i dettagli ripetuti, materiali con pochi campionamenti; decine di capitali e centinaia di caccia
    in battaglia sull'Air (SCALA.md): misura i triangoli, i materiali e le texture per nave.
-5. **Compatibilità**: i pezzi di rottura (`_SecBow/_SecMid/_SecStern`), i punti dei motori (`fx_nozzles.json`, `thrusters.json`), le luci di posizione
-   (`extract_nav_lights.py`), i solidi di SPAZIO-VIVO (`space3_solids.py`), le decalcomanie di danno e i piani di FLOTTA-VIVA dipendono dagli scafi:
-   rigenerali tutti, con i loro banchi, e scrivi i passi di reimportazione esatti.
+5. **Compatibilità**: dagli scafi dipendono molte cose, e vanno rigenerate tutte, con i loro banchi. Scrivi i passi di reimportazione esatti.
+   - i pezzi di rottura (`_SecBow/_SecMid/_SecStern`);
+   - i punti dei motori (`fx_nozzles.json`, `thrusters.json`);
+   - le luci di posizione (`extract_nav_lights.py`);
+   - i solidi di SPAZIO-VIVO (`space3_solids.py`);
+   - le decalcomanie di danno e i piani di FLOTTA-VIVA;
+   - dal 5/10 le **mappe di profondità della pelle**, su cui colpi, fuochi e segni si posano:
+     `blender -b --factory-startup --python-exit-code 1 -P tools/art/war_fx_hull_surface.py` →
+     `python3 tools/art/war_fx_data.py --manifest art/export/ships_v3/manifest.json` → `AstraWarFXSurface.inl`, `AstraWarFXData.inl`, da ricompilare.
 
 ## Prove
 Anteprime Blender (Cycles o Eevee) di ogni classe da vicino, a 2 km e a 20 km, di fronte a quelle di oggi; il lead le vede nel gioco (schermo
