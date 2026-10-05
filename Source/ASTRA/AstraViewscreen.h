@@ -64,12 +64,17 @@ private:
 	UPROPERTY() TObjectPtr<UFont> Title;
 
 	// the shot: what the camera frames, where it is, how wide
-	enum class EShot : uint8 { Forward, Contact, Group, Point, Ship, Swarm, Off };
+	enum class EShot : uint8 { Forward, Contact, Group, Point, Ship, Swarm, Broadside, Off };
+	/** The shots that see the Aquila's own hull from outside (the camera's world has it in only for these). */
+	bool ShowsOwnHull(EShot S) const { return S == EShot::Ship || S == EShot::Broadside; }
 	EShot Shot = EShot::Forward;
 	FString ShotId;                    // the contact (Contact)
 	FString ShotName;                  // how the caption calls it
 	TArray<FString> GroupIds;          // the contacts to frame together (Group)
 	double SwarmShotAt = -100.0;       // the last time a salvo coming in had the screen (Swarm: the missiles at the Aquila, framed as they come)
+	double BroadsideShotAt = -100.0;   // the last time the Aquila's own fire had the screen (Broadside: her hull from outside, her rounds going away to the target)
+	double BroadsideSince = -1.0;      // the broadside shot the camera's side was chosen for
+	FVector BroadsideSide = FVector::RightVector;
 	FVector ShotPoint = FVector::ZeroVector;   // system frame (Point: where a ship died)
 	FString ShotWhy;                   // "TARGET", "FIRING ON US", "DESTROYED", "ORDERED", …
 	int32 ShotPri = 0;                 // the director's priority of the shot on screen

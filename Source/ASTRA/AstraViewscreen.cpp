@@ -40,6 +40,9 @@ namespace
 		TEXT("Main viewscreen: the widest the optical feed grows to when the screen covers that many pixels and the frame holds its pace"));
 	TAutoConsoleVariable<float> CVarViewscreenFill(TEXT("astra.viewscreen.fill"), 0.35f,
 		TEXT("Main viewscreen: the sensors' fill from the camera's side, as a fraction of the star's light (a ship against the star is not a black cut-out; 0 = off)"));
+	TAutoConsoleVariable<FString> CVarViewscreenBroadside(TEXT("astra.viewscreen.broadside"), TEXT("320,210,100,2500,46"),
+		TEXT("Main viewscreen, the Aquila firing seen from outside: metres behind her hull's centre along the line of fire, to the side, above; how far down the line of fire the camera looks; its field of view"));
+
 	FAutoConsoleCommandWithWorldAndArgs CmdViewscreenDump(TEXT("astra.viewscreen.dump"),
 		TEXT("Testing: astra.viewscreen.dump [path.png] (the main viewscreen's image at full resolution, feed under overlay)"),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* World)
@@ -333,6 +336,7 @@ FString AAstraViewscreen::Describe() const
 	case EShot::Point: What = FString::Printf(TEXT("where %s was destroyed"), *ShotName); break;
 	case EShot::Ship: What = TEXT("the Aquila from outside"); break;
 	case EShot::Swarm: What = FString::Printf(TEXT("%s coming at the Aquila"), *ShotName); break;
+	case EShot::Broadside: What = FString::Printf(TEXT("the Aquila firing on %s (%s), from outside"), *ShotId, *ShotName); break;
 	default: What = TEXT("the view ahead"); break;
 	}
 	return FString::Printf(TEXT("%s: %s, %s, zoom x%.0f"), *Mode, *ShotWhy.ToLower(), *What, 58.f / FMath::Max(Fov, 0.05f));
@@ -341,7 +345,7 @@ FString AAstraViewscreen::Describe() const
 void AAstraViewscreen::Cut(EShot NewShot, const FString& Id, const FString& Name, const FString& Why, int32 Pri, double Hold)
 {
 	const bool bSame = NewShot == Shot && Id == ShotId;
-	if ((NewShot == EShot::Ship) != (Shot == EShot::Ship))
+	if (ShowsOwnHull(NewShot) != ShowsOwnHull(Shot))
 	{
 		NextShowListAt = 0.0;   // the Aquila's own hull enters or leaves the camera's world now, not half a second later
 	}
@@ -597,7 +601,19 @@ void AAstraViewscreen::Direct(float Dt)
 	else if (const FContact* E = FindC(Cs, Engaged); E && E->Track >= 2)
 	{
 		Best = {EShot::Contact, E->ContactId, E->Label, TEXT("TARGET"), 4, 8.0, FVector::ZeroVector, {}};
-		if (Shot == EShot::Contact && ShotId == E->ContactId && Now - ShotSince > 16.0)
+		const UAstraBattleSubsystem::FFireControl FC = B->GetFireControl();
+		const bool bFiring = FC.Target == E->ContactId && (FC.RailVolleys > 0 || FC.LaserShots > 0);
+		if (Shot == EShot::Broadside && ShotId == E->ContactId && bFiring && Now < HoldUntil)
+		{
+			Best = {EShot::Broadside, E->ContactId, E->Label, TEXT("OPEN FIRE"), 4, 5.0, FVector::ZeroVector, {}};   // (held while she fires, for its few seconds)
+		}
+		else if (bFiring && Shot == EShot::Contact && ShotId == E->ContactId && Now - ShotSince > 7.0 && Now - BroadsideShotAt > 22.0)
+		{
+			// a fight is a story told in cuts: the target under our fire, then the Aquila firing as seen from outside (her hull large at one side of the frame,
+			// her rounds streaming away down the line of fire), then the target again (5 Oct: «battaglie epiche»; the screen had only the telescope on the target)
+			Best = {EShot::Broadside, E->ContactId, E->Label, TEXT("OPEN FIRE"), 4, 5.0, FVector::ZeroVector, {}};
+		}
+		else if (Shot == EShot::Contact && ShotId == E->ContactId && Now - ShotSince > 16.0)
 		{
 			// a long fight: now and then the wider picture — the target's group, the hostile warships within 20 km of
 			// it — then back on the target
@@ -704,6 +720,10 @@ void AAstraViewscreen::Direct(float Dt)
 		if (Best.Shot == EShot::Group)
 		{
 			GroupIds = Best.Group;
+		}
+		if (Best.Shot == EShot::Broadside)
+		{
+			BroadsideShotAt = Now;
 		}
 		Cut(Best.Shot, Best.Id, Best.Name, Best.Why, Best.Pri, Best.Hold);
 	}
@@ -812,6 +832,32 @@ void AAstraViewscreen::Aim(float DeltaSeconds)
 		}
 		break;
 	}
+	case EShot::Broadside:
+	{
+		// the Aquila firing on her target, from outside: off her quarter on the far side from the target, a little above, looking down the line of fire
+		// three kilometres out — her hull large across one side of the frame, her rounds going away towards the target in the middle of it. The camera's
+		// side is fixed for the shot (it does not swing over as she turns)
+		const FVector Hull(-17200.f, 0.f, -6200.f);
+		const FContact* C = FindC(Plot(), ShotId);
+		const FVector Dir = C ? (B->WorldOf(C->Pos) - Hull).GetSafeNormal() : FVector::ForwardVector;
+		if (BroadsideSince != ShotSince)
+		{
+			BroadsideSince = ShotSince;
+			BroadsideSide = FVector::CrossProduct(FVector::UpVector, Dir).GetSafeNormal();
+			if (BroadsideSide.IsNearlyZero())
+			{
+				BroadsideSide = FVector::RightVector;
+			}
+		}
+		TArray<FString> K;
+		CVarViewscreenBroadside.GetValueOnGameThread().ParseIntoArray(K, TEXT(","));
+		const auto Num = [&K](int32 i, double Def) { return K.IsValidIndex(i) ? FCString::Atod(*K[i]) : Def; };   // (seen in the game, 5 Oct: lower than ~90 m the superstructure hides the target)
+		WantPos = Hull - Dir * Num(0, 320.0) * 100.0 + BroadsideSide * Num(1, 210.0) * 100.0 + FVector(0.0, 0.0, Num(2, 100.0) * 100.0);
+		WantDir = (Hull + Dir * Num(3, 2500.0) * 100.0 - WantPos).GetSafeNormal();
+		FovWant = FMath::Clamp((float)Num(4, 46.0) / Zoom, 10.f, 75.f);
+		bOrbit = true;
+		break;
+	}
 	case EShot::Ship:
 	{
 		// around the Aquila, slowly: her hull frame is 172 m aft and 62 m below the bridge (BridgeOffset)
@@ -838,7 +884,7 @@ void AAstraViewscreen::Aim(float DeltaSeconds)
 	if (bPushIn)
 	{
 		bPushIn = false;
-		if (FMath::RadiansToDegrees(FromRot.AngularDistance(WantRot)) > 40.f || Shot == EShot::Ship || bOrbit)
+		if (FMath::RadiansToDegrees(FromRot.AngularDistance(WantRot)) > 40.f || ShowsOwnHull(Shot) || bOrbit)
 		{
 			// a big change of subject is a clean cut, a little wide, then the zoom pushes in
 			PanSince = -100.0;
@@ -1392,11 +1438,14 @@ void AAstraViewscreen::DrawOverlay(UCanvas* Canvas, int32 Width, int32 Height)
 	case EShot::Swarm: Caption = FString::Printf(TEXT("%s  ·  %s"), *ShotWhy, *ShotName.ToUpper()); break;
 	case EShot::Point: Caption = FString::Printf(TEXT("%s DESTROYED"), *ShotName.ToUpper()); break;
 	case EShot::Ship: Caption = FString::Printf(TEXT("ASN AQUILA  ·  HULL %.0f%%"), 100.f * B->PlayerHullFraction()); break;
+	case EShot::Broadside: Caption = FString::Printf(TEXT("ASN AQUILA  ·  FIRING ON %s"), *ShotName.ToUpper()); break;
 	default: Caption = ShotWhy; break;
 	}
 	D.Text(Width * 0.5f, (Top - PxName) * 0.5f, Caption, false, PxName, ShotPri >= 5 ? ColAlarm : ColText, 1);
 	D.Text(Width - 16.f * S, Ty, FString::Printf(TEXT("x%.0f   FOV %.1f°"), 58.f / FMath::Max(Fov, 0.05f), Fov), true, PxData, ColDim, 2);
 	const float By = Bottom + (Height - Bottom - PxData) * 0.5f;
+	const FString Status = Ship ? FString::Printf(TEXT("AQUILA  HULL %.0f%%   SHIELDS %.0f%% %s   HEAT %.0f%%"), 100.f * B->PlayerHullFraction(),
+	                                              100.f * B->PlayerShieldFraction(), *Ship->GetShieldMode().ToUpper(), Ship->GetHeatPct()) : FString();
 	if (Missiles.Num())
 	{
 		D.Text(16.f * S, By, FString::Printf(TEXT(">> %d MISSILE%s INBOUND"), Missiles.Num(), Missiles.Num() > 1 ? TEXT("S") : TEXT("")), true, PxData, ColAlarm);
@@ -1423,19 +1472,22 @@ void AAstraViewscreen::DrawOverlay(UCanvas* Canvas, int32 Width, int32 Height)
 		}
 		else
 		{
-			FString Line = FString::Printf(TEXT("PLOT  %d HOSTILE  ·  %d FRIENDLY  ·  %d CONTACTS"), Hostile, Friendly, Plot().Num());
+			const FString Head = FString::Printf(TEXT("PLOT  %d HOSTILE  ·  %d FRIENDLY"), Hostile, Friendly);
+			const FString Contacts = FString::Printf(TEXT("  ·  %d CONTACTS"), Plot().Num());
+			FString Line = Head + Contacts;
 			if (bGate && Gate.Friendly > 0 && Gate.FriendlyEtaS >= 0.f)
 			{
-				Line += FString::Printf(TEXT("  ·  GATE: %d ASTRA INBOUND %s"), Gate.Friendly, *Eta(Gate.FriendlyEtaS));
+				// (the line shares the bar with the Aquila's own: a friendly force on its way in takes the contacts' place when both do not fit)
+				const FString In = FString::Printf(TEXT("  ·  GATE: %d ASTRA %s"), Gate.Friendly, *Eta(Gate.FriendlyEtaS));
+				const float Room = Width - 48.f * S - (Ship ? D.Width(Status, true, PxData) : 0.f);
+				Line = D.Width(Head + Contacts + In, true, PxData) <= Room ? Head + Contacts + In : Head + In;
 			}
 			D.Text(16.f * S, By, Line, true, PxData, ColDim);
 		}
 	}
 	if (Ship)
 	{
-		D.Text(Width - 16.f * S, By, FString::Printf(TEXT("AQUILA  HULL %.0f%%   SHIELDS %.0f%% %s   HEAT %.0f%%"), 100.f * B->PlayerHullFraction(),
-		                                              100.f * B->PlayerShieldFraction(), *Ship->GetShieldMode().ToUpper(), Ship->GetHeatPct()),
-		       true, PxData, ColDim, 2);
+		D.Text(Width - 16.f * S, By, Status, true, PxData, ColDim, 2);
 	}
 	D.Flush();
 }
@@ -1525,7 +1577,7 @@ void AAstraViewscreen::RebuildShowList()
 			continue;
 		}
 		bool bSpace = A->ActorHasTag(SkyTag) || A->GetActorLocation().SizeSquared() > FMath::Square(60000.0);   // beyond 600 m: out there
-		if (!bSpace && Shot == EShot::Ship)
+		if (!bSpace && ShowsOwnHull(Shot))
 		{
 			// the Aquila's own hull (its frame is 183 m from the bridge), only for the view of her from outside: the sensors
 			// do not see their own ship, and her radiators and masts would hang in front of a target as huge blurred planes

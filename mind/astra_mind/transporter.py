@@ -213,7 +213,8 @@ def _pct(v: Any) -> str:
 def board(state: dict[str, Any] | None) -> str:
     """The room as she sees it this moment: the ship's plot on her display, where the Captain is, and her console (the card)."""
     st = state or {}
-    lines = [f"Where the Captain is: {str(st.get('captain') or 'on the bridge')[:300]}"]
+    lines = [f"Where the Captain is NOW (the ship's live reading of his badge: it beats anything remembered, a beam of minutes ago included): "
+             f"{str(st.get('captain') or 'on the bridge')[:300]}"]
     lines.append(f"The ship: {st.get('location', '?')}; alert {st.get('alert', 'green')}; hull {_pct(st.get('hull_pct'))}, shields {_pct((st.get('shields') or {}).get('strength_pct'))} "
                  f"({(st.get('shields') or {}).get('state', 'up')}); heading {st.get('heading_deg', '?')}, speed {st.get('speed_mps', '?')} m/s; "
                  f"power to the sensors {(st.get('power_pct') or {}).get('sensors', '?')}%")
@@ -637,6 +638,8 @@ class TransporterRoom:
 
         comp = await models.chat(self.llm, ROLE, messages=msgs, tools=[SAY], tool_choice="auto", on_tool_call=on_call, max_tokens=140)
         self.stats["cost"] += comp.cost
+        if not out and comp.error:
+            return text                    # (a model that failed has not judged the line: it is said as it stands; None is her own choice to let it go)
         return " ".join(out) if out else None
 
     def summary(self) -> str:
