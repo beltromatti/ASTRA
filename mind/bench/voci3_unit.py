@@ -591,6 +591,41 @@ class TestDelegation(unittest.TestCase):
         c2.begin(new=False)
         self.assertEqual((c2.levels["flight"], c2.levels.get("tactical")), ("advise", None))
 
+    def test_the_ship_reads_a_delegation_however_the_model_writes_it(self) -> None:
+        """The first live run: «nessuno lancia senza il mio ordine» made the model call `station flight delegation manual`: refused («flight has no mode delegation»), and the
+        launches went on on their own. It is the XO's mode whoever it names."""
+        from astra_mind import stations as S
+        want = ("xo", "delegation", {"station": "flight", "level": "manual"})
+        for args in ({"station": "xo", "mode": "delegation", "params": {"station": "flight", "level": "manual"}},
+                     {"station": "flight", "mode": "delegation", "params": {"level": "manual"}},
+                     {"station": "flight", "mode": "delegation", "params": {"station": "flight", "level": "manual"}},
+                     {"station": "xo", "mode": "delegation", "params": {"station": "flight", "delegation": "manual"}},
+                     {"station": "flight", "mode": "delegation", "params": {"delegation": "manual"}}):
+            cmd, err = S.normalize(args, None)
+            self.assertIsNotNone(cmd, (args, err))
+            self.assertEqual((cmd["station"], cmd["mode"], cmd["params"]), want, args)
+
+    def test_everyone_in_one_call_and_it_is_kept_for_every_console(self) -> None:
+        from astra_mind import delegation as d
+        from astra_mind import stations as S
+        call = {"station": "xo", "mode": "delegation", "params": {"station": "all", "level": "manual"}}
+        c = Crew(Script(calls=[("station", call), speak("Tutti su richiesta, Capitano.", "xo")]))
+        turn = asyncio.run(c.agent.handle("Nessuno fa nulla senza il mio ordine.", "it"))
+        self.assertTrue(turn.actions[0][2]["ok"], turn.actions)
+        self.assertEqual({st for st, lv in c.ship.delegation.items() if lv == "manual"}, set(S.DELEGABLE), c.ship.delegation)
+        self.assertEqual(len(c.said), 1)
+        dg = d.Delegation(self.path)
+        dg.begin(new=True)
+        self.assertTrue(dg.note_call(*turn.actions[0]))
+        self.assertEqual({st: dg.levels[st] for st in S.DELEGABLE}, {st: "manual" for st in S.DELEGABLE})
+
+    def test_a_sloppy_call_is_kept_like_a_proper_one(self) -> None:
+        from astra_mind import delegation as d
+        dg = d.Delegation(self.path)
+        dg.begin(new=True)
+        self.assertTrue(dg.note_call("station", {"station": "flight", "mode": "delegation", "params": {"level": "manual"}}, {"ok": True}))
+        self.assertEqual(dg.levels["flight"], "manual")
+
     def test_the_wire_is_the_xos_delegation_command_in_the_games_words(self) -> None:
         from astra_mind import delegation as d
         w = d.Delegation(self.path).wire("flight", "advise")

@@ -26,6 +26,7 @@ ZOOM_WORDS = ("close", "wide", "max")             # (a zoom is a factor on the n
 
 UNTIL_WORDS = ("done", "target_lost", "order")           # and "time:<seconds>"
 DELEGATIONS = ("manual", "advise", "auto")
+DELEGABLE = ("helm", "tactical", "sensors", "ops", "engineering", "comms", "flight")       # the consoles whose officer has a delegation (the XO's own has none)
 SQUADRONS = ("alpha", "bravo", "drones")
 WEAPON_GROUPS = ("railguns", "lasers", "missiles", "torpedoes")
 SECTORS = ("forward", "aft", "port", "starboard", "dorsal", "ventral")
@@ -241,8 +242,8 @@ def _build() -> dict[str, Station]:
     xo = [
         m("xo", "delegation", "delegation", "how far an officer may act on their own: manual = only on orders, advise = proposes and "
           "waits for a go, auto = acts within orders and standing orders and informs",
-          (P("station", STR, "helm | tactical | sensors | ops | engineering | comms | flight", required=True,
-             enum=("helm", "tactical", "sensors", "ops", "engineering", "comms", "flight")),
+          (P("station", STR, "helm | tactical | sensors | ops | engineering | comms | flight, or all (every console at once: «fate da soli», «everyone on their own»)", required=True,
+             enum=("helm", "tactical", "sensors", "ops", "engineering", "comms", "flight", "all")),
            P("level", STR, "manual | advise | auto", enum=DELEGATIONS, required=True)), "order"),
     ]
     out: dict[str, Station] = {}
@@ -387,6 +388,13 @@ def normalize(args: dict[str, Any], available: dict[str, Iterable[str] | None] |
     Numbers are coerced and clamped to the mode's range; unknown parameters are dropped; a missing required one is an error."""
     st_id = str(args.get("station", "")).strip().lower()
     mode = str(args.get("mode", "")).strip().lower().replace("-", "_").replace(" ", "_")
+    if mode == "delegation" and st_id in STATIONS:
+        # «flight delegation manual»: the model names the console the level is for instead of the XO, whose mode it is, or calls the level `delegation` (the words «nessuno lancia
+        # senza il mio ordine» changed nothing: the call was refused)
+        params = args.get("params") if isinstance(args.get("params"), dict) else {}
+        level = params.get("level") or params.get("delegation")
+        args = {**args, "station": "xo", "params": {**params, "station": params.get("station") or (st_id if st_id != "xo" else ""), **({"level": level} if level else {})}}
+        st_id = "xo"
     st = STATIONS.get(st_id)
     if st is None:
         return None, f"no such station '{st_id}' (stations: {', '.join(STATIONS)})"

@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from astra_mind import models
+from astra_mind import stations as station_model
 from astra_mind.agent import SYSTEM_CALL_ASK, WHEEL_ASK, Turn, net_ask, system_calls_only
 from astra_mind.crew import WHEEL_EVENT
 from astra_mind.nets import NET_EVENT, Nets
@@ -172,6 +173,70 @@ async def run_net(llm: OpenRouter, case: Net, lang: str) -> Out:
     return out
 
 
+@dataclass
+class Deleg:
+    name: str
+    words: str                          # what the Captain says
+    expect: dict[str, set[str]]         # station -> the levels that are right for it
+    lang: str = "it"
+    at_least: int = 0                   # how many consoles must be set at all (for «everybody»)
+
+
+DELEG_CASES = [
+    Deleg("everybody alone", "Da qui in poi fate da soli.", {"tactical": {"auto"}, "helm": {"auto"}, "flight": {"auto"}}, at_least=5),
+    Deleg("nobody launches", "Nessuno lancia le squadriglie senza il mio ordine.", {"flight": {"manual", "advise"}}),
+    Deleg("Voss decides", "Voss, decidi tu.", {"tactical": {"auto"}}),
+    Deleg("Ferri proposes first", "Ferri, proponimi prima di agire.", {"helm": {"advise"}}),
+    Deleg("nobody launches (en)", "Nobody launches without my order.", {"flight": {"manual", "advise"}}, lang="en"),
+]
+
+
+async def run_deleg(llm: OpenRouter, case: Deleg) -> Out:
+    """The Captain changes how far an officer may go by his words: the XO sets the console's delegation (the call the server keeps with the campaign)."""
+    out = Out(case.name, "delegation")
+    h = Harness(llm, case.lang)
+    t0 = time.perf_counter()
+    turn = await h.agent.handle(case.words, case.lang)
+    out.seconds = time.perf_counter() - t0
+    facts(turn, out)
+    set_ = {}
+    for n, a, r in turn.actions:
+        cmd, _ = station_model.normalize(a, None) if n == "station" else (None, "")                    # (as the ship read it)
+        if cmd is not None and cmd["station"] == "xo" and cmd["mode"] == "delegation" and r.get("ok"):
+            st, lv = cmd["params"]["station"], cmd["params"]["level"]
+            for s in (station_model.DELEGABLE if st == "all" else (st,)):
+                set_[s] = lv
+    out.logs = [(s, f"-> {lv}") for s, lv in set_.items()]
+    for st, ok in case.expect.items():
+        out.must(f"{st} -> {'/'.join(sorted(ok))}", set_.get(st) in ok, f"set {set_}")
+    out.must(f"at least {case.at_least} consoles set", len(set_) >= case.at_least, f"{len(set_)}")
+    out.must("acknowledged in one or two lines", 1 <= len(out.lines) <= 2, f"{len(out.lines)}")
+    return out
+
+
+async def run_advise(llm: OpenRouter, lang: str) -> Out:
+    """Flight is on advise (the default of a new campaign): enemy strike craft come, Flight Control proposes instead of launching; the Captain says go and the squadron goes."""
+    out = Out("advise: propose, then go", "delegation")
+    h = Harness(llm, lang)
+    h.ship.delegation["flight"] = "advise"
+    t0 = time.perf_counter()
+    news = "tactical: new contacts — 6 enemy strike craft (Harpies) inbound from T-56, 38 km, bearing 090; Alpha and Bravo are on the deck, ready"
+    turn = await h.agent.handle_event(news, lang, ask=None)
+    out.cost += turn.cost
+    flew = [a for n, a, r in turn.actions if n == "station" and str(a.get("station")) == "flight" and r.get("ok")]
+    out.lines += list(turn.lines)
+    out.must("nobody launches on their own", not flew, f"{flew}")
+    out.must("a proposal is made (a line or two)", 1 <= len(turn.lines) <= 2, f"{len(turn.lines)}")
+    go = "Sì, vai." if lang == "it" else "Yes, go."
+    t2 = await h.agent.handle(go, lang)
+    out.cost += t2.cost
+    out.lines += [("(captain: " + go + ")", "")] + list(t2.lines)
+    went = [a for n, a, r in t2.actions if n == "station" and str(a.get("station")) == "flight" and r.get("ok")]
+    out.must("his go launches them", bool(went), f"{[(n, a) for n, a, _ in t2.actions]}")
+    out.seconds = time.perf_counter() - t0
+    return out
+
+
 async def run_distress(llm: OpenRouter, lang: str) -> Out:
     """Three merchants call for help in 80 s (the ages of what the officers said aloud are kept by hand, as the speech floor keeps them): who tells the Captain, and how often."""
     out = Out("three distress calls", "distress")
@@ -206,7 +271,7 @@ async def _nothing() -> None:
 
 async def main_async(args: argparse.Namespace) -> int:
     llm = OpenRouter()
-    only = set(args.only.split(",")) if args.only else {"wheel", "nets", "distress"}
+    only = set(args.only.split(",")) if args.only else {"wheel", "nets", "distress", "delegation"}
     cases = [c for c in args.case.split(",") if c]
     outs: list[tuple[str, Out]] = []
     t_all = time.perf_counter()
@@ -223,6 +288,12 @@ async def main_async(args: argparse.Namespace) -> int:
                             outs.append((lang, await _guard(run_net(llm, n, lang), n.name, "nets")))
                 if "distress" in only and (not cases or any(k in "three distress calls" for k in cases)):
                     outs.append((lang, await _guard(run_distress(llm, lang), "three distress calls", "distress")))
+                if "delegation" in only:
+                    for d in DELEG_CASES:
+                        if not cases or any(k in d.name for k in cases):
+                            outs.append((d.lang, await _guard(run_deleg(llm, d), d.name, "delegation")))
+                    if not cases or any(k in "advise: propose, then go" for k in cases):
+                        outs.append((lang, await _guard(run_advise(llm, lang), "advise: propose, then go", "delegation")))
     finally:
         await llm.close()
     for lang, o in outs:
