@@ -138,6 +138,9 @@ _KINDS: tuple[tuple[re.Pattern[str], Kind], ...] = tuple((re.compile(p, re.I), k
     (r"^boarding: .+ is back in the boat bay", Kind("home", False, wake=False)),
     (r"^boarding: (?:.+ is sending \d+ .+ to board |the boarding of .+ (?:is off|could not be set up)|the boats of .+ never left|.+ is latched to .+ but the fight|.+ could not cut in at|"
      r".+ could not come home|the boarders have nothing to go for|.+ was destroyed \()", Kind("assault_log", False, wake=False)),
+    (r"^boarding: .+'s boats are .+ from .+'s hull: the first cuts in then", Kind("assault_log", False, wake=False)),     # (the half-minute warning: the bridge's news)
+    (r"^boarding: the marines are called out of her decks", Kind("called_out", False)),                     # (call_off with the marines aboard: they come out by their hatches; the net reads it, the bridge says it)
+    (r"^boarding: the marines who could not get out in time are brought off", Kind("assault_log", False, wake=False)),
     (r"^boarding: contact: ", Kind("contact", True, call=True)),
     (r"^boarding: .+ is dead at ", Kind("dead", True, call=True)),
     (r"^boarding: .+ is down, wounded, at ", Kind("down", True)),
