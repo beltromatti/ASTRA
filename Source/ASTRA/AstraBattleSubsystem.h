@@ -757,6 +757,8 @@ public:
 		float HitAgeS = 1e9f;                  // seconds since
 	};
 	FPlayerFireState GetPlayerFireState() const;
+	/** The war's visual effects, for whoever reads what they show (the main viewscreen frames a ship's death by its fireball: UAstraWarFX::GetBlasts). */
+	const UAstraWarFX* GetWarFX() const { return WarFX; }
 	// --- ABBORDAGGI-2 (AstraBoardCraft.cpp, docs/brief/ABBORDAGGI-2.md): the boarding craft are craft of the battle; the host of the boarding (UAstraBoardSubsystem) asks for them and reads what happens
 	/** Boats leave a carrier for a target, each for its hatch (Req.Docks are in the target's frame). False, and why, when it cannot be (the carrier has no boat free, her hangar is out, the target is gone). */
 	bool LaunchBoarding(const AstraBoardCraft::FLaunch& Req, AstraBoardCraft::FLaunchResult& Out);

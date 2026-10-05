@@ -1,4 +1,5 @@
 #include "AstraViewscreen.h"
+#include "AstraWarFX.h"
 #include "Engine/Engine.h"
 #include "ASTRA.h"
 #include "AstraShipSubsystem.h"
@@ -832,11 +833,27 @@ void AAstraViewscreen::Aim(float DeltaSeconds)
 		break;
 	case EShot::Point:
 	{
-		const FVector P = B->WorldOf(ShotPoint);
+		// a ship's death: framed by its fireball while it burns (VFX-2's blasts: a fireball of 300 m seen at x8 was a wall of cloud), else 450 m about the point
+		FVector Centre = ShotPoint;
+		double Half = 45000.0;
+		if (const UAstraWarFX* Fx = B->GetWarFX())
+		{
+			TArray<AstraFx::FBlastView> Blasts;
+			Fx->GetBlasts(Blasts);
+			for (const AstraFx::FBlastView& Bl : Blasts)
+			{
+				if (FVector::Dist(Bl.Pos, ShotPoint) < 3000.0 && Bl.Age < 8.f)
+				{
+					Centre = Bl.Pos;
+					Half = FMath::Max(Half, (double)Bl.Radius * 100.0 * 1.4);
+				}
+			}
+		}
+		const FVector P = B->WorldOf(Centre);
 		WantDir = P.GetSafeNormal();
 		Subject.Add(P);
 		const double D = FMath::Max(P.Size() - StandOff, 1000.0);
-		FovWant = FMath::Clamp((float)FMath::RadiansToDegrees(2.0 * FMath::Atan(45000.0 / D * 1.8)) / Zoom, 0.4f, 60.f);
+		FovWant = FMath::Clamp((float)FMath::RadiansToDegrees(2.0 * FMath::Atan(Half / D * 1.8)) / Zoom, 0.4f, 60.f);
 		break;
 	}
 	case EShot::Group:
