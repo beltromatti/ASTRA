@@ -11,9 +11,17 @@
                                        and the same plan with the roles turned (who wins, how fast, at what cost)
                                        --scenario war [--class acheron] (on request): FLOTTA-VIVA's inside of a class's ship is shot at (none, a few, many, a great many blows) and the marines go
                                        aboard with the people the war left (the host's own way: AstraBoardScene with the snapshot): who holds her, who lies hurt, what it costs the marines
+                                       --scenario take|breach|sweep|ambush|hold|seal|drills (on request): the infantry orders (ABBORDAGGI-4, docs/ABBORDAGGI.md §15.2), each with the order and without it on the same
+                                       rooms and seeds (take: stack and go in together against walking in, one door and two, with a sync and without; breach: a charge against the torches; sweep: four rooms
+                                       off a corridor; ambush: twelve marines at a junction on the boarders' way, fire held against fire free; hold: twelve marines in Engineering with no order, hold the place,
+                                       hold a whole section; seal: a squad falling back to Engineering that shuts the bulkheads behind it); `drills` runs them all. --setup N picks one of a scenario's
+                                       orders (a trace: --trace --seeds 1 --boarders 8); --scenario escort [--class acheron]: the Captain walking to a ship's bridge with a squad that follows or escorts him
                                        --scenario fps (on request, no plan needed): the Captain's arms on the weapons against the mannequin's own
                                        animations (the sight on its place, the hands on the grips, what the picture holds at 16:9 and 16:10);
                                        --fpsposes FILE writes the engine's poses for the offline preview
+  tools/boarding.py assault [--setup in|out|out_ride|out_war|out_orders|out_orders_captain|...]
+                                       a boarding in the game's own host through the war bench (AstraWarSim): the boats, the fight, the commands; out_orders gives the marines the infantry orders
+                                       through `marine_order` (`astra.board.order`, which waits for the fight) and checks what the host answers, the drills' news and the picture's `drill` fields
   tools/boarding.py craft [--setup out|shield|pd|pd2|cap|all] [--seeds 8]
                                        the assault craft in the battle (the war bench, AstraWarSim, no window): our Kestrels from a ship to a hulk, a shield that holds them off the hull, the
                                        Mandate's skiffs through the point defence of a ship whose shield is down (how many dock, in how long), and the same with fighters on cap;
@@ -305,6 +313,27 @@ ASSAULT_SETUPS["out_recall"] = dict(doc="the boarding is called off with the mar
                                     at="11000=astra.board.disable M1|11001=astra.board.assault out M1 - 2 port|11215=astra.board.recall the_Captain called_off|11235=astra.board.info",
                                     expect=[r"ok: the marines are called out of her decks: \d+ squads", r"the marines are called out of her decks: back to the boats by their hatches",
                                             r"the marines have broken off and are back in their boats|Hulk is ours", r"departed Kestrel 1", r"recovered Kestrel 1", r"is back in the boat bay: \d+ marines aboard"])
+# the infantry orders through the game's own entrance (ABBORDAGGI-4: `marine_order` with sweep, breach, take, ambush, escort_captain and what goes with them): the marines in two Kestrels at a hulk, ordered once
+# they are through. The times are the bench's (the first boat cuts in about a minute after the order at 3 km).
+def _orders_at(after: int, *orders: str) -> str:
+    """The orders are given once the fight has run `after` seconds (the plan is read on a worker: the fight begins when it begins; the console queues the order until then)."""
+    return "|".join(f"11002=astra.board.order {o} after={after}" for o in orders)
+
+
+ASSAULT_SETUPS["out_orders"] = dict(doc="the infantry orders through marine_order on a hulk's decks: sweep, take with a sync, ambush with the fire held, seal behind on the way out; refused when they cannot be", seconds=12150,
+                                    exec=f"{_AQ};astra.war.spawn acheron mandate 0 -3 0 90 id=M1 name=Hulk static hold passive;{_NOFATE}",
+                                    at="11000=astra.board.disable M1|11001=astra.board.assault out M1 - 2 port|" + _orders_at(8, "Boarding_Alpha sweep bridge", "Boarding_Bravo take engineering sync=go", "Boarding_Alpha escort_captain",
+                                                                                                              "Boarding_Alpha take -", "Nobody take bridge", "Boarding_Bravo breach no_such_door",
+                                                                                                              "Boarding_Bravo ambush deck_2_section_C fire=held") +
+                                       "|" + _orders_at(40, "all withdraw seal_behind=true") + "|11002=astra.board.order picture after=30|11002=astra.board.order picture after=70",
+                                    expect=[r"order ok at \d+ s: Boarding Alpha: clear the rooms of", r"order ok at \d+ s: Boarding Bravo: take .*in together", r"order refused at \d+ s: the Captain is not in the fight with the marines",
+                                            r"order refused at \d+ s: take needs a place", r"order refused at \d+ s: no squad of ours is called 'Nobody'", r"order refused at \d+ s: .*no_such_door|order refused at \d+ s: the plan has no place",
+                                            r"order ok at \d+ s: Boarding Bravo: lie in ambush at deck 2 section C", r"order ok at \d+ s: .*closes every pressure bulkhead behind them", r"picture at \d+ s: .*\"drill\":\""])
+ASSAULT_SETUPS["out_orders_captain"] = dict(doc="the same with the Captain in the first Kestrel (a test Captain with no pawn): escort_captain is taken and the board's keys say he is aboard", seconds=12150,
+                                            exec=f"{_AQ};astra.war.spawn acheron mandate 0 -3 0 90 id=M1 name=Hulk static hold passive;{_NOFATE}",
+                                            at="11000=astra.board.disable M1|11000=astra.board.testcaptain 0 0 0|11001=astra.board.assault out M1 - 2 port - ride|" + _orders_at(10, "Boarding_Alpha escort_captain") + "|11002=astra.board.order picture after=40",
+                                            expect=[r"the Captain is aboard Hulk with the marines", r"order ok at \d+ s: Boarding Alpha: escort the Captain", r"picture at \d+ s: .*\"drill\":\"escorting the Captain",
+                                                    r"snapshot at \d+ s: \{\"captain_aboard\":true,\"captain_with_marines\":true"])
 # the pace of the whole operation at the distances a battle is fought at (ABBORDAGGI-4): the order, the muster, the flight, the cut in, the fight, the flight home
 for _km in (10, 20, 40, 80):
     ASSAULT_SETUPS[f"out_{_km}"] = dict(doc=f"the marines in two Kestrels at a hulk {_km} km away: how long from the order to the cut in, and the boats home", seconds=11900 + 4 * _km,
@@ -378,7 +407,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     r = sub.add_parser("run")
-    r.add_argument("--scenario", default="all", help="all | map | rules | duel | squad | flank | board | orders (the marines' orders, on request only) | fps (the Captain's arms, on request only) | plans | attack (other ships' plans and the marines aboard one, on request only) | interior (every class's plan made solid and the simulation's routes walked through it, on request only) | war (a ship the war has shot at, boarded, on request only) | dress (every class's decks dressed: instances and triangles for the ship, each deck and the ring round a Captain against the plain boxes, the soldiers' ways clear of the props, the doors, no one placed in a prop; on request only)")
+    r.add_argument("--scenario", default="all", help="all | map | rules | duel | squad | flank | board | orders (the marines' orders, on request only) | fps (the Captain's arms, on request only) | plans | attack (other ships' plans and the marines aboard one, on request only) | interior (every class's plan made solid and the simulation's routes walked through it, on request only) | war (a ship the war has shot at, boarded, on request only) | take | breach | sweep | ambush | hold | seal | drills (the infantry orders with and without, on request only) | escort (the Captain walking to a bridge with an escort, on request only) | dress (every class's decks dressed: instances and triangles for the ship, each deck and the ring round a Captain against the plain boxes, the soldiers' ways clear of the props, the doors, no one placed in a prop; on request only)")
     r.add_argument("--seed", type=int, default=1)
     r.add_argument("--seeds", type=int, default=20, help="how many fights of each kind (seeds seed .. seed+seeds-1)")
     r.add_argument("--boarders", type=int, default=0, help="board: the size of the boarding party of the first setup (default 10, one skiff)")

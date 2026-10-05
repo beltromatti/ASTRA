@@ -68,7 +68,9 @@ struct FBoardDoors
 {
 	TBitArray<> Open;                         // by the damage map's door index: standing open (someone is at it)
 	TBitArray<> Sealed;                       // shut for good (a pressure bulkhead, a lockdown): nobody passes
-	void Init(int32 NumDoors) { Open.Init(false, NumDoors); Sealed.Init(false, NumDoors); }
+	TArray<int8> ClosedBy;                    // a sealed door a squad shut behind it (its last man at the console): the side that did it (an int of ESide), else -1; those who want through it work at it, the side that shut it quickest
+	void Init(int32 NumDoors) { Open.Init(false, NumDoors); Sealed.Init(false, NumDoors); ClosedBy.Init(-1, NumDoors); }
+	int32 ClosedBySide(int32 Door) const { return ClosedBy.IsValidIndex(Door) ? (int32)ClosedBy[Door] : -1; }
 	bool IsOpen(int32 Door) const { return Door == INDEX_NONE || (Open.IsValidIndex(Door) && Open[Door] && !Sealed[Door]); }
 	bool IsSealed(int32 Door) const { return Door != INDEX_NONE && Sealed.IsValidIndex(Door) && Sealed[Door]; }
 };
@@ -78,6 +80,7 @@ struct FBoardRouteOptions
 {
 	bool bThroughSealed = false;              // breach a sealed door (cut through it: takes time)
 	float SealedCost = 4000.f;                // ... and what that costs
+	bool bThroughClosed = false;              // pass a door a squad has shut behind it (every side may: the one that shut it opens it again, the ship's people override it, the attackers cut it)
 	bool bStairs = true;                      // may use stairs
 	const TArray<float>* PortalPenalty = nullptr;   // extra cost (cm) per portal: a flank avoids the portals the enemy covers
 	const FBoardDoors* Doors = nullptr;       // sealed doors stop a route

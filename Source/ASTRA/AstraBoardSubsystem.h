@@ -195,6 +195,9 @@ public:
 
 	/** The tests: what the bodies are doing. */
 	int32 NumBodies() const;
+	/** Testing (the bench's `astra.board.order`): an order of the marines that waits until the fight has run AfterS seconds (the plan of a boarded ship is read on a worker, so a fight begins when it begins, not at a time the bench can name);
+	 *  given at once when that is already so. */
+	void QueueBenchOrder(const TSharedPtr<FJsonObject>& Args, float AfterS);      // (no Args: the marines' picture is written to the log then)
 
 	// ------------------------------------------------------------------------------------------------ the Captain's weapons (AstraBoardArms.cpp)
 	/** E at a post of the weapons (the Marine Armory's rack, the Ready Room's locker): he takes what it holds that he lacks (the rifle, the sidearm), else puts back what it takes. The words for
@@ -281,6 +284,11 @@ private:
 	bool bWarmed = false;
 
 	void TryFinishLoading();
+	struct FBenchOrder { TSharedPtr<FJsonObject> Args; float AfterS = 0.f; };      // (no Args: the marines' picture is written to the log)
+	TArray<FBenchOrder> BenchOrders;
+	void RunBenchOrder(const TSharedPtr<FJsonObject>& Args);
+	/** The game's side of a door the simulation has shut or opened by itself (a squad closed a bulkhead behind it, a charge, a cut): the damage model's seal and the door actor; the simulation is not told. */
+	void MirrorDoor(int32 Door, bool bSealed);
 	// --- boarding by assault craft (AstraBoardAssault.cpp): one assault at a time, flying and fighting, on one scene
 	struct FLeg
 	{
