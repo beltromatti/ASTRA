@@ -37,6 +37,7 @@ namespace AstraWar
 		float RailDamage = 55.f, RailCd = 8.f, RailRange = 8000.f;
 		int32 Missiles = 12;
 		float MissileCd = 30.f, MissileRange = 25000.f;
+		int32 MissileSalvo = 0;                         // the cells it empties together in a massed salvo, on its group's signal (0: the tier's own, UAstraBattleSubsystem::MassedSalvoOf)
 		float LaserDamage = 18.f, LaserCd = 5.f, LaserRange = 4000.f;
 		int32 PDChannels = 2;
 		float PDRange = 2000.f;

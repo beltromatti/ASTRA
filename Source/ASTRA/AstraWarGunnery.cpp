@@ -408,6 +408,13 @@ FString UAstraBattleSubsystem::AdviseTarget(const FString& Current, bool bOnlyFi
 	return Best ? Best->ContactId : FString();
 }
 
+int32 UAstraBattleSubsystem::MassedSalvoOf(const FAstraBattleShip& S)
+{
+	static AstraWar::FTuneVar KSalvoN(TEXT("salvo_n"), 1.f);              // (the bench's lever: every ship's massed salvo times this)
+	const int32 Base = S.MissileSalvo > 0 ? S.MissileSalvo : (S.SizeTier >= 2 ? 6 : 3);
+	return FMath::Max(1, FMath::RoundToInt((float)Base * KSalvoN.Get()));
+}
+
 int32 UAstraBattleSubsystem::MissilesToSaturate(const FString& ContactId) const
 {
 	const FAstraBattleShip* X = ContactId.IsEmpty() ? nullptr : FindByContact(ContactId);

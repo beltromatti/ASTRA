@@ -82,6 +82,7 @@ struct FAstraBattleShip
 	int32 RailSlugs = 2;                 // slugs per volley
 	float MissileCd = 30.f, MissileT = 10.f, MissileRange = 25000.f;
 	int32 Missiles = 12;
+	int32 MissileSalvo = 0;              // the cells it empties together in a massed salvo (0: the tier's own)
 	float PDRange = 2000.f, PDT = 0.f;
 	int32 PDChannels = 2;                // missiles engaged per point-defence cycle
 
@@ -623,6 +624,8 @@ public:
 	FString AdviseTarget(const FString& Current, bool bOnlyFiringAtUs = false, double MaxKm = 0.0) const;
 	/** How many missiles make a salvo that point defence cannot stop (about 2 plus 1.6 for each channel the target still has), 3 to 8; 6 when its class is not known. */
 	int32 MissilesToSaturate(const FString& ContactId) const;
+	/** The cells a ship empties together in a massed salvo (the group's signal, or the commander's order): its class's own number, else 6 on a cruiser and 3 on anything smaller. */
+	static int32 MassedSalvoOf(const FAstraBattleShip& S);
 	/** What the Aquila's gunners aim at on a target, the Captain's choice of the system to hit: "" (or "hull") the middle of the hull; "bow", "midships" or "stern"; or a system ("engines", "sensors",
 	 *  "hangar", "bridge", "reactor", "weapons"), found in the section of that target that holds it. A shot placed so lands where it is aimed within a gunner's scatter (a sprayed one is spread
 	 *  along the whole hull); the geometry still decides the rest: a slug from ahead enters at the bow whatever the aim along the hull, so the stern is reached from the quarter, abeam or from

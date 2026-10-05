@@ -30,6 +30,9 @@ real time. For the lead and the war module's support agents (in their own worktr
   tools/war.py fight Saved/War/run.json | --tag batch [--vs other]
                                               what a battle was like to watch: the fire second by second, silences, engagements, the accuracy at each
                                               range, who killed whom, the retreats, the Aquila's heat and fires (tools/war_fight.py; BATTAGLIA-3)
+  tools/war.py classes --small cd=0.85,regen=0.5 --scen ss,st,op --seeds 8 [--mandate-small ...] [--acheron ...] [--missiles acheron=48] [--salvo acheron=8]
+                                              the class table under the bench: a variant of data/war/classes.json (written to Saved/War, the real file untouched) over a
+                                              few scenarios, one summary each: the Aquila's hull and losses, the kills, the Mandate's missiles (tools/war_classes.py)
 
 `run` needs the editor target built for this checkout (Build.sh ASTRAEditor Mac Development -Project=... -WaitMutex) and uses
 -nullrhi: it never opens a window or touches the GPU, so it can run while the game or the editor is open. It never starts more than two
@@ -50,6 +53,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from war_fight import cmd_fight  # noqa: E402  (the fight log's reader, BATTAGLIA-3)
+from war_classes import SCENARIOS, cmd_classes  # noqa: E402  (the class table under the bench, BATTAGLIA-3)
 
 # The Captain's orders for the bench (the Aquila's stations take them as the officers would: `station` commands at battle times), by name:
 #   engage   the tactical officer fires on every hostile warship as it comes, engineering moves to combat power (BATTAGLIA-3's duels)
@@ -87,6 +91,19 @@ def captain_script(name: str) -> list[str]:
     return items + helm
 
 
+def join_at(*parts: str) -> str:
+    """The timed commands of several `--at` strings as one, in the order of their times: the bench runs them in the order given (a command due at 1 s waits behind one due at 380 s that
+    came before it), so an `--at` of a scenario and a Captain's script (`--script`, orders at 1 s) have to be merged by time. Stable: those of the same second keep their order."""
+    items = [it for part in parts for it in (part or "").split("|") if it.strip()]
+
+    def when(it: str) -> float:
+        try:
+            return float(it.split("=", 1)[0])
+        except ValueError:
+            return 0.0
+    return "|".join(sorted(items, key=when))
+
+
 ROOT = Path(__file__).resolve().parent.parent
 MAX_PROCESSES = 2                                             # AstraWarSim processes at once, whatever --jobs says
 ENGINE = Path("/Users/Shared/Epic Games/UE_5.8/Engine/Binaries/Mac/UnrealEditor-Cmd")
@@ -117,6 +134,8 @@ def build_args(a: argparse.Namespace, out: Path) -> list[str]:
     if getattr(a, "holo_at", ""):
         args.append(f"-holo_at={a.holo_at}")               # the holo table's plan at those battle times (docs/SCALA.md)
         args.append(f"-holo_out={ROOT / 'Saved' / 'War' / 'holo'}")
+    if getattr(a, "classes", ""):
+        args.append(f"-warclasses={Path(a.classes).resolve()}")      # a class table of its own for this run (an experiment): the real data/war/classes.json is left alone
     return args
 
 
@@ -372,6 +391,7 @@ SUITE = [
     ("sym_small 3 v 3", "sym_small", 900, -1, "", ""),
     ("sym_medium 6 v 6", "sym_medium", 1200, -1, "", ""),
     ("the opening", "", 900, 160, "engage", ""),
+    ("the opening, as the March plays it", "", 1100, 160, "engage", "", SCENARIOS["o13"][4]),   # (Solm's group, then the vanguard, then the relief: tools/war_classes.py)
     ("fleet_battle", "fleet_battle", 1200, -1, "engage", ""),
 ]
 
@@ -381,14 +401,14 @@ def cmd_suite(a: argparse.Namespace) -> None:
     from war_fight import fight_of
     seeds = list(range(1, a.seeds + 1))
     print(f"{'battle':<28} {'len':>5} {'action':>6} {'fire%':>5} {'sil':>4} {'eng':>4} {'maxeng':>6} | kills A/M (aq, craft) | {'shots/kill':>10} | {'ret':>4} | alive A/M | Aquila hull  heat")
-    for name, scenario, seconds, jump, script, ex in SUITE:
+    for name, scenario, seconds, jump, script, ex, *more in SUITE:
         if a.only and a.only.lower() not in name.lower() and a.only.lower() not in scenario.lower():
             continue
         ns = argparse.Namespace(**vars(a))
         ns.scenario, ns.seconds, ns.jump, ns.every = scenario, seconds, jump, 5
-        ns.at = "|".join([x for x in [a.at] + captain_script(script) if x])
+        ns.at = join_at(a.at, *more, *captain_script(script))
         ns.views, ns.aquila, ns.aquila_opts, ns.holo_at = False, False, "", ""
-        tag = f"{a.tag}_{(scenario or 'opening')}"
+        tag = f"{a.tag}_{(scenario or ('opening13' if more else 'opening'))}"
         paths = seeds_run(ns, tag, "; ".join([x for x in [ex, a.exec] if x]), seeds, a.jobs)
         recs = [p for p in paths if p.exists()]
         if not recs:
@@ -465,7 +485,7 @@ def cmd_chase(a: argparse.Namespace) -> None:
             continue
         ns = argparse.Namespace(**vars(a))
         ns.scenario, ns.jump, ns.every, ns.views, ns.aquila, ns.aquila_opts, ns.holo_at = "chase_retreat", -1, 5, False, False, "", ""
-        ns.at = "|".join([withdraw] + captain_script(script))
+        ns.at = join_at(withdraw, *captain_script(script))
         tag = f"{a.tag}_{script.replace(':', '')}"
         paths = seeds_run(ns, tag, a.exec, seeds, a.jobs)
         rows = [chase_of(load(p), a.order_at) for p in paths if p.exists()]
@@ -754,6 +774,7 @@ def main() -> None:
         p.add_argument("--aquila", action="store_true", help="keep the Aquila in the scenario (at the origin, with the ASTRA side): the game's scale test from the bridge")
         p.add_argument("--aquila-opts", default="", help='the Aquila in the scenario, where and how ("at=-34,0,0;speed=0;heading=0": km, m/s, degrees; implies --aquila)')
         p.add_argument("--holo-at", default="", help='the holo table\'s plan at these battle times ("60,120"): Saved/War/holo_<t>.json, drawn by tools/art/holo_plan_preview.py')
+        p.add_argument("--classes", default="", help="a class table (a copy of data/war/classes.json with other numbers) for this run, instead of the real one: tools/war.py classes writes the variants")
 
     p = sub.add_parser("run")
     common(p, 900, -1)
@@ -843,9 +864,22 @@ def main() -> None:
     p.add_argument("--vs", default="")
     p.add_argument("--brief", action="store_true")
     p.set_defaults(fn=cmd_fight)
+    p = sub.add_parser("classes", help="the class table under the bench: a variant of data/war/classes.json over a few scenarios (tools/war_classes.py)")
+    p.add_argument("--small", default="", help="multipliers for vigilant, styx and lethe: cd, dmg, laser, mcd, hull, shield, regen (cd=0.85,regen=0.5)")
+    p.add_argument("--mandate-small", dest="mandate_small", default="", help="the same for styx and lethe alone")
+    p.add_argument("--acheron", default="", help="the same for the Acheron")
+    p.add_argument("--aquila", default="", help="the same for the Aquila")
+    p.add_argument("--missiles", default="", help="the cells of a class: acheron=48,styx=24")
+    p.add_argument("--salvo", default="", help="the cells a class empties together in a massed salvo: acheron=8,styx=4")
+    p.add_argument("--o13", default="", help="the battle times at which the vanguard, Constance and the 7th Fleet's main body arrive in o13: 230,350,440")
+    p.add_argument("--scen", default="ss,st,op", help="ss (Styx v Styx) | sm (sym_small) | st (the Aquila v the strike group) | op (the opening) | o13 (the opening with the vanguard and the relief) | mb1 mb2 mb3 (the main body: the Aquila 8, 14, 20 km behind the line)")
+    p.add_argument("--seeds", type=int, default=8)
+    p.add_argument("--exec", default="", help="console commands for every run (astra.war.tune name value;...)")
+    p.add_argument("--tag", default="cls")
+    p.set_defaults(fn=cmd_classes)
     a = ap.parse_args()
     if getattr(a, "script", ""):
-        a.at = "|".join([x for x in [getattr(a, "at", "")] + captain_script(a.script) if x])
+        a.at = join_at(getattr(a, "at", ""), *captain_script(a.script))
     a.fn(a)
 
 

@@ -1573,10 +1573,11 @@ void UAstraBattleSubsystem::TickWeapons(FAstraBattleShip& S, float Dt)
 	const bool bMayLaunch = bMassed || (S.MissileT <= 0.f && !S.bHoldMissiles && S.SalvoAt < 0.f);
 	if (S.Missiles > 0 && bMayLaunch && Dist < S.MissileRange && Dist > 2.5 * OneKm && T->Side != EAstraSide::Neutral)
 	{
-		// a massed salvo empties the ready cells (6 on a cruiser, 3 on a destroyer): the cells then reload for longer
+		// a massed salvo empties the ready cells (the class's own number, by default 6 on a cruiser and 3 on a destroyer): the cells then reload for longer
 		S.LitT = 40.f;
-		S.MissileT = S.MissileCd * FMath::FRandRange(0.8f, 1.2f) * (S.bConserve ? 2.2f : 1.f) * (bMassed ? 2.f : 1.f);
-		const int32 N = FMath::Min(S.Missiles, bMassed ? (S.SizeTier >= 2 ? 6 : 3) : (S.SizeTier >= 2 ? 4 : 2));
+		static AstraWar::FTuneVar KMassCd(TEXT("salvo_cd"), 2.f);               // (the bench's lever: the cells' reload after a massed salvo, in cooldowns)
+		S.MissileT = S.MissileCd * FMath::FRandRange(0.8f, 1.2f) * (S.bConserve ? 2.2f : 1.f) * (bMassed ? KMassCd.Get() : 1.f);
+		const int32 N = FMath::Min(S.Missiles, bMassed ? MassedSalvoOf(S) : (S.SizeTier >= 2 ? 4 : 2));
 		S.bSalvo = false;
 		S.SalvoAt = -1.f;
 		S.bHoldMissiles = false;
@@ -2321,7 +2322,7 @@ bool UAstraBattleSubsystem::EnemyTactics(const TSharedPtr<FJsonObject>& Args, FS
 		{
 			S.bSalvo = true;
 			S.bConserve = false;
-			Salvo += FMath::Min(S.Missiles, S.SizeTier >= 2 ? 6 : 3);
+			Salvo += FMath::Min(S.Missiles, MassedSalvoOf(S));
 		}
 		else if (Missiles.Equals(TEXT("conserve"), ESearchCase::IgnoreCase)) { S.bConserve = true; }
 		else if (Missiles.Equals(TEXT("normal"), ESearchCase::IgnoreCase)) { S.bConserve = false; }

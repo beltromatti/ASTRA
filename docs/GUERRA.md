@@ -1410,9 +1410,12 @@ rotaia di prua; Vigilant, Acheron, Styx un affusto in più dove serve).
 | aquila | 6 × 60 / 4,6 s, 45 km | 17 / 3,0 s, 9 km | 96, 40 km | 1,6 | 18–30 |
 | praetorian | 6 × 68 / 5,1 s, 42 km | 17 / 3,2 s, 9 km | 24, 40 km | 1,7 | 15–28 |
 | vigilant | 3 × 45 / 4,9 s, 30 km | 15 / 3,0 s, 7,5 km | 12, 35 km | 2,2 | 10–20 |
-| acheron | 4 × 64 / 5,1 s, 34 km | 17 / 3,2 s, 8,5 km | 32, 40 km | 2,0 | 12–24 |
-| styx | 3 × 47 / 5,1 s, 28 km | 15 / 3,0 s, 7,5 km | 16, 35 km | 2,3 | 10–20 |
-| lethe | 2 × 41 / 4,9 s, 22 km | 14 / 3,0 s, 6,5 km | 8, 30 km | 2,6 | 8–16 |
+| acheron | 4 × 64 / 5,1 s, 34 km | 17 / 3,2 s, 8,5 km | **48**, 40 km | 2,0 | 12–24 |
+| styx | 3 × 47 / 5,1 s, 28 km | 15 / 3,0 s, 7,5 km | **24**, 35 km | 2,3 | 10–20 |
+| lethe | 2 × 41 / 4,9 s, 22 km | 14 / 3,0 s, 6,5 km | **12**, 30 km | 2,6 | 8–16 |
+
+Le celle del Mandato sono quelle della BIBBIA (Acheron 48 celle VLS, «missili a saturazione»; Styx e Lethe in proporzione). `missiles.salvo` (facoltativo) è il numero di celle che una nave svuota insieme in una salva massiccia
+(senza: 6 su un incrociatore, 3 sotto); `astra.war.tune salvo_n` lo moltiplica e `salvo_cd` (2) è il ricarico delle celle dopo una salva massiccia, in cicli.
 
 Il ritmo (quanto dura una nave) si regola con le scale di durezza **di serie**: scudi ×2,0, corazza ×2,0, struttura ×2,6 (`shield_scale`, `armour_scale`,
 `struct_scale`), rottura 0,15 alla prima sezione sventrata e 0,6 alla seconda (`breakup_p1/p2`): con queste, un duello Aquila–Styx dura 77–89 s di fuoco continuo,
@@ -1423,7 +1426,8 @@ Aquila–Acheron 127 s, l'Aquila contro un gruppo d'attacco di tre navi circa 12
 **Una legge sola per `keep_on_bow` e `intercept`**: la prua sul bersaglio (il Capitano lo vede dal finestrone; la faccia forte e la sezione piccola incontrano i suoi
 cannoni; **sotto il fuoco la prua diventa il quarto più pieno e a turno: la postura del §11.11**) e la **distanza tenuta dall'acceleratore**. La velocità di avvicinamento è `min(Vmax, errore/4,5)`: il motore risponde in circa cinque secondi, quindi chiude
 solo a una velocità da cui può ancora fermarsi; una volta alla distanza uguaglia la corsa del bersaglio; se il bersaglio la chiude dentro la distanza fa retromarcia
-con la spinta inversa (fino al −30 %). Girare per portare la prua costa velocità lungo la linea (`max(0,25, cos(errore d'angolo))`). L'**intercetta** vira su un punto di
+con la spinta inversa (fino al −30 %), ma se la chiude a più di 72 m/s (metà di ciò che la retromarcia può dare) tiene la posizione: prima arretrava al −30 % per tutta la battaglia lunga e si
+allontanava di decine di km dalla sua flotta senza aprire la distanza (`AstraStations.cpp`, `TickHelm`). Girare per portare la prua costa velocità lungo la linea (`max(0,25, cos(errore d'angolo))`). L'**intercetta** vira su un punto di
 incontro alla velocità che può fare (dove il bersaglio sarà, non dov'è); contro uno che corre più di lei lo segue con un anticipo di qualche secondo. Senza distanza
 data si ferma a circa 0,45 della portata delle rotaie (8–22 km).
 
@@ -1518,6 +1522,11 @@ e non servono più. Il banco legge ciò che c'è aperto: `incident_list` (i prim
   il tempo della battaglia), `SectionGutted` (una sezione sventrata), `SystemOut` (motori / sensori / hangar / ponte / reattore / difesa di punto sotto 0,35), `MountOut` (un affusto fuori) e
   `ShieldFell` (una faccia dello scudo è caduta); ognuno con `bByPlayer` (l'ultimo colpo su quella nave era dell'Aquila), `bKnown` (l'Aquila ha una traccia ferma: la nebbia) e la classe.
 
+- `UAstraBattleSubsystem::EnemyOrder(order, reason, commander, detail, bParley)` e il comando `enemy_order`: «the Mandate ships are withdrawing as agreed over the channel» esce solo se il Capitano era sul canale con quel
+  comandante quando ha dato l'ordine (`bParley`, dallo stato del canale della nave: `ChannelParty`); un ammiraglio che ordina la ritirata da solo dà «the Mandate ships are breaking off on their commander's order», e l'esito
+  del direttore «victory: the Mandate commander ordered the survivors to break off». Provato nel banco dell'apertura: canale aperto dal Mandato (Solm chiama a 182 s) e ordine a 230 s: «as agreed»; con `end_transmission`
+  a 229,6 s: «on their commander's order».
+
 ### 11.8 Il banco
 
 ```
@@ -1525,14 +1534,17 @@ python3 tools/war.py suite [--seeds 8] [--only duel] [--tag base] [--exec "astra
 python3 tools/war.py fight Saved/War/run.json | --tag batch [--vs other]                          # com'è stato da guardare: il fuoco secondo per secondo
 python3 tools/war.py chase [--seeds 6] [--order-at 150]                                          # il timone contro una ritirata, cinque modi
 python3 tools/war.py run|batch ... --script engage|standoff:20|bow|intercept:15                   # gli ordini del Capitano per l'Aquila nel banco
+python3 tools/war.py classes --small cd=0.85,regen=0.5 --scen ss,st,op,o13,mb1,mb2,mb3 --seeds 8   # una variante della tabella delle classi (il file vero non si tocca), una riga per scenario
+python3 tools/war.py batch|suite|run ... --classes Saved/War/classes_<tag>.json                    # il banco con una tabella sua (`-warclasses=` del motore)
 ```
+`tools/war.py classes` (`tools/war_classes.py`) scrive la variante in `Saved/War/classes_<tag>.json` e la passa al banco: moltiplicatori per `--small` (Vigilant, Styx, Lethe), `--mandate-small`, `--acheron`, `--aquila` (`cd`, `dmg`, `range`, `track`, `laser`, `mcd`, `hull`, `shield`, `regen`), `--missiles` e `--salvo` (numeri veri). Gli scenari: `ss` (Styx contro Styx), `sm`, `st` (l'Aquila contro il gruppo d'attacco a 24 km), `op` (l'apertura), `o13` (l'apertura come la gioca la March: Solm a 170 s, la vanguardia a +60 s, Constance a +180 s, il grosso della 7ª Flotta a +270 s; `--o13 230,350,440` cambia i tempi), `mb1`, `mb2`, `mb3` (`data/war/scenarios/main_body.json`: il grosso del Mandato contro quattro Praetorian e dieci Vigilant, l'Aquila ferma 8, 14 e 20 km dietro la linea, solo gli esecutori). **`--at` ora va per tempo** (`join_at`): il banco eseguiva i comandi nell'ordine scritto, così con `--script` e `--at` insieme gli ordini del Capitano (a 1 s) aspettavano il comando più tardo; le tabelle dell'inseguimento (§11.4) erano state fatte col vecchio ordine (gli ordini dell'Aquila partivano insieme alla ritirata, a 150 s) e vanno rifatte.
 **Cosa misura `suite`** (una riga per scontro, media sui semi): durata dell'azione (s con fuoco di navi da guerra), **fuoco %** (celle di 1 s con almeno un colpo, sulla durata),
 silenzio più lungo, scontri (intervalli di 20 s di silenzio) e il più lungo, uccisioni ASTRA/Mandato (per l'Aquila, per i velivoli), colpi per uccisione, ritirate, navi vive, scafo e calore
 dell'Aquila. `fight` aggiunge la precisione per fascia di distanza (0–2, 2–5, 5–10, 10–15, 15–20, 20–30, 30–40, 40–50, 50–70, 70+ km), chi ha ucciso con cosa, il fuoco amico, il calore e gli incendi
 dell'Aquila. Il banco gira a −nullrhi, deterministico per seme; il comando `station` dentro `--at` dà gli ordini del Capitano (`CAPTAIN_SCRIPTS`).
 
 **Variabili di taratura nuove** (`astra.war.tune <nome> <valore>`): `track_scale` (1: moltiplica l'errore del puntamento di tutti), `rail_dmg`, `laser_dmg` (1: il danno), `rail_heat`, `laser_heat`,
-`soak_heat`, `recharge_heat` (§11.6), `break_a`, `break_m` (1: la soglia delle perdite del morale). Le durezze di serie sono quelle del §11.3 (`shield_scale` 2,0, `armour_scale` 2,0, `struct_scale` 2,6,
+`soak_heat`, `recharge_heat` (§11.6), `break_a`, `break_m` (1: la soglia delle perdite del morale), `salvo_n`, `salvo_cd` (§11.3), `pd_kill` (1: la probabilità che la difesa di punto abbatta un missile, per il banco), `prize` (0: la caccia alla nave ammiraglia, §11.12). Le durezze di serie sono quelle del §11.3 (`shield_scale` 2,0, `armour_scale` 2,0, `struct_scale` 2,6,
 `breakup_p1` 0,15, `breakup_p2` 0,6; nel §5.8 sono quelle di prima).
 
 ### 11.9 Risultati (8 semi per scontro; prima = `suite_base`, dopo = `suite_m4`)
@@ -1584,10 +1596,13 @@ vedeva già prima (2 σ su 96 semi): non l'ho trovato nel codice (nulla di diver
 - **Gli scontri fra uguali sono lenti.** Un cacciatorpediniere muore in un paio di minuti contro l'Aquila, la Praetorian o il fuoco concentrato di una flotta, ma non contro un altro cacciatorpediniere: Styx
   contro Styx a 15 km (rotaie 3 × 47 per 5,1 s, il 52–75 % dei colpi a segno) non ha fatto un solo morto in nove minuti di fuoco continuo (560 s, 0,0 uccisioni su 8 semi), e `sym_small` (tre navi a parte) ne fa
   1–2 in dodici. Se si vuole più rapido: alzare il danno o la cadenza delle rotaie dello Styx e del Lethe in `data/war/classes.json` (non ho toccato i numeri di classe oltre le portate e le durezze di serie, per non
-  spostare la forza relativa che il lead ha deciso).
+  spostare la forza relativa che il lead ha deciso). **Misurato nella tappa 6 (§11.12):** lo stallo è lo scudo che si ricarica quanto basta contro il fuoco di un uguale (rigenerazione 12 punti/s contro 11,8 che lo scudo assorbe da un
+  altro Styx a 15 km): con la rigenerazione dimezzata (Vigilant 5 → 2,5, Styx e Lethe 4 → 2) Styx contro Styx fa 0,5 uccisioni in 600 s invece di 0 e nulla cambia nei duelli dell'Aquila; alzare la cadenza o il danno delle rotaie piccole, invece,
+  fa cadere l'Aquila da sola contro il gruppo d'attacco dal 69 % al 20 % già con +11 % (sul filo). **Non applicato** (vedi «cosa manca»).
 - **L'apertura è facile per l'ASTRA** (3,9 su 5 in tre minuti, nessuna perdita): la forza del gruppo d'attacco di Solm (un Acheron, tre Styx, un Lethe e i caccia) contro Aquila, Praetorian e Vigilant è 2,6 contro 6,4
   al contatto. Per un'apertura che costa (§0 dello STATO: «la vittoria arriva con perdite»), dare al Mandato un secondo Acheron o più missili nei dati dell'apertura (non è un file mio) o abbassare `gunnery.track_mrad`
-  del Mandato in `classes.json` (oggi 2,0–2,6 contro 1,6–2,2 dell'ASTRA: una differenza di puntamento dell'ordine del 20 %).
+  del Mandato in `classes.json` (oggi 2,0–2,6 contro 1,6–2,2 dell'ASTRA: una differenza di puntamento dell'ordine del 20 %). **Tappa 6:** fatto il secondo Acheron (Hecate, T-25) e le celle 48/24/12; con la vanguardia e il soccorso
+  come li gioca la March (`o13`) l'apertura non è più facile: vedi §11.12.
 - **L'Aquila muore presto nella battaglia di flotta del banco** (`fleet_battle`: in tutti gli otto semi, fra 140 e 240 s; anche con il timone che la tiene a 25 km dall'azione, `--script standoff:25`, quattro semi su
   quattro, a 160–240 s dopo 80 s fra il 92 % e lo zero): è messa a 16 km dalla linea nemica, ferma, e fra 90 navi è il bersaglio di più valore (il tattico nemico sceglie per valore e per quanto ha già danno). Il banco non
   ha il Capitano che la ritira, che sposta gli scudi o che la copre con la flotta; il numero dice solo che in una mischia da 90 navi una nave sola, per quanto dura, non regge più di un paio di minuti. Per questo nella
@@ -1680,3 +1695,103 @@ crociera): motori dei predoni al **32 %** (50 % senza mira), danno allo scafo 94
 **Per la mente (richiesta fuori dai miei file):** nel menu del tattico `engage` il parametro `aim` (enum sopra) con la spiegazione di cui sopra; nel timone `posture: bow` (prua esatta) e il fatto che la
 nave lo fa da sola. **Per il lead:** la ruota ha ENGAGE → `keep_on_bow` con `standoff_km`: la postura si accende da sola; un ordine «prua sul bersaglio» preso alla lettera dal Capitano (`posture: bow`) è
 il caso di un attacco sul fianco debole che deve vedere dal finestrone.
+
+### 11.12 Chiusura di BATTAGLIA-3 (tappa 6): cosa è fatto, cosa manca, come riprendere
+
+*Chiusura chiesta dal lead il 5/10 sera: sul ramo resta solo ciò che la suite delle battaglie ha provato; le leve misurate ma non applicate sono sotto, con i numeri, perché chi riprende parta da lì.*
+
+**Cosa è fatto (sul ramo, compilato, provato dalla suite)**
+
+- **Incendi** (§11.6): da 170 a 18 incendi accesi in 600 s di battaglia dura (10 o più aperti insieme: da 385 a 78 s) con i profili dei 447 locali che non ne avevano, la nebbia degli sprinkler in ogni locale senza gas (6 s sopra la forza
+  di un incidente, riarmo a 45 s) e le squadre che vanno al più grave. **Il banco aspetta l'interno dell'Aquila** (`WaitForInterior`): prima poteva finire prima che il piano da 3 234 locali fosse letto.
+- **Il ritiro**: `bParley` (§11.7), il testo «as agreed over the channel» resta per un vero parlamento sul canale e per un ordine dato a un comandante con cui il Capitano parla.
+- **Il Mandato secondo la BIBBIA**: celle 48/24/12 (§11.3), il secondo Acheron (Hecate, T-25) anche nell'apertura del C++; `missiles.salvo` e `salvo_n`/`salvo_cd`/`pd_kill` per il banco (default invariati).
+- **Il timone**: non arretra più al −30 % per tutta una battaglia (§11.4); la postura e la mira della tappa 5 restano.
+- **Gli strumenti**: `tools/war.py classes` e `--classes` (tabelle di prova senza toccare il file), `join_at` (il bug di `--at`), gli scenari `main_body`, `o13` (con la picchetta, Constance e il grosso della 7ª Flotta), la riga `o13` nella suite.
+- **La leva `prize`** (`astra.war.tune prize`, `AstraWarGroups.cpp`, 0 di serie: nessun cambiamento): i gruppi del Mandato cacciano la nave ammiraglia (la distanza non conta contro di lei nella scelta del bersaglio del gruppo, e vale di più).
+
+**La suite alla chiusura** (8 semi, `python3 tools/war.py suite --seeds 8 --tag B0`; prima = `suite_m4` del §11.9, alla tappa 4; i numeri del 5/10 sera sono su questo ramo, con il banco che vede l'interno e le tappe 5 e 6)
+
+| battaglia | azione s | fuoco % | silenzio s | uccisioni A/M (Aquila) | ritirate | scafo Aquila |
+|---|---|---|---|---|---|---|
+| duello Aquila–Styx | 90 → **77** | 82 → 81 | 7 → 7 | 1,0/0 → 1,0/0 (1,0) | 1,0 → 0,8 | 100 % |
+| duello Aquila–Acheron | 139 → 143 | 93 → 94 | 2 → 2 | 1,0 → 1,0 (1,0) | 0,9 → 1,0 | 96 % |
+| l'Aquila contro il gruppo d'attacco (un Acheron, tre Styx; prima tre navi), esecutori soli | 596 → 539 | 91 → 80 | 11 → 125 | 2,0 → 2,4 (2,4) | 3,6 → 4,0 | 49 % |
+| ... con il timone a 24 km | – → 370 | – → 93 | – → 10 | – → 4,0/0 (4,0) | – → 1,8 | 68 % |
+| Styx contro Styx | 562 → 562 | 52 → 53 | 17 → 23 | 0,0 → 0,0 | 0,2 → 0,0 | – |
+| incrociatore + caccia a parte | 724 → 714 | 60 → 68 | 158 → 96 | 0,4/0,6 → 0,6/0,4 | 2,6 → 2,1 | – |
+| `sym_small` (3 contro 3) | 756 → 735 | 58 → 52 | 204 → 196 | 1,1/0,6 → 1,4/0,5 | 4,0 → 3,2 | – |
+| `sym_medium` (6 contro 6) | 1140 → 941 | 54 → 58 | 170 → 156 | 2,8/2,8 → 3,6/2,5 | 6,4 → 5,1 | – |
+| l'apertura (Solm, picchetta e Aquila) | 452 → 387 | 62 → 81 | 209 → 71 | 3,9/0 → **5,0/0** (2,4) | 2,4 → 2,9 | 96 % → 83 % |
+| l'apertura come la gioca la March (Solm, vanguardia, Constance, il grosso) | – → 1046 | – → 68 | – → 162 | – → 7,1/0,5 (0,9) | – → 16,2 | **persa in 8 semi su 8** |
+| `fleet_battle` | 1175 → 1194 | 89 → 93 | 54 → 24 | 29,6/6,0 → 27,0/7,2 (0,4) | 39,5 → 37,4 | persa (come prima) |
+
+Simmetria (stesse forze a parti invertite, entrambi gli ordini di creazione): `sym_small` 32 semi **+0,06 ± 0,24** e **+0,34 ± 0,17** (il secondo a 2 σ: vantaggio dei superstiti dell'ASTRA, in navi su 3; 64 battaglie +0,20 ± 0,15, rumore); `sym_medium` 16 semi per ordine **+0,25 ± 0,61** e **−0,25 ± 0,49** (simmetrico).
+Test offline della mente (`mind/bench`): `war_minds_unit` 71, `march_unit` 46, `march_glue_unit` 42, `stations_unit` 70: tutti verdi. Compilazione: «Result: Succeeded», nessun avviso.
+
+**Cosa è misurato e non è applicato (i default restano quelli provati)**
+
+*L'Aquila è troppo forte contro il grosso (il lead, 5/10: 98 % di scafo dopo 2,5 minuti, 67 % contro 17 navi nel primo scontro).* Lo scenario `main_body` lo riproduce: con l'Aquila a 20 km dietro la linea alleata (28–32 km dalla prima fila del
+Mandato) finisce al **98 %** (la tua), a 14 km al 71 %, a 8 km al 41 %: è la geometria. La linea tiene il Mandato a ~12 km, le rotaie Styx e Acheron arrivano a 28 e 34 km, e dietro la linea non arriva niente.
+
+| scafo dell'Aquila a fine prova, esecutori soli, dietro la linea a: | 8 km | 14 km | 20 km |
+|---|---|---|---|
+| **di serie** (`prize` 0) | 41 % | 71 % | **98 %** |
+| portata delle rotaie del Mandato +14–18 % (Styx 32, Acheron 40) | 44 % | 76 % | 98 % |
+| salve di missili ×2 / ×3 | 29 / 22 % | 73 / 71 % | 100 / 98 % |
+| `group_order attack target AQUILA` a un gruppo (i Lethe / la linea Styx / gli Acheron con lo schermo) | – | – | 81 / 83 / 71 % |
+| ... alla linea Styx e ai Lethe insieme / a tutti i gruppi | – | – | 36 % / persa |
+| `prize` 0,25 / 0,5–1 (6 semi, dei vivi) | 26 / 28 % | 52 / 54 % | 80 / 66 % |
+| **`prize` 0,6** (8 semi, i persi a 0) | 28 % | 42 % | **62 %** |
+| `prize` 0,6 + portata (Styx 30, Lethe 24, Acheron 38 km) | 18 % | 20 % (3 vive su 8) | **49 %** (8 vive su 8; 2 con una sezione sventrata) |
+| `prize` 0,6 + portata + errore del puntamento 0,95 (8 semi) | 17 % | 25 % | 45 % |
+| `prize` 0,6 + errore del puntamento del Mandato ×0,85 (6 semi) | 36 % | 42 % | 58 % |
+| `prize` 0,6 + difesa di punto ×0,7 (6 semi) | 23 % | 32 % | 66 % |
+| `prize` 0,6 + salve ×2 (6 semi) | 19 % | 20 % | 64 % |
+| `prize` 0,6 + portata +14 / +18 % (6 semi) | 22 % | 29 % | 36 % |
+
+La portata, le salve e il danno da soli non spostano nulla (a 32 km non arriva niente: la difesa di punto, le esche e i caccia fermano i missili); ciò che sposta l'Aquila è che il Mandato la cerchi. Le menti lo possono già ordinare
+(`group_order attack` sull'AQUILA, tabella sopra); `prize` è la stessa cosa per l'IA di serie. **Combinazione consigliata, non applicata:** `prize` 0,6 + portata Styx 30 / Lethe 24 / Acheron 38 km (49 % a 20 km dietro la linea, con
+sezioni e sistemi colpiti: il ponte fuori in 2 semi su 8; un buon Capitano fa meglio degli esecutori). Dei suoi effetti sul resto della suite sono state fatte solo le prime tre righe (duello Aquila–Styx: azione 103 s, scafo 99 %; Aquila–Acheron: 134 s, 95 %; il gruppo d'attacco con gli esecutori
+soli: 389 s, scafo 61 %, contro 77 s / 100 %, 143 s / 96 %, 539 s / 49 % di serie): **la suite completa con la combinazione manca**, per questo non è il default.
+
+*Le classi piccole* (Vigilant, Styx, Lethe; Styx contro Styx 8 semi/600 s, il gruppo d'attacco con il timone a 24 km 8 semi, l'apertura 8 semi):
+
+| variante | Styx v Styx: uccisioni | Aquila contro il gruppo d'attacco: viva / scafo / uccisioni | apertura: scafo |
+|---|---|---|---|
+| di serie | 0,0 | 8/8 · 69 % · 4,0 | 83 % |
+| rigenerazione degli scudi ×0,5 | **0,5** | 8/8 · 71 % · 4,0 | 83 % (il Mandato perde 5,9 invece di 5,1) |
+| rigenerazione ×0,35 | 0,25 | 8/8 · 71 % · 4,0 | 85 % |
+| cadenza delle rotaie ×0,9 (+11 % di fuoco) | – | 7/8 · **20 %** · 1,75 | 82 % |
+| cadenza ×0,85 | – | 4/8 · 14 % · 1,4 | 82 % |
+| cadenza ×0,77 / ×0,67 | 0,1 / 0,1 | 2/8 / **0/8** | 83 / 62 % |
+| danno ×1,3, cadenza ×0,9, scudo e scafo ×0,8 | 0,4 | 1/6 | 70 % |
+
+Contro l'Aquila ferma il gruppo d'attacco è sul filo: le armi stanno nella sezione di prua insieme ai sensori (con la prua a zero l'errore del puntamento triplica) e un 11 % in più di fuoco delle rotaie piccole la fa sventrare prima
+che finisca i nemici. Per questo non ho alzato il fuoco delle classi piccole (la forza relativa è quella voluta). Lo stallo dei duelli fra uguali è lo scudo che si ricarica quanto il fuoco dell'altro: la rigenerazione dimezzata lo
+rompe un poco (0,5 uccisioni in 600 s) e non tocca i duelli dell'Aquila; **non applicata** (da provare con la suite intera).
+
+*L'apertura come la gioca la March* (`o13`: Solm a 170 s, la vanguardia a 230 s, Constance a 350 s, il grosso della 7ª Flotta a 440 s, la picchetta con l'Aquila dall'inizio): con i soli esecutori l'Aquila ferma al centro viene persa in **8 semi
+su 8 fra 316 e 354 s (336 s in media)**, mentre arriva Constance (350 s): le sezioni di prua e di mezzo vanno a zero fra 280 e 320 s, quando i tredici scafi della vanguardia sono a portata, con le rotaie e i missili del Mandato tutti su di lei; la picchetta resta intatta (93–99 %) perché il fuoco del Mandato va sull'Aquila (valore 1,9 nella scelta del bersaglio del gruppo). Con le celle di prima (Acheron 32, Styx 16, Lethe 8) è lo stesso (misurato con Constance a 440 s e senza il grosso della 7ª Flotta:
+persa in 8 su 8 a 330–360 s). Non l'ho rimisurato con altre celle e i tempi di Mattia. I tempi vanno cambiati nella March (Constance prima o la vanguardia più tardi: `tools/war.py classes --scen o13 --o13 V,C,M`, tempi di arrivo in secondi
+di battaglia), non il Mandato più morbido; non ho fatto la griglia dei tempi.
+
+**Cosa manca**
+
+1. La taratura dell'Aquila: decidere `prize` e la portata (combinazione consigliata sopra) e rifare la suite completa con `--tag F --classes <tabella> --exec "astra.war.tune prize 0.6"` (le prime tre righe sono pulite), poi 32 semi di simmetria.
+2. L'apertura (`o13`): i tempi nella March, e la griglia dei tempi (vanguardia 230/260/290 × Constance 350/310/270) con `--o13`.
+3. Il passo degli scontri fra uguali: la rigenerazione ×0,5 provata solo su tre scenari, non sulla suite intera.
+4. Il banco dell'inseguimento (`tools/war.py chase`) da rifare dopo la correzione di `--at` (la tabella del §11.4 è del vecchio ordine).
+5. Gli effetti a 30–45 km non sono stati visti (nessun editor); l'Aquila muore presto in `fleet_battle` e in `o13` con i soli esecutori (limite noto: non c'è il Capitano nel banco).
+6. Rischi: `prize` e la portata cambiano molto le battaglie con l'Aquila (poche decine di punti di scafo per ogni seme e posizione: usare almeno 8 semi); il gruppo d'attacco contro l'Aquila ferma è sul filo (+11 % di fuoco delle rotaie piccole: da 69 % a 20 %).
+
+**Come riprendere**
+
+```
+python3 tools/war.py classes --tag F --exec "astra.war.tune prize 0.6" --mandate-small range=1.07 --acheron range=1.12 --scen mb1,mb2,mb3 --seeds 8     # la combinazione consigliata sul grosso
+python3 tools/war.py suite --seeds 8 --tag F --classes Saved/War/classes_F.json --exec "astra.war.tune prize 0.6"                                     # e sul resto (confronto con il §11.12 sopra)
+# se va: KPrize in AstraWarGroups.cpp (0 → 0,6); rail.range in data/war/classes.json (acheron 38000, styx 30000, lethe 24000);
+python3 tools/war.py embed        # la tabella compilata nel gioco (AstraWarClassesData.inl)
+# poi ricompilare (Build.sh ASTRAEditor Mac Development -WaitMutex) e rifare la suite
+```
+Il banco gira a −nullrhi (non apre finestre) e due processi al massimo; `Saved/War/` non è nel repo (le tabelle qui sopra sono le mie misure).

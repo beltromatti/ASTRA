@@ -596,7 +596,8 @@ void UAstraBattleSubsystem::TickPointDefence(FAstraBattleShip& S)
 		{
 			HullSound(TEXT("SW_PD_Burst"), 0.4f, 0.6f);
 		}
-		if (FMath::FRand() < (S.bPlayer ? 0.32f : 0.25f) * (Pr.bTorpedo ? 0.8f : 1.f))
+		static AstraWar::FTuneVar KPdKill(TEXT("pd_kill"), 1.f);                // (the bench's lever: the point defence's chance to splash a missile, times this)
+		if (FMath::FRand() < (S.bPlayer ? 0.32f : 0.25f) * (Pr.bTorpedo ? 0.8f : 1.f) * KPdKill.Get())
 		{
 			Pr.bDead = true;
 			if (Pr.OwnerSide >= 0 && Pr.OwnerSide < 2)
