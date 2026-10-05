@@ -202,9 +202,9 @@ def glow_shade(xy, ndv, col, inten, age, kind, seed=0.3, tm=1.0):
         core = np.exp(-q * q)
         p2 = r / 0.28
         psf = 1.0 / (1.0 + p2 * p2) ** 1.4
-        sh = np.exp(-ay_ * 18.0) * np.exp(-ax_ * 2.2)
+        sh = np.exp(-ay_ * 18.0) * np.exp(-ax_ * 4.5)
         sv = np.exp(-ax_ * 30.0) * np.exp(-ay_ * 4.0) * 0.35
-        out = lerp(col, white, saturate(core * 1.4)[..., None]) * (core * 1.6 + psf * 0.5 + (sh + sv) * 0.8)[..., None] * (fade ** 1.6) * rim[..., None]
+        out = lerp(col, white, saturate(core * 1.4)[..., None]) * (core * 1.6 + psf * 0.5 + (sh + sv) * 0.6)[..., None] * (fade ** 1.6) * rim[..., None]
     elif kind == 2:
         q = r / 0.14
         psf = 1.0 / (1.0 + q * q) ** 1.5
@@ -212,7 +212,7 @@ def glow_shade(xy, ndv, col, inten, age, kind, seed=0.3, tm=1.0):
         arms = np.exp(-ay_ * 24.0) * np.exp(-ax_ * 3.2) * 0.5 + np.exp(-ax_ * 24.0) * np.exp(-ay_ * 3.2) * 0.5
         out = lerp(col, white, psf[..., None]) * (psf + arms * 0.5)[..., None] * tw * (fade ** 0.45) * rim[..., None]
     else:
-        qs = (ndv - 0.16) / 0.11
+        qs = (ndv - 0.16) / 0.065
         limb = np.exp(-qs * qs)
         body = ndv ** 3.0 * 0.05
         out = lerp(col, white, 0.3) * (limb + body)[..., None] * (fade ** 1.3) * smoothstep(0.0, 0.08, ndv)[..., None]

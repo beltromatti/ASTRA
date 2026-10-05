@@ -8,6 +8,7 @@ Conventions (docs/VFX.md):
     arms line up with the screen however the camera turns, and zoomed or not the effect is round, never a plate seen edge-on.
   - Nothing is lit at the silhouette (the rims fade to zero), so the polygons of the engine's low-poly spheres never show, whatever the zoom.
   - Per-instance custom data (AstraWarFX.h, AstraFx::Fill): 0-2 colour, 3 intensity, 4 age, 5 P1, 6 P2, 7 seed, 8 width (m), 9 length (m).
+  - A thin thing (slug, beam, wake, spark) is lit by its barrel's profile normalised by the view angle, never by a Fresnel term (see "how a thin thing is lit").
 Inputs of each snippet are the names its Custom node gets; every snippet returns the type its node declares.
 """
 
@@ -35,14 +36,32 @@ float wantR = max(curR * sc, 0.5 * MinPx * pxCm * lerp(1.0, 0.6, t));
 return (curR > 0.001) ? (RadW / curR) * (wantR - curR) : float3(0.0, 0.0, 0.0);
 """
 
-# ------------------------------------------------------------------------------------------------------------------------------- dart
-# A slug, a spark: a stretched sphere whose axis (local z) runs along its flight, head at +z. Inputs: Fr (Fresnel, exponent 1), LZ (local z, cm),
-# Col, Inten, Age, Style (0 slug, 2 a trail's bead, 3 spark), P2 (a bead: its age at the head), Seed, Tm.
+# ------------------------------------------------------------------------------------------------------------------------------- how a thin thing is lit
+# A slug, a beam, a wake, a spark is a cylinder along its local z (head at +z). Its Fresnel term is at most sin(theta), theta the angle between the view and the axis, so lit by
+# it (as the first version was) a slug seen from behind or along the line of fire - the view of every camera that sees "our" fire: the main viewscreen, the bridge, the Aquila's
+# broadside shot - was a dark disc and a beam a faint halo (VFX-2, 5 Oct: tools/art/war_fx_view_angles.py draws both from 90 degrees down to head-on). Now:
+#  - the cross-section is the barrel's radial profile normalised by sin(theta) (1 on the centre line of the strip, 0 at its silhouette, whatever the angle: the lower bound 0.12
+#    keeps the last degrees from blowing up);
+#  - the two end discs are shaded as discs (round, bright in the middle): head-on a slug is a round glow of its own width;
+#  - what runs along the axis (the tail's fade, the ends, a wake's decay) is used as far as the axis lies across the view (`side`, from sin(theta)) and is averaged away when it
+#    does not: nothing hides behind its own foreshortening.
+# Inputs: NW (the radial direction of the pixel, world), CamV (to the camera), LP (local position, cm), AxisW (the axis, world), then the instance's data.
+
 DART = """
-float ndv = saturate(1.0 - Fr);
-float t = saturate(LZ / 100.0 + 0.5);
-float head = smoothstep(0.0, 0.92, t);
-float tail = pow(head, 1.3);
+float3 ax = normalize(AxisW + float3(0.0, 0.0, 0.00001));
+float3 v = normalize(CamV);
+float sinT = length(cross(ax, v));
+float side = smoothstep(0.05, 0.35, sinT);
+float t = saturate(LP.z / 100.0 + 0.5);
+float rr = length(LP.xy) / 50.0;
+float3 n = normalize(NW + float3(0.00001, 0.0, 0.0));
+float ndv0 = (abs(LP.z) > 49.5 && rr < 0.97) ? sqrt(saturate(1.0 - rr * rr * rr)) : saturate(abs(dot(n, v)) / max(sinT, 0.12));
+float tp = lerp(1.0, sqrt(saturate(1.0 - (2.0 * t - 1.0) * (2.0 * t - 1.0))), side);
+float lat = sqrt(saturate(1.0 - ndv0 * ndv0)) / max(tp, 0.06);
+float ndv = sqrt(saturate(1.0 - lat * lat));
+float tt = lerp(0.5, t, side);
+float head = smoothstep(0.0, 0.92, tt);
+float tail = lerp(1.0, pow(head, 1.3), side);
 float core = pow(ndv, 6.0);
 float halo = pow(ndv, 1.4);
 float hot = core * (0.55 + 0.45 * head);
@@ -56,7 +75,7 @@ if (Style < 1.5)
 }
 else if (Style < 2.5)
 {
-    float a = lerp(Age, P2, t);
+    float a = lerp(Age, P2, tt);
     fade = pow(saturate(1.0 - a), 1.3);
     tail = 1.0;
     hot = hot * 0.5;
@@ -72,15 +91,21 @@ return c * Inten * (halo * 0.5 + hot * 1.7) * tail * fade * tw * edge;
 """
 
 # ------------------------------------------------------------------------------------------------------------------------------- tube
-# A beam, a trail, a stream of tracers: a cylinder along its local z, head at +z. Inputs: NW (the radial direction of the pixel, world), CamV
-# (the camera vector), LP (local position, cm), LenM, Col, Inten, Age, Style (1 beam, 2 trail, 4 tracer), P2 (a trail: its age at the head), Seed, Tm.
+# A beam, a trail, a stream of tracers, a slug's wake: a cylinder along its local z, head at +z (lit as above). Inputs: NW, CamV, LP, AxisW, LenM, Col, Inten, Age,
+# Style (1 beam, 2 trail, 4 tracer, 5 wake), P2 (a trail: its age at the head; a wake: its decay, e^(-P2) at the tail against 1 at the head), Seed, Tm.
 TUBE = """
+float3 ax = normalize(AxisW + float3(0.0, 0.0, 0.00001));
+float3 v = normalize(CamV);
+float sinT = length(cross(ax, v));
+float side = smoothstep(0.05, 0.35, sinT);
 float3 n = normalize(NW + float3(0.00001, 0.0, 0.0));
-float ndv = abs(dot(n, normalize(CamV)));
+float rr = length(LP.xy) / 50.0;
+float ndv = (abs(LP.z) > 49.5 && rr < 0.97) ? sqrt(saturate(1.0 - rr * rr * rr)) : saturate(abs(dot(n, v)) / max(sinT, 0.12));
 float t = saturate(LP.z / 100.0 + 0.5);
+float tt = lerp(0.5, t, side);
 float L = max(LenM, 1.0);
 float e = saturate(18.0 / L);
-float ends = smoothstep(0.0, e, t) * smoothstep(1.0, 1.0 - e, t);
+float ends = lerp(1.0, smoothstep(0.0, e, tt) * smoothstep(1.0, 1.0 - e, tt), side);
 float core = pow(ndv, 4.5);
 float halo = pow(ndv, 1.25);
 float3 white = float3(1.0, 0.97, 0.9);
@@ -90,17 +115,24 @@ float pulse = 1.0;
 if (Style > 0.5 && Style < 1.5)
 {
     pulse = 0.82 + 0.18 * sin(t * L / 7.0 - Tm * 42.0 + Seed * 6.2831853);
+    c = lerp(Col * 1.15, white, saturate(core * 0.85));
 }
 else if (Style > 1.5 && Style < 2.5)
 {
-    float a = lerp(Age, P2, t);
+    float a = lerp(Age, P2, tt);
     fade = pow(saturate(1.0 - a), 1.3);
     ends = 1.0;
     c = lerp(c, Col * 0.55, a);
 }
-else if (Style > 3.5)
+else if (Style > 3.5 && Style < 4.5)
 {
-    ends = smoothstep(0.0, 0.85, t) * smoothstep(1.0, 0.97, t);
+    ends = lerp(1.0, smoothstep(0.0, 0.85, tt) * smoothstep(1.0, 0.97, tt), side);
+}
+else if (Style > 4.5)
+{
+    fade = lerp(exp(-0.5 * P2), exp(-P2 * (1.0 - t)), side);
+    ends = lerp(1.0, smoothstep(0.0, 0.04, tt), side);
+    c = lerp(Col * 1.1, white, saturate(core * 0.5) * lerp(0.5, t, side));
 }
 float edge = smoothstep(0.0, 0.18, ndv);
 return c * Inten * (halo * 0.45 + core * 1.5) * ends * pulse * fade * edge;
@@ -129,9 +161,9 @@ else if (Kind < 1.5)
     float core = exp(-q * q);
     float p2 = r / 0.28;
     float psf = 1.0 / pow(1.0 + p2 * p2, 1.4);
-    float sh = exp(-abs(xy.y) * 18.0) * exp(-abs(xy.x) * 2.2);
+    float sh = exp(-abs(xy.y) * 18.0) * exp(-abs(xy.x) * 4.5);
     float sv = exp(-abs(xy.x) * 30.0) * exp(-abs(xy.y) * 4.0) * 0.35;
-    rgb = lerp(Col, white, saturate(core * 1.4)) * (core * 1.6 + psf * 0.5 + (sh + sv) * 0.8) * pow(fade, 1.6) * rim;
+    rgb = lerp(Col, white, saturate(core * 1.4)) * (core * 1.6 + psf * 0.5 + (sh + sv) * 0.6) * pow(fade, 1.6) * rim;
 }
 else if (Kind < 2.5)
 {
@@ -143,7 +175,7 @@ else if (Kind < 2.5)
 }
 else
 {
-    float qs = (ndv - 0.16) / 0.11;
+    float qs = (ndv - 0.16) / 0.065;
     float limb = exp(-qs * qs);
     float body = pow(ndv, 3.0) * 0.05;
     rgb = lerp(Col, white, 0.3) * (limb + body) * pow(fade, 1.3) * smoothstep(0.0, 0.08, ndv);

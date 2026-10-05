@@ -6,8 +6,8 @@ Run in the editor, with no game or PIE running (the masters are rebuilt in place
 
 Makes, in /Game/ASTRA/Materials (all unlit, for instanced static meshes: the game draws every shot, spark, flash, fireball, puff of smoke and drive
 plume as an instance of an engine sphere or cylinder, one component per material):
-  M_WAR_Dart     additive   a stretched sphere: a slug, a spark, a bead of a missile's trail
-  M_WAR_Tube     additive   a cylinder: a laser beam, a stream of tracers
+  M_WAR_Dart     additive   a cylinder shaded as a spindle: a slug, a spark, a bead of a missile's trail
+  M_WAR_Tube     additive   a cylinder: a laser beam, a stream of tracers, a slug's wake
   M_WAR_Glow     additive   a sphere drawn as a screen-facing disc: flashes, flares, hot spots, a drive's glare, the limb of a blast wave
   M_WAR_Fire     additive   a sphere drawn as a disc with a flipbook of fire (T_WAR_Fire)
   M_WAR_Smoke    translucent  the same with a flipbook of smoke (T_WAR_Smoke)
@@ -202,15 +202,29 @@ def import_flipbook(name):
 
 
 # ------------------------------------------------------------------------------------------------------------------------ the materials
+def thin_inputs(m, x=-1800):
+    """What a thin thing (a slug, a beam, a wake, a spark: a cylinder along its local z) is lit from (war_fx_hlsl.py, "how a thin thing is lit"): its local position, the
+    radial direction of the pixel and the axis, both in the world, and the camera vector."""
+    lp = local_position(m, x, -200)
+    rg = mask(m, lp, "", x + 200, -300, r=True, g=True)
+    ap = E(m, unreal.MaterialExpressionAppendVector, x + 400, -280)
+    link(rg, "", ap, "A")
+    link(const(m, 0.0, x + 200, -220), "", ap, "B")
+    nw = instance_to_world(m, ap, x + 600, -280)
+    zaxis = E(m, unreal.MaterialExpressionConstant3Vector, x + 400, -120, constant=unreal.LinearColor(0.0, 0.0, 1.0, 0.0))
+    axw = instance_to_world(m, zaxis, x + 600, -120)
+    camv = E(m, unreal.MaterialExpressionCameraVectorWS, x + 600, 40)
+    return lp, nw, camv, axw
+
+
 def build_dart():
     m = fresh("M_WAR_Dart", unreal.BlendMode.BLEND_ADDITIVE)
     m.set_editor_property("enable_responsive_aa", True)                     # sharp small moving things under the temporal upscaler
-    fr = E(m, unreal.MaterialExpressionFresnel, -1400, -200, exponent=1.0, base_reflect_fraction=0.0)
-    lz = mask(m, local_position(m, -1600, -100), "", -1400, -100, b=True)
-    tm = E(m, unreal.MaterialExpressionTime, -1400, 300)
-    ins = [("Fr", (fr, "")), ("LZ", (lz, "")), ("Col", (cd3(m, 0, -1400, 0), "")), ("Inten", (cd(m, 3, -1400, 80), "")), ("Age", (cd(m, 4, -1400, 140), "")),
-           ("Style", (cd(m, 5, -1400, 200), "")), ("P2", (cd(m, 6, -1400, 240), "")), ("Seed", (cd(m, 7, -1400, 280), "")), ("Tm", (tm, ""))]
-    c = custom(m, H.DART, ins, -900, 0)
+    lp, nw, camv, axw = thin_inputs(m)
+    tm = E(m, unreal.MaterialExpressionTime, -1200, 480)
+    ins = [("NW", (nw, "")), ("CamV", (camv, "")), ("LP", (lp, "")), ("AxisW", (axw, "")), ("Col", (cd3(m, 0, -1200, 120), "")), ("Inten", (cd(m, 3, -1200, 200), "")),
+           ("Age", (cd(m, 4, -1200, 260), "")), ("Style", (cd(m, 5, -1200, 320), "")), ("P2", (cd(m, 6, -1200, 360), "")), ("Seed", (cd(m, 7, -1200, 400), "")), ("Tm", (tm, ""))]
+    c = custom(m, H.DART, ins, -800, 0)
     mel.connect_material_property(c, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
     min_size(m, False, 2.4)
     finish(m)
@@ -219,17 +233,11 @@ def build_dart():
 def build_tube():
     m = fresh("M_WAR_Tube", unreal.BlendMode.BLEND_ADDITIVE)
     m.set_editor_property("enable_responsive_aa", True)
-    lp = local_position(m, -1800, -200)
-    rg = mask(m, lp, "", -1600, -300, r=True, g=True)
-    ap = E(m, unreal.MaterialExpressionAppendVector, -1400, -280)
-    link(rg, "", ap, "A")
-    link(const(m, 0.0, -1600, -220), "", ap, "B")
-    nw = instance_to_world(m, ap, -1200, -280)
-    camv = E(m, unreal.MaterialExpressionCameraVectorWS, -1200, -120)
-    tm = E(m, unreal.MaterialExpressionTime, -1200, 380)
-    ins = [("NW", (nw, "")), ("CamV", (camv, "")), ("LP", (lp, "")), ("LenM", (cd(m, 9, -1200, 0), "")), ("Col", (cd3(m, 0, -1200, 40), "")),
-           ("Inten", (cd(m, 3, -1200, 120), "")), ("Age", (cd(m, 4, -1200, 160), "")), ("Style", (cd(m, 5, -1200, 200), "")), ("P2", (cd(m, 6, -1200, 240), "")),
-           ("Seed", (cd(m, 7, -1200, 280), "")), ("Tm", (tm, ""))]
+    lp, nw, camv, axw = thin_inputs(m)
+    tm = E(m, unreal.MaterialExpressionTime, -1200, 480)
+    ins = [("NW", (nw, "")), ("CamV", (camv, "")), ("LP", (lp, "")), ("AxisW", (axw, "")), ("LenM", (cd(m, 9, -1200, 120), "")), ("Col", (cd3(m, 0, -1200, 160), "")),
+           ("Inten", (cd(m, 3, -1200, 240), "")), ("Age", (cd(m, 4, -1200, 280), "")), ("Style", (cd(m, 5, -1200, 320), "")), ("P2", (cd(m, 6, -1200, 360), "")),
+           ("Seed", (cd(m, 7, -1200, 400), "")), ("Tm", (tm, ""))]
     c = custom(m, H.TUBE, ins, -800, 0)
     mel.connect_material_property(c, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
     min_size(m, False, 2.0)

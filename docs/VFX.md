@@ -4,10 +4,10 @@
 si tara. I nomi nel gioco e nei dati sono in inglese; il documento in italiano. Il contratto con la simulazione è in
 [GUERRA.md](GUERRA.md) (§5.3 morte e danni, §6.8 effetti visivi); lo stile e l'esposizione in [STILE.md](STILE.md).*
 
-**Stato: scritto e compilato, mai visto nel motore.** Il modulo è stato costruito senza avviare l'editor né il gioco (regola dei
-moduli di supporto): il codice C++ compila e gira sul banco (`tools/war.py`, senza grafica), gli shader sono compilati con il DXC
-del motore, lo script dei materiali è controllato contro lo stub Python dell'editor. Quello che nessuno ha ancora potuto fare è
-guardare il risultato: il primo passo del lead è `astra.fx.swatch` (§12), poi la lista del §15.
+**Stato: visto nel gioco (il lead, 5/10) e rifatto per le battaglie lunghe da VFX-2 (5/10, §2bis, §19).** La prima versione fu costruita senza
+avviare l'editor né il gioco (regola dei moduli di supporto): il codice C++ compila e gira sul banco (`tools/war.py`, senza grafica), gli shader sono
+compilati con il DXC del motore, lo script dei materiali è controllato contro lo stub Python dell'editor. VFX-2 l'ha provata nel gioco di prova del
+suo worktree (porta 8771, con `astra.fx.series` e la camera libera `astra.fx.cam`, §12): ciò che dice questo documento della resa è misurato lì.
 
 ## 1. Il principio
 
@@ -61,6 +61,30 @@ Le prove fatte senza il motore: `tools/art/war_fx_shader_preview.py` (porta nump
 immagini in `docs/progressi/vfx/`), `tools/art/war_fx_hlsl_check.py` (ogni snippet Custom-node compilato con il DXC del motore,
 11 su 11).
 
+## 2bis. Come si illumina una cosa sottile (VFX-2, 5/10: perché il fuoco «non si vedeva»)
+
+Un dardo, un fascio, una scia, una scintilla sono cilindri lunghi e sottili. La prima versione li illuminava con il Fresnel (quanto la superficie
+guarda l'occhio), che su un cilindro vale al massimo **sin θ**, con θ l'angolo fra la vista e l'asse: **visti da dietro o lungo la linea di tiro un
+dardo era un disco nero e un fascio un alone appena percettibile** (`tools/art/war_fx_view_angles.py` li disegna da 90° a 0°, vecchio contro nuovo).
+Ma tutte le telecamere che vedono «il nostro fuoco» stanno dietro o lungo la linea di tiro: lo schermo principale (a 1 km dal ponte, davanti alla
+prua), il ponte, la ripresa «ASN AQUILA · FIRING ON ...» che sta sulla scia dei cannoni. Ora (`war_fx_hlsl.py`, DART e TUBE):
+
+- il profilo trasversale è quello della canna **normalizzato per sin θ** (1 sulla linea di mezzo della striscia, 0 sul bordo, qualunque angolo; il
+  minimo 0,12 evita che gli ultimi gradi esplodano);
+- i **dischi di testa e di coda** sono ombreggiati come dischi (tondi, luminosi al centro): di faccia un dardo è un bagliore tondo della sua larghezza;
+- ciò che corre lungo l'asse (la coda che sfuma, le estremità, il decadimento di una scia) vale **solo quanto l'asse sta di traverso alla vista**
+  (`side`, da sin θ) e si media via quando non lo è: niente sparisce dietro il proprio scorcio;
+- il dardo è un fuso (la sagoma si assottiglia alle punte) solo di lato; i dardi sono cilindri (non più sfere allungate: una sfera allungata vista di
+  punta è un ago), come i tubi.
+
+Il fatto che il dardo sia visibile non basta: a 12 km/s la scheggia è un punto che attraversa il cielo in pochi fotogrammi. Quello che dice
+dove va il fuoco è la **scia** (§5): una linea dal cannone alla scheggia, luminosa alla testa e spenta alla coda (stile 5 del tubo).
+
+Nota sullo schermo principale (`AstraViewscreen.cpp`, del lead): quando è puntato su un bersaglio con ingrandimento forte, **taglia con il piano vicino i
+tre quarti del percorso verso il soggetto** (per non avere velivoli enormi e sfocati). È giusto per i velivoli, ma toglie anche tutto il volo delle
+schegge: restano gli ultimi 7,5 km su 30 (0,6 s su 2,5 s di volo). Le schegge nell'inquadratura «ASN AQUILA · FIRING ON ...» (che non taglia) si vedono
+dal cannone al bersaglio.
+
 ## 3. I file
 
 | File | Cosa contiene |
@@ -69,13 +93,15 @@ immagini in `docs/progressi/vfx/`), `tools/art/war_fx_hlsl_check.py` (ogni snipp
 | `Source/ASTRA/AstraWarFX.cpp` | i livelli, il frame, i colpi (`DrawShots`), i fasci, le particelle, le luci, i cvar |
 | `Source/ASTRA/AstraWarFXEvents.cpp` | lampi, fumo, onda d'urto, `Explosion`, scudi (`ShieldHit`), i colpi per tipo (`OnHit`), le morti |
 | `Source/ASTRA/AstraWarFXHull.cpp` | tabella per nave, punti sullo scafo, la bocca dei cannoni, i segni di danno, fuochi e sfiati, spegnimento, pezzi, scudi, motori |
-| `Source/ASTRA/AstraWarFXTest.cpp` | i comandi `astra.fx.*` |
+| `Source/ASTRA/AstraWarFXTest.cpp` | i comandi `astra.fx.*` (anche `series`, `cam`, `reset`: §12) |
 | `Source/ASTRA/AstraWarFXData.inl` | **generato**: campane dei motori, pezzi e facce di taglio per ogni nave (non si modifica a mano) |
 | `tools/ue_scripts/make_war_fx.py` | i materiali e le texture nell'editor |
 | `tools/ue_scripts/war_fx_hlsl.py` | gli shader (testo semplice, uno per Custom node) |
 | `tools/art/war_fx_textures.py` | i flipbook del fuoco e del fumo (`art/_cache/fx`, non in git) e le anteprime |
 | `tools/art/war_fx_nozzles.py`, `war_fx_data.py` | le campane dei motori (Blender, dai generatori delle navi: `data/war/fx_nozzles.json`) e la tabella C++ |
 | `tools/art/war_fx_shader_preview.py`, `war_fx_hlsl_check.py` + `dxc_check.cpp`, `war_fx_script_check.py` | le prove offline del §2 |
+| `tools/art/war_fx_view_angles.py` | dardo, fascio e scia visti da 90° a 0° (vecchio contro nuovo): la prova del §2bis |
+| `docs/progressi/vfx/vfx2_*.png` | le catture dal gioco di prova di VFX-2 (salve, missili, battaglia, reattore, rottura) |
 
 La tabella per nave si rigenera solo quando cambia uno scafo: `blender -b --factory-startup -P tools/art/war_fx_nozzles.py`
 e poi `python3 tools/art/war_fx_data.py` (il manifesto delle sezioni `art/export/ships_v3/manifest.json` non è in git).
@@ -87,8 +113,8 @@ e poi `python3 tools/art/war_fx_data.py` (il manifesto delle sezioni `art/export
 | `Smokes` | sfera | `M_WAR_Smoke` (traslucente) | 220 | −2 | nuvole di fumo (flipbook `T_WAR_Smoke`) |
 | `Fires` | sfera | `M_WAR_Fire` (additivo) | 200 | 0 | palle di fuoco (flipbook `T_WAR_Fire`) |
 | `Plumes` | cilindro | `M_WAR_Plume` | 220 | 1 | pennacchi dei motori |
-| `Tubes` | cilindro | `M_WAR_Tube` | 1200 | 2 | fasci laser, traccianti |
-| `Darts` | sfera | `M_WAR_Dart` | 1500 | 3 | colpi di rotaia, scintille, perle delle scie |
+| `Tubes` | cilindro | `M_WAR_Tube` | 2000 | 2 | fasci laser, traccianti, **scie delle schegge, fiamma e fumo dei missili, scarico dei caccia** |
+| `Darts` | cilindro (fuso) | `M_WAR_Dart` | 1500 | 3 | colpi di rotaia, scintille, perle delle scie dei missili |
 | `Glows` | sfera | `M_WAR_Glow` | 700 | 4 | lampi, riverberi, punti caldi, bagliore dei motori, bordo delle onde d'urto |
 | `DebrisL` | cubo | `M_WAR_Debris` (opaco, illuminato) | 140 | 0 | frammenti di scafo |
 
@@ -97,12 +123,12 @@ Più: `M_WAR_Shield` (il guscio, un attore per nave), `M_WAR_DamageDecal` e le o
 
 **I dati per istanza** (`AstraFx::Fill`, 12 float, `PerInstanceCustomData`): 0–2 colore, 3 intensità, 4 età, 5 P1, 6 P2, 7 seme,
 8 larghezza (m), 9 lunghezza (m), 10–11 riservati. P1/P2 dicono allo shader cosa disegnare: dardo `Style` 0 colpo / 2 perla di una
-scia / 3 scintilla; tubo `Style` 1 fascio / 4 tracciante; bagliore `Kind` 0 palla / 1 lampo con strisce / 2 riverbero / 3 bordo di
+scia / 3 scintilla; tubo `Style` 1 fascio / 2 scia di perle (P2: l'età alla testa) / 4 tracciante / **5 scia luminosa** (P2: il decadimento, e^-P2 alla coda contro 1 alla testa); bagliore `Kind` 0 palla / 1 lampo con strisce / 2 riverbero / 3 bordo di
 onda d'urto; pennacchio: 0 ASTRA, 1 Mandate (P1) e il balbettio del motore malato (P2).
 
-Esposizione: fissa nello spazio, EV100 6,6 (STILE §8): un emissivo di ~116 legge come bianco. Intensità usate: colpo 700, fascio 520,
-cannone 420, difesa di punto 360, fuoco 190, bagliori 110–460, pennacchio 70, fumo 70 (colore 0,5/0,48/0,46), guscio dello scudo
-48 × `Gain` (l'intensità). Con l'esposizione dei mondi (EV 8,3, quasi due stop più scura) gli effetti leggono più deboli, nello schermo principale (EV 5,6, un diaframma più
+Esposizione: fissa nello spazio, EV100 6,6 (STILE §8): un emissivo di ~116 legge come bianco. Intensità usate: colpo 700, scia 190, fascio 520,
+cannone 420, difesa di punto 360, **fuoco 85** (era 190: sommati, i fuochi di una nave che salta facevano uno schermo di 5000), bagliori 110–460, pennacchio 70,
+fumo 45 (colore 0,42/0,40/0,38), guscio dello scudo 48 × `Gain` (l'intensità). Con l'esposizione dei mondi (EV 8,3, quasi due stop più scura) gli effetti leggono più deboli, nello schermo principale (EV 5,6, un diaframma più
 aperto) più forti: si regola con `astra.fx.intensity`.
 
 ## 5. Le armi
@@ -114,11 +140,12 @@ mira esce dal box dello scafo dove sta il cannone. Il colpo parte lì e si raddr
 
 | Arma | Come si vede |
 |---|---|
-| **Rotaia** | un dardo: ellissoide luminoso e allungato, bianco-caldo alla testa, sfuma dietro; lunghezza `clamp(velocità × 0,05, 90, 560)` m, larghezza `clamp(3,2 + danno × 0,055, 4, 9)` m; lampo alla bocca con scintille |
-| **Laser** | un tubo dalla bocca al bersaglio, disegnato in 0,06 s, tiene e si assottiglia; larghezza `Radius × 0,016` (2,5–7 m); alone alle due estremità, il calore sul bersaglio (bagliore + scintille + macchia di bruciatura); se il bersaglio ha lo scudo, il fascio finisce sul guscio |
-| **Cannoni dei caccia**, Falcon del Capitano | raffiche di traccianti (tubi `Style` 4), 2 per fascio, 70 m × 1,1 m |
+| **Rotaia** | un **dardo** (cilindro ombreggiato a fuso, bianco-caldo alla testa; lunghezza `clamp(velocità × 0,05, 90, 560)` m, larghezza `clamp(3,2 + danno × 0,055, 4, 9)` m) e la sua **scia**: un tubo dal cannone alla scheggia, lungo fino a 1,1 s di volo (13 km), luminoso alla testa e `e^-κ` alla coda (τ 0,42 s), che resta appeso dopo l'impatto e si spegne (`FWake`, 160); **il lampo alla bocca è della misura del cannone** (`R × 0,03` m, 3–14): nucleo bianco, bagliore con le strisce, un getto di scintilla lunga lungo la mira, un anello che si allarga, scintille e una luce sullo scafo intorno (8 luci in tutto) |
+| **Laser** | un tubo dalla bocca al bersaglio, disegnato in 0,06 s, tiene e si assottiglia; larghezza `Radius × 0,016` (2,5–7 m); **il nucleo tiene il colore della parte** (azzurro o rosso, non bianco puro); alone alle due estremità, il calore sul bersaglio (bagliore + scintille + macchia di bruciatura); se il bersaglio ha lo scudo, il fascio finisce sul guscio |
+| **Cannoni dei caccia**, Falcon del Capitano | raffiche di traccianti (tubi `Style` 4), 2 per fascio, 70 m × 1,1 m; un lampo alla bocca (`astra.fx.muzzle`) |
+| **Caccia (scarico)** | entro 14 km una **striscia dello scarico** lungo la prua (30–320 m secondo la spinta, tubo di stile 5): una squadriglia che vira disegna archi nel cielo |
 | **Difesa di punto** | un flusso di 4 traccianti, 38 m × 0,9 m; l'abbattimento: lampo + nuvoletta di fumo + scintille (`Flak`) |
-| **Missili, siluri, razzi** | testa luminosa + scia di perle (ellissoidi del 70% più lunghi del tratto di traiettoria, quindi fusi: più larghe, scure e fredde con l'età; un punto ogni 0,1 s, 9 punti); alla fine del colpo la scia resta 1–1,5 s e svanisce (`FGhost`) |
+| **Missili, siluri, razzi** | testa luminosa e **fiamma del motore** (tubo corto e caldo dietro la testa); scia di perle (un punto ogni 0,1 s, 9 punti: più larghe, scure e fredde con l'età) e **fumo lungo** (un punto ogni mezzo secondo per quattro secondi, tubi pallidi che si spengono lungo la traiettoria vera: dove il missile è stato, quindi anche dove ha virato); **sbuffi di gas di assetto** quando il cercatore vira forte (accelerazione laterale oltre 40 m/s²); alla fine del colpo le perle restano 1–1,5 s e il fumo lungo 3 s, e svaniscono dove sono (`FGhost`) |
 | **Esche** | un piccolo sole caldo che deriva e si spegne (`Decoy`) |
 
 Colori (`ShotColor`): le due parti si leggono a colpo d'occhio. ASTRA = azzurri (rotaia 0,42/0,70/1,00; laser 0,22/0,58/1,00;
@@ -150,15 +177,21 @@ Parametri del materiale per istanza dinamica: `Axes`, `Color`, `HexSize`, `Gain`
 `Explosion(Pos, Vel, R, bAstra, Power)` (la stessa per un caccia che muore, un colpo pesante, un'esplosione secondaria, il
 reattore dell'Aquila: cambiano raggio e potenza):
 
-1. **lampo**: bianco, tondo, con le strisce anamorfiche (bagliore `Kind` 1), breve (0,3–1 s secondo la potenza);
+1. **lampo**: bianco, tondo, con le strisce anamorfiche (bagliore `Kind` 1; la striscia orizzontale è più corta di prima), **breve** (0,12–0,36 s secondo la potenza; era 0,3–0,96: due lampi sommati facevano mezzo secondo di schermo bianco);
 2. **palla di fuoco**: da 1 a 5 "billow" dal flipbook di fuoco (un po' scostati l'uno dall'altro), 1,5–4 s, dalla temperatura bianca ai
-   rossi di brace;
+   rossi di brace, **a un'intensità (85) tale che il corpo del fuoco resta sotto il bianco dell'esposizione e i billow si vedono**: il bianco è lasciato al nucleo;
 3. **alone** che indugia un attimo, e **scintille** (12–46, fino a un centinaio nelle più grandi: tracce lunghe che si raffreddano,
    bianco-caldo, colore del metallo, rosso);
 4. **fumo**: nuvole del flipbook di fumo (4–7,5 s) con una brace interna che si spegne;
-5. **onda d'urto** (potenza oltre 0,45): il bordo di un guscio che si allarga (un anello da qualunque lato lo guardi);
+5. **onda d'urto** (potenza oltre 0,45): il bordo di un guscio che si allarga (un anello da qualunque lato lo guardi, ora sottile: il 2 % del raggio);
 6. **detriti**: cubi illuminati (2–8, fino a una ventina) che girano e brillano finché sono caldi, lasciando scintille;
 7. **luce**: un lampo di luce sugli scafi vicini (candele ∝ R²·√P, 0,3–1,3 s; solo le più forti per l'occhio, §10).
+
+Tutte le intensità e le durate di una esplosione si cambiano **a gioco acceso** con `astra.war.tune fx_<nome> <valore>` (la tabella di taratura della guerra, senza compilare):
+`fx_blast` (1: tutto insieme), `fx_flash` (420), `fx_fire` (85), `fx_halo` (12), `fx_smoke` (45), `fx_wave` (90), `fx_light` (4000: candele per R²), `fx_reactor_flash` (380),
+`fx_reactor_light` (4e9), `fx_cut_flash` (520: il lampo al taglio di una rottura), `fx_break_light` (1e9). I valori scritti qui sono quelli di serie.
+
+**La sezione che va a zero** (`GutBurst`, quando `GuttedT` diventa 0): lo scoppio del suo cuore, il rivestimento che salta: un lampo, una palla di fuoco, un anello sullo scafo, dieci lastre di rivestimento e una pioggia di scintille, una luce. Poi brucia e sfiata (sotto).
 
 **Esplosioni secondarie nelle sezioni che bruciano**: una sezione con fuoco (`Burn` oltre 8 s) fa ogni tanto una piccola esplosione
 dentro lo scafo (una sventrata, ogni 2,5–7 s; una che brucia soltanto, ogni 7–16 s): una nave in fiamme non è mai quieta. Sono
@@ -177,10 +210,10 @@ separazione). Il modulo lo riceve **direttamente da `Destroy()`** (non consuma l
   pareggiano e lo scafo viene distrutto. Niente salti sul bersaglio nello schermo.) I pezzi si separano con la quantità di moto giusta (il gruppo
   che si stacca contro il resto, in proporzione alle lunghezze), ruotano piano attorno al loro baricentro, e **le facce di taglio** (`MI_HULL_<f>_Cut`) partono roventi (`Heat` 1 → 0 in ~60 s) e
   alimentano fuochi, scintille e fumo finché sono calde; le finestre si spengono con un balbettio in 2,5 s. Un lampo e una fontana di
-  scintille al punto di rottura, l'onda d'urto, quattro esplosioni lungo le due metà. Ogni pezzo diventa un ostacolo (`Wrecks`) per le navi
+  scintille al punto di rottura, l'onda d'urto, quattro esplosioni lungo le due metà e, mentre si allontanano, **altre cinque minori fino a 4 s** (i magazzini, le linee, le celle che vanno uno dopo l'altro). Ogni pezzo diventa un ostacolo (`Wrecks`) per le navi
   che girano intorno.
 - **Reattore (`ReactorBreach`)**: i pezzi sono scagliati via dalla palla di fuoco, carbonizzati (le superfici scure), e bruciano più forte;
-  un lampo e una sfera di fuoco che inghiottono la nave, l'onda d'urto, una luce fortissima. L'Aquila (`OnAquilaBreach`): una catena di
+  un lampo breve (0,2 s, 380: nel gioco il bianco pieno era questo, 950 per 0,9 s) e una palla di fuoco il cui cuore caldo si raffredda in billow lungo tutta la nave, due onde d'urto, sette scoppi minori in 1,6 s, una luce forte. L'Aquila (`OnAquilaBreach`): una catena di
   esplosioni lungo lo scafo e il lampo del reattore.
 - **Scafo spento (`DisableShip`)**: nessuna esplosione; una scarica di scintille lungo lo scafo, poi le luci si spengono in 3,5 s con
   balbettio, i lampeggianti spariscono, il motore muore: un relitto alla deriva, buio. (Resta abbordabile: non cambia nulla per la guerra.)
@@ -235,11 +268,19 @@ Girano il vero codice della guerra (`ApplyHit`, `FireRail`, `Destroy`...): ciò 
 | `astra.fx.burn [su T]` | fuochi e sfiati in ogni sezione, una sventrata (e le sue esplosioni secondarie) |
 | `astra.fx.break <bow\|mid\|stern\|reactor\|disable> [su T]` | la fine della nave, come la guerra la chiude |
 | `astra.fx.clear` | le navi della scena spariscono (senza esplosione) |
-| `astra.fx.stats` | cosa c'è e cosa costa (istanze ora/picco per livello, scartati, particelle, pezzi, macchie, luci, ms/frame) |
+| `astra.fx.reset` | tutto ciò che gli effetti tengono sparisce: i pezzi dell'ultima rottura, le particelle, le macchie, i gusci (un cielo pulito per la prova dopo; senza, i relitti dell'ultima rottura restano e lo schermo principale li inquadra al posto del bersaglio nuovo, che ha lo stesso id) |
+| `astra.fx.stats` | cosa c'è e cosa costa (istanze ora/picco per livello, scartati, particelle, scie, pezzi, macchie, luci, ms/frame **senza il tempo delle catture di prova**) |
+| `astra.fx.series <prefisso> [n 8] [ogni_s 0,25] [vs] [cam] [do <comando>]` | **n immagini della vista del gioco** (senza interfaccia) a intervalli dell'orologio degli effetti, dal fotogramma del comando; dopo `do` il comando da provare (`astra.fx.series b 30 0.1 cam do fire rail 3 aquila T`: una salva a passi). `vs` aggiunge il feed dello schermo principale (`<prefisso>_NN_vs.png`), `cam` la camera libera (`_NN_cam.png`). Una prova che prima era un colpo di screenshot a caso. |
+| `astra.fx.cam <x> <y> <z> <yaw> <pitch> [fov 60]` \| `broadside [T]` \| `off` | una **camera libera di prova**: una SceneCapture che vede tutto ciò che vedrebbe la plancia (stesso EV 6,6), da dove la metti (metri nel riferimento del ponte: x avanti, y a dritta, z su; il centro dello scafo dell'Aquila è 172 m a poppa e 62 m sotto il ponte). `broadside` è la ripresa «ASN AQUILA · FIRING ON ...» dello schermo principale (320 m dietro il suo centro, 210 di lato, 100 su, lungo la linea di tiro, 46°) **senza passare dalla regia**: si prova il fuoco senza aspettare che il regista tagli. |
 
 Cvar: `astra.fx.enable` (0 spegne tutto: si torna al vecchio disegno, da cambiare prima della battaglia), `astra.fx.intensity` (0,1–6, la
 luminosità di tutto), `astra.fx.density` (0,2–2: quante particelle), `astra.fx.lights` (0 niente luci), `astra.fx.sim` (1: la
-simulazione degli effetti gira anche dove non si disegna, cioè sul banco), `astra.fx.log N` (i contatori nel log ogni N secondi).
+simulazione degli effetti gira anche dove non si disegna, cioè sul banco), `astra.fx.log N` (i contatori nel log ogni N secondi), **`astra.fx.wake`** (0–3: la luminosità delle righe
+che scie e caccia disegnano; 0 le toglie) e **`astra.fx.muzzle`** (0,2–3: la misura del lampo alla bocca). Le intensità delle esplosioni: `astra.war.tune fx_*` (§7).
+
+**Le prove di VFX-2 si fanno così** (nessun editor, il gioco di prova del worktree: `ASTRA_HARNESS_PORT=8771 tools/play.py launch --nomind --res 1280x720`): `astra.fx.scene 25 0`,
+`astra.fx.cam broadside T`, `astra.cmd fire_weapons {'weapon':'railguns','contact_id':'FX-T','salvo':3}`, `astra.fx.series bc 60 0.15 cam`; per un'esplosione `astra.fx.reset`, `astra.fx.scene 5 0`,
+`astra.fx.cam 1500 800 100 -12.9 1.2 35` e `astra.fx.series rc 30 0.12 cam do break reactor T`.
 
 ## 13. Misure (banco senza grafica, MacBook Air M4)
 
@@ -253,8 +294,11 @@ Sono i costi CPU della *simulazione e dello staging* degli effetti (il banco non
 
 (Le due righe del tick variano da una prova all'altra con il carico della macchina: il lead usa il gioco mentre il banco gira.) I
 livelli restano dentro i tetti anche nella battaglia più grande; il tetto dei detriti è raggiunto e funziona come deve (il chunk più vecchio
-cede il posto a uno nuovo). **Il costo della GPU non è misurato** (nessun editor): le cose da guardare per prime sono la sovrapposizione del
-fuoco e del fumo traslucenti vicino alla telecamera (§15) e il gate di [ricerca/11](ricerca/11-efficienza-grafica.md).
+cede il posto a uno nuovo). **Il costo della GPU non è ancora misurato in modo pulito: vedi §19**; il gate di [ricerca/11](ricerca/11-efficienza-grafica.md) resta il riferimento.
+
+**La misura che si fa offline: la dimensione degli shader.** `tools/art/war_fx_hlsl_check.py` compila ogni nodo Custom con il DXC del motore (con gli ingressi in un buffer di costanti, perché il compilatore
+non li riduca a un valore) e stampa le istruzioni scalari DXIL: DART 229, TUBE 282, GLOW 213, FIRE (UV 61 + peso 11 + ombreggiatura 83, più due letture del flipbook), SMOKE 93 (+ UV), PLUME 128, SHIELD 450, MINSIZE 53–66. Per pixel
+sono poche centinaia di operazioni: un livello a tutto schermo a 1080p sono circa 0,6 miliardi di operazioni, cioè frazioni di millisecondo sulla GPU del M4; il costo vero è quanti strati si sovrappongono (§15), e quello si misura nel gioco.
 
 ## 14. I ganci nel resto del codice (tutti)
 
@@ -303,27 +347,29 @@ Nessuno cambia la simulazione: se `astra.fx.enable 0` o mancano i materiali (`M_
 | esplosioni secondarie troppo frequenti | gli intervalli in `HullEmitters` (`BlastT`) |
 | i pennacchi corti o lunghi | `DrawDrives`: `Len = R × (5 + 25 × spinta)`, `Width = 1,9 R` |
 | le macchie sullo scafo grandi/piccole | `AddScar`: `Half`, i tetti per nave |
+| le righe delle scie troppe, lunghe o forti | `astra.fx.wake`; `WakeSeconds` e `WakeTau` in `AstraWarFX.cpp`; `190.f * Intensity * WakeGain` nelle `Fill` della scia |
+| l'esplosione bianca / senza struttura / senza fumo | `astra.war.tune fx_fire`, `fx_flash`, `fx_smoke`, `fx_wave`, `fx_blast` (§7), a gioco acceso; la durata del lampo in `Explosion` |
+| i fasci o le scie troppo bianche, senza il colore della parte | `war_fx_hlsl.py`: TUBE (`core * 0.85` nel fascio, `core * 0.5` nella scia) |
 
 Le immagini delle prove (`docs/progressi/vfx/*.png`) mostrano com'è pensato: lo scudo visto da fuori e dalla plancia, il crollo, i bagliori,
 i dardi, i fasci e i pennacchi, i fogli del fuoco e del fumo.
 
 ## 17. Limiti noti
 
-- **Non verificato nel motore** (vedi sopra): i materiali non sono stati compilati dall'editor, le intensità sono tarate sul numpy e
-  sull'esposizione 6,6, non a occhio. Il rischio più concreto al primo avvio è un Custom node che il traduttore dei materiali non digerisce;
-  `make_war_fx.py` lo dice nel log e il resto prosegue.
+- **Prova nel gioco di prova di un solo giocatore** (VFX-2): le catture e le misure del §19 sono del suo worktree, a 1280×720, con la macchina carica (4 commandlet e il gioco del lead insieme: 6–40 fps): i
+  costi della GPU sono ordini di grandezza, non il gate del MacBook Air.
 - **TSR e traslucenti**: i bagliori e le scie additivi sono senza velocità; se sotto il TSR si vede un'ombra residua dietro i colpi veloci
   si accende "Output Translucent Velocity" nei materiali (non si può senza vederlo).
 - **I fuochi sono sul box dello scafo**, non sulla mesh: su uno scafo molto rastremato un fuoco può stare un poco fuori dalla superficie
   (la tabella dei pezzi e delle facce di taglio è invece esatta, viene dal generatore).
-- **Niente puff dei motori di manovra (RCS)**, niente nomi e numeri sugli scafi né il "tetto dell'isola" del brief: non fatti.
+- **I puff dei motori di manovra (RCS)** ci sono solo per i missili (gas di assetto quando il cercatore vira); non per le navi capitali. Niente nomi e numeri sugli scafi né il "tetto dell'isola" del brief: non fatti.
 - **`SM_WAR_Ball`** (una sfera più fine per gli scudi) non è fornita: si usa la sfera del motore; basta fare la mesh in
   `/Game/ASTRA/FX/SM_WAR_Ball` e viene usata.
 - **Cambiare `astra.fx.enable` a battaglia in corso**: i colpi già in volo non hanno l'attore (non lo hanno mai creato) e restano invisibili
   fino alla fine; si cambia prima della battaglia.
 - **Lo schermo principale vede la separazione dei pezzi 0,75 s dopo la plancia** (§8): è il prezzo di non avere salti sul bersaglio; sparirebbe
   se la lista degli attori dello schermo si potesse aggiornare subito (§18). Lampi, fuoco e scintille della rottura ci sono da subito in entrambi.
-- Il costo **GPU** del fuoco e del fumo traslucenti molto vicini alla telecamera non è misurato (§13).
+- **Lo schermo principale a ingrandimento forte dentro una palla di fuoco** (la regia taglia sul pezzo del relitto a x8, FOV 7°, mentre la palla di fuoco di 300 m lo avvolge) vede solo la nube, anche a intensità basse: serve un'inquadratura larga quanto la palla di fuoco finché brucia (`GetBlasts`, §19).
 
 ## 18. Richieste fuori dal modulo (per il lead)
 
@@ -334,3 +380,35 @@ i dardi, i fasci e i pennacchi, i fogli del fuoco e del fumo.
 - Opzionale, in `AstraViewscreen`: oggi `RebuildShowList()` gira ogni 0,5 s e gli attori nuovi mancano allo schermo fino al giro successivo; il modulo
   lo aggira (gusci creati in anticipo, scafo intero portato avanti per 0,75 s dopo una rottura). Se la funzione fosse pubblica e fosse chiamabile
   da `UAstraWarFX` subito dopo aver creato i tre pezzi, il giro di attesa non servirebbe più.
+- **Dopo ogni unione di VFX-2 si rilancia `tools/ue_scripts/make_war_fx.py`** (l'editor, una volta): gli shader dei materiali `M_WAR_*` sono cambiati (cilindri e tubi
+  con la luce normalizzata, §2bis) e i `.uasset` generati **non** sono nel commit (non si uniscono: sono binari rigenerabili).
+- Per la regia dello schermo principale, `UAstraWarFX::GetBlasts(TArray<AstraFx::FBlastView>&)` dà le esplosioni vive (posizione, raggio, età, nave, se è dell'Aquila, se è un reattore):
+  una palla di fuoco di 300 m ha bisogno di un'inquadratura larga quanto lei finché brucia; a ×8 dentro la palla la camera vede solo la nube. Il modulo non tocca `AstraViewscreen`.
+- La ripresa **Broadside** («ASN AQUILA · FIRING ON ...») è l'inquadratura giusta per il fuoco: il nostro tiro vi corre per 2,5 km davanti alla camera. Vale la pena che la regia
+  la scelga ogni volta che l'Aquila apre il fuoco e non solo a cavallo di un ordine del Capitano.
+
+## 19. VFX-2 (5/10): il fuoco si legge, le esplosioni hanno forma, i colpi lasciano un segno
+
+Il punto di partenza ([PARTITE_2026-10-05.md](PARTITE_2026-10-05.md), il lead): un reattore che salta a 5 km era un lampo bianco che accecava plancia e schermo per un secondo e mezzo; il fuoco
+a 20–45 km sullo schermo principale era poco visibile; la ripresa «FIRING ON ...» mostrava l'Aquila che sparava senza che lo sparo si vedesse. Il lavoro è in tre tappe, ognuna misurata nel gioco di prova
+(porta 8771) con le immagini a passi di `astra.fx.series` e la camera libera `astra.fx.cam` (§12). Le anteprime sono in `docs/progressi/vfx/vfx2_*.png`.
+
+**Tappa 1: il fuoco a ogni distanza.** La causa (§2bis) non era l'intensità: un cilindro o una sfera stirata vista di fianco ha il bordo in ombra e, vista di punta, un'ellisse piccola;
+il bagliore alla Fresnel di un corpo sottile non supera `sin θ`, e le righe dei colpi sparivano proprio nelle viste da dietro e lungo la linea di tiro, cioè dove il giocatore le guarda. Ora il profilo
+è normalizzato su `sin θ` (minimo 0,12), i dischi di estremità sono ombreggiati come dischi, le dissolvenze lungo l'asse pesano con `smoothstep(0,05; 0,35; sin θ)` (`tools/art/war_fx_view_angles.py` lo mostra da 90° a testa in su,
+vecchio contro nuovo: `docs/progressi/vfx/view_angles.png`). Sopra, la scheggia ha la sua **scia** (tubo di stile 5, §5), il cannone il suo **lampo**, i missili il **fumo lungo** e i gas di assetto, i caccia la **striscia dello scarico**.
+Il colore dice di chi è: azzurro/bianco per ASTRA, arancio/rosso per il Mandate; il nucleo di un fascio non è più bianco puro.
+
+**Tappa 2: le esplosioni.** Un reattore non acceca più: il lampo è di 0,2 s (380) invece di 0,9 s (950), il corpo del fuoco resta sotto il bianco dell'esposizione (85) e i billow si vedono. Misurato sulla cattura
+della camera libera a 3,6 km con FOV 35°: i pixel bianchi al picco sono il **2,4 %** (prima 96–99 % per mezzo secondo); sul feed dello schermo principale (un'unità di esposizione più chiaro) il 13,5 % per 0,2 s.
+La sequenza è: lampo breve, palla di fuoco con nucleo e fiamme, fumo scuro (45, tono 0,42/0,40/0,38), anello sottile, scoppi secondari, luce sugli scafi. La rottura in tre pezzi (`_SecBow/_SecMid/_SecStern`) ha il lampo al taglio (520, 0,3 s), le
+facce roventi, quattro scoppi lungo le metà e **cinque minori fino a 4 s**; la sezione sventrata ha il suo `GutBurst` (§7); `OnAquilaBreach` è riscritta in modo analogo. Tutte le intensità sono a gioco acceso con `astra.war.tune fx_*` (§7).
+
+**Tappa 3: i colpi lasciano un segno.** Scudo a esagoni, macchie dello scafo (`GetDamageView` e decal, §9), sfiati e fuochi, finestre che si spengono per sezione e le sezioni che scoppiano per conto loro (`GutBurst`) fanno parte
+del modulo dal 1/10; in VFX-2 è nuovo lo scoppio della sezione sventrata. Le macchie sullo scafo illuminato dal Sole **non sono ancora state verificate a occhio** nel gioco di prova (lo scafo del banco era sul lato notte).
+
+**Come vederlo.** `astra.fx.scene 25 0` + `astra.fx.cam broadside T` + `astra.cmd fire_weapons {"weapon":"railguns","contact_id":"FX-T","salvo":3}` + `astra.fx.series bc 60 0.15 cam`: la salva dell'Aquila vista dal Broadside;
+`astra.fx.reset`, `astra.fx.scene 5 0`, `astra.fx.cam 1500 800 100 -12.9 1.2 35`, `astra.fx.series rc 30 0.12 cam do break reactor T`: il reattore a 3,6 km.
+
+**Costo.** Il banco (CPU, senza grafica) dà 0,02–0,055 ms/frame per gli effetti nella battaglia più grande (30 navi e 148 caccia, §13: misure di prima delle scie; con le scie e il fumo lungo il tetto dei tubi è salito a 2000 e il picco si legge con `astra.fx.stats`); in gioco `astra.fx.stats` conta ora le scie (`wakes`) insieme a tubi, pezzi, macchie e luci e **non include il tempo delle
+catture di prova**. La misura pulita della GPU (milisecondi con un'esplosione che riempie lo schermo) è la prova che manca (§17): il gioco di prova ha girato carico (4 commandlet più il gioco del lead) e i suoi fps non sono il gate del MacBook Air.
