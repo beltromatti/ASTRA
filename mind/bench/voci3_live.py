@@ -40,13 +40,17 @@ class Wheel:
     lines: int = 1                # the most lines he hears
 
 
-WHEEL_CASES = [
-    Wheel("helm course", "Helm: course set to heading 090 (steady on 090)", {"helm"}, 8),
-    Wheel("tactical weapons free", "Tactical: weapons free on T-23 (fire control: free to engage T-23)", {"tactical"}, 9),
-    Wheel("alert red", "the alert: red alert (alert level set to red)", {"xo"}, 8),
-    Wheel("flight launch", "Flight: launch Alpha squadron (Alpha squadron: launching, 6 Falcons)", {"flight"}, 10),
-    Wheel("ops power", "Operations: power to the engines 70 percent (route_power: engines 70)", {"ops", "engineering"}, 10),
-    Wheel("tactical refused", "Tactical: fire on T-99 (REFUSED: no such contact on the plot)", {"tactical", "xo"}, 30, lines=2),
+WHEEL_CASES = [                                       # (the eight orders of the wheel, AstraCommandWheel.cpp: «<what he told> (<the console's detail>)»)
+    Wheel("weapons free", "weapons free on every hostile in range (tactical engagement: weapons free)", {"tactical"}, 9),
+    Wheel("engage", "engage T-23: tactical's guns on it and the helm keeping the bow on it (tactical engage T-23; helm keep on bow T-23)", {"tactical", "helm"}, 10),
+    Wheel("missile salvo", "missiles on T-23, saturating its point defence (tactical missiles: saturate)", {"tactical"}, 10),
+    Wheel("fighters strike", "all squadrons on a strike on T-23 (alpha strike T-23; bravo strike T-23; drones strike T-23)", {"flight"}, 10),
+    Wheel("recall fighters", "every squadron back aboard (alpha recall; bravo recall)", {"flight"}, 10),
+    Wheel("shields to threat", "shields to the threat (tactical shields: face threat)", {"tactical"}, 9),
+    Wheel("red alert", "red alert, battle stations (alert level set to red)", {"xo"}, 8),
+    Wheel("main screen", "main screen on T-23 (ops viewscreen: target T-23)", {"ops"}, 9),
+    Wheel("part failed", "engage T-23: tactical's guns on it and the helm keeping the bow on it (tactical engage T-23; helm: REFUSED, no course lane free)", {"tactical", "helm"}, 30, lines=2),
+    Wheel("shields refused", "shields to the threat (tactical shields: refused, shield generators offline)", {"tactical", "ops", "engineering", "xo"}, 30, lines=2),
 ]
 
 

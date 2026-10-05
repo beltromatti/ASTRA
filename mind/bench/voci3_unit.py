@@ -465,7 +465,7 @@ class TestCommandWheel(unittest.TestCase):
         self.assertIn(crew_mod.WHEEL_EVENT.split(":", 1)[1].strip(), prompt)
         self.assertIn("ALREADY carried it out", prompt)
         self.assertIn("nobody else says anything about it", prompt)
-        for needle in ("HIS ORDER", "in a few words and no more", "does not ask whether the Captain meant it", "no other officer says anything", "did not go through"):
+        for needle in ("HIS ORDER", "WHO: ONE officer", "Nobody else says anything", "HOW: two to five words", "no question about whether he meant it", "UNLESS", "did not go through"):
             self.assertIn(needle, agent_mod.WHEEL_ASK)
 
     def test_the_turn_can_only_speak_and_carries_no_standing_orders(self) -> None:

@@ -559,13 +559,16 @@ def net_ask(events: list[str]) -> str:
     follow the first thing they are told), with the general ask when other news is there too."""
     return NET_ASK if all(e.startswith(NET_EVENT) for e in events) else EVENT_ASK + " " + NET_ASK
 WHEEL_ASK = ("THE COMMAND WHEEL: the event above is an order the Captain gave WITHOUT A WORD, from his command wheel. It is HIS ORDER, exactly as if he had spoken it, and the console has "
-             "already carried it out (you only have `speak`: do not carry it out again). ONE officer answers, the one whose station it is — Helm for course and speed, Tactical for targets, "
-             "weapons, shields and decoys, Flight Control for the flight deck and the squadrons, Operations for power, damage control and the transporter, the XO for the alert level — and "
-             "he acknowledges it in a few words and no more, in the Captain's language and in character: «Aye, helm.» «Weapons free.» «Red alert.» «Falcons launching.» Not «Red alert, "
-             "Captain: all hands to battle stations» (that says what it means), not «Weapons free on the Cocytus at fifteen kilometres» (that reads the wheel's own picture back). He "
-             "does not say what will happen next or why, does not ask whether the Captain meant it, and no other officer says anything, the XO included. Only when the order did not "
-             "go through (the detail says refused or failed), or it will hurt the ship in a way the Captain cannot see on the wheel (it turns her broadside to a missile salvo, it "
-             "drops the shields with a torpedo in the water), the officer says that instead, in one short line.")
+             "already carried it out (you only have `speak`: do not carry it out again). "
+             "WHO: ONE officer answers, the one whose station it is — Helm for course and speed; Tactical for targets, weapons, missiles, shields and decoys; Flight Control for the flight "
+             "deck and the squadrons; Operations for power, damage control, the transporter and the main screen; the XO for the alert level. An order that spans two stations (engage: guns "
+             "and bow) is answered once, by Tactical. Nobody else says anything, the XO included. "
+             "HOW: two to five words, in the Captain's language and in character — «Aye, helm.» «Weapons free.» «Red alert.» «Falcons launching.» «Screen on the target.» Not a sentence: no "
+             "what-it-means («all hands to battle stations»), no range, target or heading read back, nothing about what happens next, no «Captain, …» preamble, no question about whether he "
+             "meant it. "
+             "UNLESS the detail in brackets shows that something did not go through (refused, failed, not possible, no lane free), or the order will hurt the ship in a way the Captain "
+             "cannot see on the wheel (it turns her broadside to a missile salvo, it drops the shields with a torpedo in the water): then one short line says what did not happen or "
+             "what is wrong, instead of the acknowledgement.")
 STANDING_ASK = (" Standing orders in force (see them in the rules) are the Captain's orders given in advance: when this "
                 "event is what one is about, that officer carries it out now, fully (weapons free means firing: fire_weapons or "
                 "an engage mode, not just a target), with the tool calls in this same turn, and says what was done.")
