@@ -21,6 +21,7 @@
 #include "Engine/LocalPlayer.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "Framework/Application/IInputProcessor.h"
 #include "Framework/Application/SlateApplication.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "HAL/FileManager.h"
@@ -143,6 +144,30 @@ bool UAstraHarness::ShouldCreateSubsystem(UObject* Outer) const
 #endif
 }
 
+namespace AstraHarnessGuard
+{
+	/** A game the harness drives hears only the harness: the keys and the mouse of whoever is using the Mac go nowhere in it (5 Oct: the test window took
+	 *  the focus while the user was typing in another app, and his keys walked the Captain off the bridge and into his quarters in the middle of a battle).
+	 *  The harness's own keys pass (SendKey marks them); -astra_harness_input lets a person play the harness game by hand. */
+	class FGuard : public IInputProcessor
+	{
+	public:
+		bool bInjecting = false;
+		virtual void Tick(const float, FSlateApplication&, TSharedRef<ICursor>) override {}
+		virtual bool HandleKeyDownEvent(FSlateApplication&, const FKeyEvent&) override { return !bInjecting; }
+		virtual bool HandleKeyUpEvent(FSlateApplication&, const FKeyEvent&) override { return !bInjecting; }
+		virtual bool HandleAnalogInputEvent(FSlateApplication&, const FAnalogInputEvent&) override { return !bInjecting; }
+		virtual bool HandleMouseMoveEvent(FSlateApplication&, const FPointerEvent&) override { return !bInjecting; }
+		virtual bool HandleMouseButtonDownEvent(FSlateApplication&, const FPointerEvent&) override { return !bInjecting; }
+		virtual bool HandleMouseButtonUpEvent(FSlateApplication&, const FPointerEvent&) override { return !bInjecting; }
+		virtual bool HandleMouseButtonDoubleClickEvent(FSlateApplication&, const FPointerEvent&) override { return !bInjecting; }
+		virtual bool HandleMouseWheelOrGestureEvent(FSlateApplication&, const FPointerEvent&, const FPointerEvent*) override { return !bInjecting; }
+		virtual const TCHAR* GetDebugName() const override { return TEXT("AstraHarnessGuard"); }
+	};
+	TSharedPtr<FGuard> Guard;
+}
+static bool GDummyInjecting = false;
+
 void UAstraHarness::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
@@ -152,6 +177,12 @@ void UAstraHarness::Initialize(FSubsystemCollectionBase& Collection)
 	if (IConsoleVariable* Idle = IConsoleManager::Get().FindConsoleVariable(TEXT("t.IdleWhenNotForeground")))
 	{
 		Idle->Set(0, ECVF_SetByCode);
+	}
+	if (FSlateApplication::IsInitialized() && !FParse::Param(FCommandLine::Get(), TEXT("astra_harness_input")))
+	{
+		AstraHarnessGuard::Guard = MakeShared<AstraHarnessGuard::FGuard>();
+		FSlateApplication::Get().RegisterInputPreProcessor(AstraHarnessGuard::Guard, 0);
+		UE_LOG(LogASTRA, Log, TEXT("[Harness] the keyboard and the mouse of the Mac are ignored: only the harness drives this game (-astra_harness_input to play it by hand)"));
 	}
 	TSharedPtr<IHttpRouter> Router = FHttpServerModule::Get().GetHttpRouter(Port, true);
 	if (!Router.IsValid())
@@ -321,6 +352,11 @@ void UAstraHarness::Initialize(FSubsystemCollectionBase& Collection)
 
 void UAstraHarness::Deinitialize()
 {
+	if (AstraHarnessGuard::Guard.IsValid() && FSlateApplication::IsInitialized())
+	{
+		FSlateApplication::Get().UnregisterInputPreProcessor(AstraHarnessGuard::Guard);
+	}
+	AstraHarnessGuard::Guard.Reset();
 	if (TickHandle.IsValid())
 	{
 		FTSTicker::GetCoreTicker().RemoveTicker(TickHandle);
@@ -439,10 +475,12 @@ void UAstraHarness::SendKey(const FKey& Key, bool bDown)
 			return;
 		}
 		const FPointerEvent E(0, App.GetCursorPos(), App.GetLastCursorPos(), App.GetPressedMouseButtons(), Key, 0.f, App.GetModifierKeys());
+		TGuardValue<bool> Mine(AstraHarnessGuard::Guard.IsValid() ? AstraHarnessGuard::Guard->bInjecting : GDummyInjecting, true);
 		bDown ? App.ProcessMouseButtonDownEvent(nullptr, E) : App.ProcessMouseButtonUpEvent(E);
 		return;
 	}
 	const FKeyEvent E(Key, App.GetModifierKeys(), 0, false, 0, 0);
+	TGuardValue<bool> Mine(AstraHarnessGuard::Guard.IsValid() ? AstraHarnessGuard::Guard->bInjecting : GDummyInjecting, true);   // (the harness's own key: it passes the guard)
 	bDown ? App.ProcessKeyDownEvent(E) : App.ProcessKeyUpEvent(E);
 }
 

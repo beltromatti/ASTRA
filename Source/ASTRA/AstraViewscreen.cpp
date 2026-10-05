@@ -438,6 +438,40 @@ void AAstraViewscreen::Direct(float Dt)
 	}
 	Arrivals.RemoveAll([this](const FArrival& A) { return Now - A.At > 45.0; });
 	LastSeen = MoveTemp(Seen);
+	// what the fight did that is worth a look (BATTAGLIA-3, ConsumeFightEvents): a ship's section gutted (ours or theirs), a system or a battery knocked out or a
+	// shield face down on the ship the fight is about — on a firm track (the fog holds: a picture of what the sensors cannot see would be a lie)
+	if (UAstraBattleSubsystem* BM = W ? W->GetSubsystem<UAstraBattleSubsystem>() : nullptr)
+	{
+		TArray<UAstraBattleSubsystem::FFightEvent> Ev;
+		BM->ConsumeFightEvents(Ev);
+		static const TCHAR* Sections[3] = {TEXT("BOW"), TEXT("MID"), TEXT("STERN")};
+		static const TCHAR* Faces[6] = {TEXT("BOW"), TEXT("STERN"), TEXT("PORT"), TEXT("STARBOARD"), TEXT("DORSAL"), TEXT("VENTRAL")};
+		static const TCHAR* Systems[6] = {TEXT("ENGINES OUT"), TEXT("SENSORS OUT"), TEXT("HANGAR OUT"), TEXT("BRIDGE HIT"), TEXT("REACTOR FAILING"), TEXT("POINT DEFENCE DOWN")};
+		for (const UAstraBattleSubsystem::FFightEvent& E : Ev)
+		{
+			using EKind = UAstraBattleSubsystem::FFightEvent::EKind;
+			if (!E.bKnown || E.ContactId.IsEmpty() || E.ContactId == TEXT("AQUILA"))
+			{
+				continue;
+			}
+			const bool bOnAction = E.ContactId == Engaged;
+			FString Why;
+			int32 Pri = 4;
+			switch (E.Kind)
+			{
+			case EKind::SectionGutted: Why = FString::Printf(TEXT("%s SECTION GUTTED"), Sections[FMath::Min<int32>(E.Section, 2)]); Pri = 5; break;
+			case EKind::SystemOut: if (bOnAction && E.System >= 0 && E.System < 6) { Why = Systems[E.System]; } break;
+			case EKind::MountOut: if (bOnAction) { Why = TEXT("A BATTERY SILENCED"); } break;
+			case EKind::ShieldFell: if (bOnAction && !E.bAstra) { Why = FString::Printf(TEXT("%s SHIELD DOWN"), Faces[FMath::Min<int32>(E.Face, 5)]); } break;
+			default: break;
+			}
+			if (!Why.IsEmpty())
+			{
+				Blows.Add({E.ContactId, E.Name.IsEmpty() ? E.ContactId : E.Name, Why, Pri, Now});
+			}
+		}
+		Blows.RemoveAll([this](const FBlow& X) { return Now - X.At > 3.0; });
+	}
 	Deaths.RemoveAll([this](const FDeath& D) { return Now - D.At > 4.0; });
 
 	// ops' order
@@ -567,6 +601,12 @@ void AAstraViewscreen::Direct(float Dt)
 			SwarmShotAt = Now;
 		}
 		Best = {EShot::Swarm, TEXT("salvo"), FString::Printf(TEXT("%d missiles"), In.Num()), TEXT("INCOMING"), 5, 3.0, FVector::ZeroVector, {}};
+	}
+	else if (const FBlow* Bl = Blows.Num() ? &Blows.Last() : nullptr; Bl && FindC(Cs, Bl->Id))
+	{
+		// the fight's turning points, as they happen: the ship and what it lost (held a few seconds, then the fight goes on)
+		Best = {EShot::Contact, Bl->Id, Bl->Name, Bl->Why, Bl->Pri, 4.5, FVector::ZeroVector, {}};
+		Blows.Reset();
 	}
 	else if (!HitId.IsEmpty())
 	{
