@@ -112,6 +112,14 @@ abbordaggi contro l'Aquila, chiesto da ABBORDAGGI).
   - i capitani nemici senza nome.
 
   Da bilanciare: l'Aquila esce quasi intatta dalla battaglia col grosso (98 %, zero missili).
+- **VFX-2 chiuso** (175b76b unito). Manopole: `astra.war.tune fx_*` (blast, flash, fire, halo, smoke, wave, light, reactor_flash, reactor_light, cut_flash, break_light, laser, far, wound, wound_size, wound_cool); tabella in docs/VFX.md §16.
+
+  Limiti aperti:
+  - il costo GPU di un'esplosione a tutto schermo non è misurato da solo;
+  - la griglia della pelle è grossolana (la bocca dei cannoni e la fine delle scie non sono ancora sulla pelle);
+  - il laser è ancora bianco da vicino.
+
+  **ARTE-SCAFI avviato** al suo posto (le navi al livello di EVE e Star Trek, prima una classe sola).
 - **Unita VFX-2 tappa 3** (ebd2cc7). Colpi, fuochi, braci e segni stanno sulla pelle dello scafo, grazie alle mappe di profondità per classe (`tools/art/war_fx_hull_surface.py` → `data/war/fx_hull_surface.json` → `AstraWarFXSurface.inl`). Altro: la brace-ferita, le morti lontane più grandi, il laser leggibile.
 
   Visto nel gioco: la morte di un Acheron a 25 km nello schermo principale (palla di fuoco intera, i tre tronconi, poi il fumo).
