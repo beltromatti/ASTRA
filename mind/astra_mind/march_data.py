@@ -239,8 +239,13 @@ MARCH_OPENING: dict[str, Any] = dict(
                      order=dict(kind="hold", target="Meridian", stance="steady", reason="Battle Group Constance musters at Meridian, one Gate from the Aurelia picket: it comes on the Admiral's word")),
     },
     # (at 90 s: the Gate's warning comes at about two and a half minutes and the strike group at under four; at 150 s the first shot came eight minutes in, 5 Oct)
+    # The vanguard follows the strike group through the Gate a minute behind it: the Interdiction Fleet comes in strength, thirteen hulls against the picket,
+    # and the battle for the Gate is fought until the relief and the main body turn it (the lead's games of 5 Oct: alone, the strike group met the picket and
+    # Battle Group Constance, judged the odds and turned away, and the vanguard came after it and did the same: no battle, only a pursuit)
     plan=[dict(at_s=90.0, side="mandate", fleet="F-M1", kind="assault", target="Aurelia", stance="bold", dark=False,
-               reason="seize Janus Gate Aurelia and Keeper Station; test the picket")],
+               reason="seize Janus Gate Aurelia and Keeper Station; the vanguard follows a minute behind: together we outnumber the picket"),
+          dict(at_s=150.0, side="mandate", fleet="F-M3", kind="assault", target="Aurelia", stance="bold", dark=False,
+               reason="follow the strike group through the Gate a minute behind it and finish what it begins: the picket's relief is minutes away, strike before it")],
 )
 
 # ------------------------------------------------------------------------------------------------ the war's pace (the bench tunes these)

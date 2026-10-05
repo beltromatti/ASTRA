@@ -370,7 +370,7 @@ class MarchOpeningTest(Fixture):
             self.assertNotIn(fid, self.glue.opening)
         self.assertEqual(self.m.fleets["F-M3"].order.kind, "hold")
         self.assertEqual(self.m.fleets["F-A3"].order.kind, "hold")
-        self.assertEqual(len(self.m.opening_plan), 1)
+        self.assertEqual(len(self.m.opening_plan), 2)                                  # (the strike group, then the vanguard a minute behind)
         self.assertEqual(self.fleet("Aurelia Picket").status, "real")                  # (the picket and the lethe are still the game's own)
         self.assertEqual(self.fleet("Lethe Hale").status, "real")
         await self.step(2)
@@ -447,14 +447,15 @@ class MarchOpeningTest(Fixture):
         self.assertEqual(self.m.hail_fleets, set())                                         # (once)
         self.assertGreaterEqual(beat["range_km"], mg.ARRIVAL_MIN_KM)                      # (from far out: never at knife range)
         self.assertEqual(beat["bearing_deg"], 200.0)
-        # the vanguard waits at Thule and the relief at Meridian: the war's, nobody has told them anything
-        self.assertEqual(self.m.fleets["F-M3"].where, "Thule")
+        # the vanguard follows the strike group; the relief waits at Meridian for the Admiral's word
+        f3 = self.m.fleets["F-M3"]                                                          # (the vanguard follows the strike group a minute behind, since 5 Oct)
+        self.assertEqual((f3.order.kind, f3.order.target, f3.order.by), ("assault", "Aurelia", "story"))
         self.assertEqual(self.m.fleets["F-A3"].where, "Meridian")
 
     async def test_the_opening_goes_on_in_a_saved_war(self) -> None:
         self.world.script_off = True
         await self.step(3)
-        self.assertEqual(len(self.m.opening_plan), 1)
+        self.assertEqual(len(self.m.opening_plan), 2)                                  # (the strike group, then the vanguard a minute behind)
         d = self.m.to_dict()
         m2 = world(2)
         m2._from_dict(d)
