@@ -508,6 +508,21 @@ class Prompts(unittest.IsolatedAsyncioTestCase):
             self.assertNotIn("Priya Castillo", captain)                                   # (Reaction 1 is elsewhere)
             self.assertIn("80% strength", captain)
 
+    def test_how_the_captain_stands_and_who_has_him_in_sight_is_on_the_board(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            bed = Bed(tmp)
+            st = ship_state()
+            st["_marines"]["captain"] = {"where": PLACE, "where_id": "corridor_5c_s", "down": False, "strength_pct": 100, "posture": "crouched", "leaning": "left", "seen_by": 2, "nearest_seer_m": 14}
+            bed.m.feed(st)
+            captain = next(r for r in bed.m._board(st).splitlines() if "the Captain in the fight" in r)
+            self.assertIn("crouched, leaning left", captain)
+            self.assertIn("2 of the enemy have him in sight now, the nearest at 14 m", captain)
+            st["_marines"]["captain"] = {"where": PLACE, "where_id": "corridor_5c_s", "down": False, "strength_pct": 100, "posture": "standing", "seen_by": 0}
+            bed.m.feed(st)
+            captain = next(r for r in bed.m._board(st).splitlines() if "the Captain in the fight" in r)
+            self.assertIn("standing", captain)
+            self.assertNotIn("in sight", captain)                                          # (nobody has him in sight: nothing to say of it)
+
     def test_what_is_the_bridges_news_says_so(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             bed = Bed(tmp)

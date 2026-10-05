@@ -138,6 +138,7 @@ namespace AstraBoard
 		FVector Pos = FVector::ZeroVector;
 		float AgeS = 0.f;
 		bool bVisibleNow = false;
+		bool bCovered = false;           // the Captain, whose eye he sees but not his body (a head over a counter, an eye round a pillar): the rounds he lays on him are laid on a smaller target
 	};
 
 	struct FUnit
@@ -162,6 +163,8 @@ namespace AstraBoard
 		float Cruise = 0.f;              // the pace of the way he is on (he goes at it again when nothing holds him)
 		bool bSprint = false;
 		bool bLow = false;               // crouched or prone (a harder target)
+		bool bProne = false;             // lying down (the Captain's: a smaller target still, and a man behind low cover is not seen)
+		FVector EyeRel = FVector(0.0, 0.0, 152.0);   // the Captain's eye from his feet (cm): his real one, which the game moves with his posture and with his lean (a man leaning out from a corner is seen)
 		EAct Act = EAct::Idle;
 		float Bleed = 0.f;               // seconds he has left when he is down
 		int32 Bearer = INDEX_NONE;       // down: the man called to carry him out
@@ -211,7 +214,7 @@ namespace AstraBoard
 		int32 HitsTaken = 0;
 		FString FellTo;                          // what put him down
 		bool Able() const { return Act != EAct::Dead && Act != EAct::Gone && Act != EAct::Down && Act != EAct::Waiting; }
-		FVector Eye() const { return Pos + FVector(0.0, 0.0, bLow ? 105.0 : 152.0); }
+		FVector Eye() const { return bExternal ? Pos + EyeRel : Pos + FVector(0.0, 0.0, bLow ? 105.0 : 152.0); }
 	};
 
 	struct FSquad
@@ -425,7 +428,9 @@ public:
 	int32 AddCaptain(const FVector& Pos);
 	/** A name for a man a scene or the bench makes (the Mandate's: a first and a last name of the Kharon; ASTRA's: Marine and a number). */
 	FString MakeName(AstraBoard::ESide Side, int32 N) { return Side == AstraBoard::ESide::Mandate ? MandateName(N) : FString::Printf(TEXT("Marine %d"), N); }
-	void SetCaptain(const FVector& Pos, float Yaw, bool bLow, float Speed, bool bDown);
+	/** Where the Captain is this frame. EyeRel: his eye from his feet (his real camera: crouched, lying, leaning out from a corner: the ones who look for him see through it, and what covers him is what is between);
+	 *  zero: the eye of the posture. bProne: lying (the smallest target). */
+	void SetCaptain(const FVector& Pos, float Yaw, bool bLow, float Speed, bool bDown, const FVector& EyeRel = FVector::ZeroVector, bool bProne = false);
 	int32 CaptainId() const { return CaptainUnit; }
 
 	// ------------------------------------------------------------------------------------------------ orders (the squad drill the mind's words come to)

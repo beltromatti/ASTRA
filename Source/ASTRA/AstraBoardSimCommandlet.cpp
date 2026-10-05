@@ -1,6 +1,7 @@
 #include "AstraBoardSimCommandlet.h"
 
 #include "ASTRA.h"
+#include "ASTRACharacter.h"
 #include "AstraArmsRig.h"
 #include "AstraBoardDress.h"
 #include "AstraBoardInterior.h"
@@ -2172,6 +2173,223 @@ static void BoardScenarioEscort(const FString& Class, int32 Seed, int32 Seeds, c
 	}
 }
 
+// ================================================================================================================== the Captain's body: leaning out of cover, lying down, a head over a wall (ABBORDAGGI-4)
+
+namespace
+{
+	/** One of the plan's corners: a place beside an opening where a man is out of the line through it (FBoardSlot), the enemy who stands in that line some metres beyond, and the way to lean into the opening. */
+	struct FLeanCorner
+	{
+		int32 Slot = INDEX_NONE;
+		FVector Foe = FVector::ZeroVector;          // his feet
+		FVector In = FVector::ZeroVector;           // unit, on the floor: the way the Captain's eye goes when he leans out into the opening
+		float FoeYaw = 0.f;                         // he looks at the corner
+	};
+
+	/** The Captain's body as the game tells the sim: where his eye is from his feet and whether he is low or lying. */
+	struct FLeanPose
+	{
+		const TCHAR* Name;
+		FVector Eye;
+		bool bLow, bProne;
+	};
+}
+
+static void BoardScenarioLean(FRig& Rig, int32 Seed, int32 Seeds)
+{
+	const FAstraBoardMap& M = *Rig.Map;
+	const TArray<FBoardPortal>& Portals = M.GetPortals();
+	constexpr double LeanCm = 34.0;                       // (the character's: ASTRACharacter.cpp, LeanOutCm)
+	constexpr double StandEye = 152.0;
+
+	// ---- the frame of a lean and its easing, as the character has them (pure)
+	{
+		float S0, D0, R0, S1, D1, R1, Sm, Dm, Rm, Sp, Dp, Rp;
+		AASTRACharacter::LeanFrame(1.f, EAstraPosture::Standing, S1, D1, R1);
+		AASTRACharacter::LeanFrame(-1.f, EAstraPosture::Standing, Sm, Dm, Rm);
+		AASTRACharacter::LeanFrame(0.f, EAstraPosture::Standing, S0, D0, R0);
+		AASTRACharacter::LeanFrame(1.f, EAstraPosture::Prone, Sp, Dp, Rp);
+		const bool bFrame = FMath::IsNearlyEqual(S1, (float)LeanCm, 0.01f) && FMath::IsNearlyEqual(Sm, -S1, 0.01f) && FMath::IsNearlyEqual(Rm, -R1, 0.01f) && FMath::IsNearlyEqual(D1, Dm, 0.01f)
+			&& S0 == 0.f && D0 == 0.f && R0 == 0.f && Sp < 0.7f * S1 && Sp > 0.4f * S1 && R1 > 5.f && R1 < 16.f && D1 > 0.f && D1 < 12.f;
+		// the easing: at sixty frames a second out in a third of a second or so, back a little quicker, never past the target, and from one side to the other through the middle
+		float L = 0.f;
+		int32 Out95 = 0, Back05 = 0;
+		bool bOver = false, bMono = true;
+		for (int32 i = 1; i <= 300 && Out95 == 0; ++i)
+		{
+			const float Next = AASTRACharacter::LeanStep(L, 1.f, 1.f / 60.f);
+			bOver |= Next > 1.f + 1.0e-4f;
+			bMono &= Next >= L;
+			L = Next;
+			Out95 = L >= 0.95f ? i : 0;
+		}
+		for (int32 i = 1; i <= 300 && Back05 == 0; ++i)
+		{
+			const float Next = AASTRACharacter::LeanStep(L, 0.f, 1.f / 60.f);
+			bOver |= Next < -1.0e-4f;
+			bMono &= Next <= L;
+			L = Next;
+			Back05 = L <= 0.05f ? i : 0;
+		}
+		float X = 0.7f;
+		bool bThrough = false;
+		for (int32 i = 1; i <= 240; ++i)
+		{
+			const float Next = AASTRACharacter::LeanStep(X, -1.f, 1.f / 60.f);
+			bThrough |= Next < 0.f && X >= 0.f;
+			bOver |= Next < -1.f - 1.0e-4f;
+			X = Next;
+		}
+		BCheck("lean: the frame and the easing", bFrame && Out95 >= 12 && Out95 <= 30 && Back05 > 0 && Back05 <= Out95 && !bOver && bMono && bThrough && X == -1.f,
+		       FString::Printf(TEXT("a full lean puts the eyes %.0f cm out and %.0f cm down and rolls the picture %.0f degrees (lying: %.0f cm); out to 95%% in %.2f s, back to 5%% in %.2f s; no overshoot, monotone, and through the middle from one side to the other"),
+		                       S1, D1, R1, Sp, Out95 / 60.f, Back05 / 60.f));
+	}
+
+	// ---- the corners: every slot of the plan with an enemy in the line through its opening, who does not see the slot
+	FAstraBoardSim Probe;
+	Probe.Init(Rig.Map.ToSharedRef(), Seed);
+	TArray<FLeanCorner> Corners;
+	int32 Hidden = 0, Shown = 0, AwayShown = 0;
+	for (int32 si = 0; si < M.GetSlots().Num(); ++si)
+	{
+		const FBoardSlot& Sl = M.GetSlots()[si];
+		const FBoardPortal& Po = Portals[Sl.Portal];
+		const int32 Other = Po.Other(Sl.Comp);
+		if (Po.Kind != FBoardPortal::EKind::Open || !M.GetComps().IsValidIndex(Other))
+		{
+			continue;                                          // (a door is shut until somebody opens it: that is another question; the open ways are the corners one leans round)
+		}
+		FLeanCorner C;
+		C.Slot = si;
+		bool bFoe = false;
+		for (const double D : {800.0, 600.0, 400.0, 250.0})
+		{
+			const FVector P = FVector(Po.Pos.X, Po.Pos.Y, M.GetComps()[Other].FloorZ()) + FVector(Sl.Out.X, Sl.Out.Y, 0.0) * D;
+			if (M.CompAt(P + FVector(0.0, 0.0, 20.0)) == Other)
+			{
+				C.Foe = P;
+				bFoe = true;
+				break;
+			}
+		}
+		if (!bFoe)
+		{
+			continue;
+		}
+		const double Toward = (Po.Pos.X - Sl.Pos.X) * Po.Along.X + (Po.Pos.Y - Sl.Pos.Y) * Po.Along.Y;
+		C.In = FVector(Po.Along.X, Po.Along.Y, 0.0) * (Toward >= 0.0 ? 1.0 : -1.0);
+		C.FoeYaw = FMath::RadiansToDegrees(FMath::Atan2(Sl.Pos.Y - C.Foe.Y, Sl.Pos.X - C.Foe.X));
+		const FVector FoeEye = C.Foe + FVector(0.0, 0.0, StandEye);
+		const FVector Eye0 = Sl.Pos + FVector(0.0, 0.0, StandEye);
+		if (Probe.Sees(FoeEye, Eye0))
+		{
+			continue;                                          // he sees the corner itself: not a corner for him
+		}
+		++Hidden;
+		Shown += Probe.Sees(FoeEye, Eye0 + C.In * LeanCm) ? 1 : 0;
+		AwayShown += Probe.Sees(FoeEye, Eye0 - C.In * LeanCm) ? 1 : 0;
+		Corners.Add(C);
+	}
+	BNote(FString::Printf(TEXT("  corners: %d places beside an opening, hidden from an enemy in the line through it; the eye leaned %.0f cm into the opening is seen from %d of them (%.0f%%), leaned %.0f cm away from %d"), Hidden, LeanCm, Shown,
+	                      Hidden ? 100.0 * Shown / Hidden : 0.0, LeanCm, AwayShown));
+	BCheck("lean: the eye out of cover is seen", Hidden >= 20 && Shown >= 0.85 * Hidden && AwayShown <= 0.05 * Hidden,
+	       FString::Printf(TEXT("%d corners: leaned into the opening the eye is seen from %d, leaned away from %d"), Hidden, Shown, AwayShown));
+
+	// ---- the fight: one enemy holds the line through an opening, the Captain stands at the corner (never moving, never firing: what the enemy does about him is all that is measured)
+	const auto Pose = [](int32 Mode) -> FLeanPose
+	{
+		switch (Mode)
+		{
+		case 1: return {TEXT("crouched"), FVector(0.0, 0.0, 105.0), true, false};
+		case 2: return {TEXT("lying"), FVector(0.0, 0.0, 45.0), true, true};
+		default: return {TEXT("standing"), FVector(0.0, 0.0, StandEye), false, false};
+		}
+	};
+	struct FOutcome { int32 Runs = 0, Contacts = 0, Hits = 0, Shots = 0; };
+	const auto Fight = [&](const FVector& CaptainAt, const FVector& Foe, float FoeYaw, const FVector& EyeRel, bool bLow, bool bProne, const TFunction<bool(const FVector&, const FVector&)>& Sight, int32 s, FOutcome& Out)
+	{
+		FAstraBoardSim Sim;
+		Sim.Init(Rig.Map.ToSharedRef(), Seed + s);
+		Sim.Tuning = Rig.Tuning;
+		Sim.Tuning.bCover = false;
+		const int32 Sq = Sim.AddSquad(ESide::Mandate, TEXT("Gun"));
+		const int32 G = Sim.AddUnit(ESide::Mandate, ERole::Leader, TEXT("Gunner"), Foe, Sq);
+		Sim.UnitMutable(G)->Yaw = FoeYaw;
+		Sim.SquadMutable(Sq)->bStand = true;
+		Sim.Order(Sq, ETask::Hold, Sim.Unit(G)->Comp, Foe, 150.f, TEXT("bench"));          // (he holds the line where he stands: he does not go to look)
+		Sim.AddCaptain(CaptainAt);
+		if (Sight)
+		{
+			Sim.SightOverride = Sight;
+		}
+		const float Yaw = FoeYaw + 180.f;
+		while (Sim.Time() < 10.0)
+		{
+			Sim.SetCaptain(CaptainAt, Yaw, bLow, 0.f, false, EyeRel, bProne);
+			Sim.Tick(0.1f);
+		}
+		++Out.Runs;
+		Out.Contacts += Sim.Book().Contacts > 0 ? 1 : 0;
+		Out.Hits += Sim.Book().CaptainHits;
+		Out.Shots += Sim.Book().Shots;
+	};
+	FOutcome Behind, Leaned;
+	const int32 Step = FMath::Max(1, Corners.Num() / 10);
+	for (int32 ci = 0; ci < Corners.Num(); ci += Step)
+	{
+		const FLeanCorner& C = Corners[ci];
+		const FVector At = M.GetSlots()[C.Slot].Pos;
+		for (int32 s = 0; s < FMath::Max(2, Seeds / 4); ++s)
+		{
+			Fight(At, C.Foe, C.FoeYaw, FVector(0.0, 0.0, StandEye), false, false, nullptr, s, Behind);
+			Fight(At, C.Foe, C.FoeYaw, FVector(C.In.X * LeanCm, C.In.Y * LeanCm, StandEye), false, false, nullptr, s, Leaned);
+		}
+	}
+	BNote(FString::Printf(TEXT("  an enemy holds the line through the opening, 10 s, the Captain at the corner: behind it he is seen in %d of %d fights and hit %d times; with the eye leaned out he is seen in %d of %d and hit %d times (%.1f a fight)"),
+	                      Behind.Contacts, Behind.Runs, Behind.Hits, Leaned.Contacts, Leaned.Runs, Leaned.Hits, Leaned.Runs ? (double)Leaned.Hits / Leaned.Runs : 0.0));
+	BCheck("lean: what shows of him is what is shot at", Behind.Runs >= 20 && Behind.Contacts == 0 && Behind.Hits == 0 && Leaned.Contacts >= 0.85 * Leaned.Runs && Leaned.Hits >= Leaned.Runs,
+	       FString::Printf(TEXT("behind the corner: seen in %d of %d fights, %d hits; leaned out: seen in %d of %d, %d hits"), Behind.Contacts, Behind.Runs, Behind.Hits, Leaned.Contacts, Leaned.Runs, Leaned.Hits));
+
+	// ---- the open lane, ten metres: standing, crouched, lying (the hits taken in ten seconds), and then with a wall across it that is 135 cm high (in the game the level decides this: the sim asks the world whether
+	//      a man and the Captain see each other, his eye and his chest; the bench stands a wall in for the level, in the same sight test)
+	FLane Lane;
+	if (!Lane.Find(Rig))
+	{
+		BCheck("lean: the lane", false, TEXT("no lane on Deck 8"));
+		return;
+	}
+	const float Z = Lane.Start.Z;
+	const FVector Gunner(-600.0, 0.0, Z), Captain(400.0, 0.0, Z);
+	constexpr double WallX = -100.0, WallH = 135.0;
+	const TFunction<bool(const FVector&, const FVector&)> Wall = [Z](const FVector& A, const FVector& B) -> bool
+	{
+		if ((A.X - WallX) * (B.X - WallX) > 0.0)
+		{
+			return true;                                       // both on one side of the wall: nothing between
+		}
+		const double T = FMath::Abs(B.X - A.X) < 1.0e-6 ? 0.0 : (WallX - A.X) / (B.X - A.X);
+		return A.Z + T * (B.Z - A.Z) > Z + WallH;              // the ray clears the wall's top, or does not
+	};
+	FOutcome Open[3], Walled[3];
+	for (int32 m = 0; m < 3; ++m)
+	{
+		const FLeanPose P = Pose(m);
+		for (int32 s = 0; s < FMath::Max(12, Seeds * 2); ++s)
+		{
+			Fight(Captain, Gunner, 0.f, P.Eye, P.bLow, P.bProne, nullptr, s, Open[m]);
+			Fight(Captain, Gunner, 0.f, P.Eye, P.bLow, P.bProne, Wall, s, Walled[m]);
+		}
+		BNote(FString::Printf(TEXT("  10 m, in the open, %-8s: seen in %d of %d fights, hit %5.1f times a fight   |   with a %.0f cm wall between: seen in %d of %d, hit %5.1f times a fight"), P.Name, Open[m].Contacts, Open[m].Runs,
+		                      Open[m].Runs ? (double)Open[m].Hits / Open[m].Runs : 0.0, WallH, Walled[m].Contacts, Walled[m].Runs, Walled[m].Runs ? (double)Walled[m].Hits / Walled[m].Runs : 0.0));
+	}
+	BCheck("lean: a smaller target is hit less", Open[1].Hits < 0.93 * Open[0].Hits && Open[2].Hits < 0.78 * Open[0].Hits && Open[2].Hits < Open[1].Hits && Open[0].Hits > 0,
+	       FString::Printf(TEXT("in ten seconds at 10 m: standing %d hits, crouched %d (%.0f%%), lying %d (%.0f%%)"), Open[0].Hits, Open[1].Hits, Open[0].Hits ? 100.0 * Open[1].Hits / Open[0].Hits : 0.0, Open[2].Hits,
+	                       Open[0].Hits ? 100.0 * Open[2].Hits / Open[0].Hits : 0.0));
+	BCheck("lean: cover is what the world's sight says", Walled[0].Contacts >= 0.9 * Walled[0].Runs && Walled[0].Hits > 0 && Walled[0].Hits < 0.75 * Open[0].Hits && Walled[1].Contacts == 0 && Walled[1].Hits == 0 && Walled[2].Contacts == 0 && Walled[2].Hits == 0,
+	       FString::Printf(TEXT("behind a 135 cm wall: standing, his head over it, is seen and hit %d times (%.0f%% of the open); crouched and lying are not seen (%d, %d fights) and not hit"), Walled[0].Hits,
+	                       Open[0].Hits ? 100.0 * Walled[0].Hits / Open[0].Hits : 0.0, Walled[1].Contacts, Walled[2].Contacts));
+}
+
 // ================================================================================================================== the Captain's arms on the weapon
 
 namespace
@@ -3883,6 +4101,10 @@ int32 UAstraBoardSimCommandlet::Main(const FString& Params)
 	if (Scenario == TEXT("orders"))                    // (on request only: a fight for each plan and seed)
 	{
 		BoardScenarioOrders(Rig, Seed, Seeds);
+	}
+	if (Scenario == TEXT("lean"))                      // (on request only: the Captain's body in the fight: leaning out of cover, lying, a head over a wall)
+	{
+		BoardScenarioLean(Rig, Seed, Seeds);
 	}
 	if (Scenario == TEXT("take") || Scenario == TEXT("drills"))                    // (on request only: the infantry orders, each with and without, on the same rooms and seeds)
 	{

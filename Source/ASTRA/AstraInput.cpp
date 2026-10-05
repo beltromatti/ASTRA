@@ -38,6 +38,8 @@ void UAstraInputSet::Build()
 	Jump = NewAction(this, TEXT("IA_ASTRA_Jump"), EInputActionValueType::Boolean);
 	Sprint = NewAction(this, TEXT("IA_ASTRA_Sprint"), EInputActionValueType::Boolean);
 	Crouch = NewAction(this, TEXT("IA_ASTRA_Crouch"), EInputActionValueType::Boolean);
+	LeanLeft = NewAction(this, TEXT("IA_ASTRA_LeanLeft"), EInputActionValueType::Boolean);
+	LeanRight = NewAction(this, TEXT("IA_ASTRA_LeanRight"), EInputActionValueType::Boolean);
 	Fire = NewAction(this, TEXT("IA_ASTRA_Fire"), EInputActionValueType::Boolean);
 	Aim = NewAction(this, TEXT("IA_ASTRA_Aim"), EInputActionValueType::Boolean);
 	Reload = NewAction(this, TEXT("IA_ASTRA_Reload"), EInputActionValueType::Boolean);
@@ -93,6 +95,11 @@ void UAstraInputSet::Build()
 	OnFoot->MapKey(Sprint, EKeys::Gamepad_LeftThumbstick);
 	OnFoot->MapKey(Crouch, EKeys::C);
 	OnFoot->MapKey(Crouch, EKeys::Gamepad_FaceButton_Right);
+	// leaning (held): Z and X, the shoulders of a gamepad
+	OnFoot->MapKey(LeanLeft, EKeys::Z);
+	OnFoot->MapKey(LeanLeft, EKeys::Gamepad_LeftShoulder);
+	OnFoot->MapKey(LeanRight, EKeys::X);
+	OnFoot->MapKey(LeanRight, EKeys::Gamepad_RightShoulder);
 
 	// the weapons: the left button fires, the right looks through the sights, R reloads, 1 and 2 the rifle and the sidearm, Q the last one, H puts it away, the wheel changes
 	OnFoot->MapKey(Fire, EKeys::LeftMouseButton);

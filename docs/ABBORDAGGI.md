@@ -800,3 +800,48 @@ Costo per passo: il banco `all` resta a 0,03 ms; i vecchi scenari danno **gli st
 **Limiti noti**: (1) i Mandati **non** usano ancora queste esercitazioni come dottrina (impilarsi alla porta dell'obiettivo, ripiegare chiudendo): un abbordaggio nemico entra come prima (la dottrina cambierebbe il bilanciamento di ogni banco già tarato: va misurata prima, è un'idea per dopo); (2) il Capitano è
 sempre il bersaglio preferito di chi lo vede (`ChooseTarget`: «ciò per cui il Mandato è venuto»): la scorta riduce i colpi, non fa da scudo; (3) la formazione della scorta è fatta di punti accanto al Capitano sul suo ponte: non è provata sulle scale (la squadra lo segue per la strada e gli arriva dopo); (4) il banco del Capitano che cammina è quello di un giocatore sconsiderato
 (non si ferma, non si ripara): è il caso peggiore, non una previsione; (5) `sweep` pulisce le stanze dalla più vicina e non torna su una stanza già pulita dove il nemico è rientrato: la squadra ha finito quando ha finito, e il prossimo ordine è di chi comanda (il quadro dice le stanze pulite).
+
+
+### 15.3 Il Capitano in prima persona (traguardo 3; `ASTRACharacter.*`, `AstraInput.*`, `AstraFpsComponent.*`, `AstraFpsHud.*`, `AstraBoardSubsystem.*`, `AstraBoardSim.*`, `AstraBoardMind.cpp`)
+
+*Il brief: «accovacciato, prono, riparo, mira e fuoco, ricarica, cambio arma, i tasti spiegati bene sullo schermo». Accovacciato (C), prono (C tenuto), mira, fuoco, ricarica e cambio arma c'erano già (§4). Questo traguardo
+dà al corpo del Capitano un peso vero nel combattimento: **la sporgenza** (Z e X), il **riparo** che decide il livello vero, **chi ti vede** prima che arrivi un colpo, e la **scheda dei tasti** giusta per l'abbordaggio.*
+
+**La sporgenza** (`AASTRACharacter::TickLean`; Z a sinistra, X a destra, tenuti; sul gamepad le spalline): gli occhi escono dalla linea del corpo di **34 cm**, scendono di 7 cm e il quadro ruota di **11°** (sdraiato poco
+più della metà: 0,55); un terzo di secondo per uscire, un quarto per rientrare (`LeanStep`, un avvicinamento morbido che non supera il bersaglio). Mai dentro un muro: gli occhi, a riposo, sono spazzati da una sfera di 12 cm fino al punto della sporgenza
+piena sul canale della camera (il livello, non i soldati) e la sporgenza si ferma dove la sfera tocca; e solo se il corpo può: non seduto, non con il datapad su, non nella lista di un ascensore, non su una scala, non in aria, non di corsa. La camera è dove
+sta l'occhio per ogni altra cosa: **i colpi partono dalla camera sporta**, il mirino e le braccia sono sulla camera e escono con lei. Il roll è quello della rotazione di controllo (`R.Roll`: la camera lo segue, e braccia e arma stanno sulla camera: sporgono e si inclinano insieme,
+senza un calcolo in più); `ResetPosture` (la sedia, l'ascensore, la scala) riporta tutto a zero. Due tasti nuovi in `UAstraInputSet` (`IA_ASTRA_LeanLeft`, `IA_ASTRA_LeanRight`).
+
+**Il corpo nella simulazione** (`FAstraBoardSim::SetCaptain(..., EyeRel, bProne)`; `UAstraBoardSubsystem::CaptainFeet`): il gioco dice alla simulazione dov'è l'**occhio** del Capitano (la sua camera, rispetto ai piedi: in piedi 165 cm, accovacciato 105, sdraiato
+40, e 34 cm più in là quando sporge) e se è sdraiato. Chi lo cerca lo vede con quell'occhio attraverso il livello vero (`SightOverride`: la prova di vista della simulazione chiede al mondo): un Capitano dietro uno spigolo non è visto, uno che sporge sì; sdraiato dietro un banco di 80 cm non è
+visto. Prima l'occhio della simulazione era 152 in piedi e 105 «basso» (anche sdraiato: il prono non nascondeva dietro nulla). **Il bersaglio**: sdraiato ×0,6 (accovacciato ×0,8, come prima); chi striscia (fino a 130 cm/s) non vale come chi corre.
+**Il riparo**: oltre agli occhi si chiede il **petto** (`FSeen::bCovered`): se l'occhio si vede e il petto no (la testa sopra un banco, un occhio oltre uno spigolo) i colpi che arrivano sono su un bersaglio piccolo (`CoverFactor`, ×0,55). Costo: una prova di vista in più per ogni nemico che lo vede, a quattro prove al secondo.
+
+**Chi ti vede** (`UAstraBoardSubsystem::SyncCaptain`, `UAstraFpsComponent::SetWatchers`): ogni quarto di secondo il gioco legge, dalla percezione degli stessi abbordatori (l'ultimo sguardo di ciascuno: il loro cono, il livello vero in mezzo, la sua postura e la sua sporgenza), chi ha il
+Capitano in vista (i cinque più vicini, entro 60 m) e lo dice allo schermo: un **arco ambra** al bordo dell'immagine verso ognuno che non gli sta davanti (davanti è sullo schermo), più forte quanto più è vicino, che entra in fretta e se ne va piano (lo sguardo di un nemico
+sfarfalla al limite della luce). Non è il rosso dei colpi che arrivano: è **prima**. La prima volta una riga dice che cosa significa e che fare («AMBER ARC: SOMEONE HAS YOU IN SIGHT · GET LOW (C) OR BEHIND COVER»). Nessun costo oltre alla prova di vista di sopra: la percezione c'era.
+
+**La scheda dei tasti** (`AstraFpsHud.cpp`): tre colonne su cappucci, in alto a sinistra: **WEAPON** (LMB, RMB, R, 1, 2, Q, H; solo se porta un'arma), **MOVING** (W A S D, Shift, C, C tenuto, **Z X lean**, Spazio, E), **COMMAND** (V tenuto parla, T scrive, **G ordini**,
+Tab datapad, F1 tutti i tasti). Sale come prima quando prende le armi o le estrae, e **all'inizio di ogni combattimento con lui dentro** (16 s, non più di una volta al minuto; se è seduto aspetta che si alzi: `IsActive`, `bKeysDue`); senza un'arma una riga dice che fare («NO WEAPON ·
+ASK THE XO FOR ONE (V) · OR THE RACK IN THE ARMORY, DECK 8 (E)»). Le righe di suggerimento sono ora centrate.
+
+**Le menti** (`AddCaptainBody`): nello stato della nave (`boarding.captain`) e nel quadro dei marine, `posture` (standing, crouched, lying), `leaning` (left, right; solo oltre 0,4), `seen_by` (quanti abbordatori lo vedono) e `nearest_seer_m`; nel prompt dei marine, una frase: un Capitano in piedi
+allo scoperto con il nemico addosso merita **una chiamata breve** (`to_captain`: «Captain, get down, two on you»), non una lezione, e non di nuovo finché dura; quello che i marine possono fare per lui è un ordine (`follow_captain`, `escort_captain`, `rescue_captain`).
+
+**Misure** (`tools/boarding.py run --scenario lean --seeds 24`, cinque controlli, il banco si giudica da solo; nessun gioco):
+- **sporgenza**: l'occhio della sporgenza piena fuori da uno spigolo di apertura è visto da un nemico che tiene la linea in **744 su 744** angoli aperti del piano dell'Aquila, dall'altra parte da 0; in 66 scontri di 10 s
+  dietro lo spigolo il nemico **non lo vede mai** (0 su 66, 0 colpi), con l'occhio sporto lo vede **in tutti** (66 su 66, 36,7 colpi a scontro: da fermo e allo scoperto un solo tiratore lo abbatte in un paio di secondi, e il banco non lo vede sparare);
+- **corpo**: a 10 m allo scoperto, in dieci secondi, in piedi 34,9 colpi a scontro, accovacciato **28,1 (80%)**, sdraiato **20,7 (59%)**;
+- **riparo**: con un muro di 135 cm in mezzo (nel gioco lo decide il livello, il banco ne mette uno finto nella stessa prova di vista), in piedi, con la testa sopra, è visto e preso **18,9 volte (54%)**; accovacciato e sdraiato **non sono visti** (0 su 48) e non presi;
+- il disegno della sporgenza (`LeanFrame`, `LeanStep`): 34 cm fuori, 7 giù, 11° (sdraiato 19 cm); fuori al 95% in 0,35 s, dentro al 5% in 0,25 s, mai oltre il bersaglio, e da un lato all'altro passando dal mezzo.
+Gli altri banchi non cambiano (`run --scenario all` 17/17 con gli stessi numeri di prima; `drills` e `escort` verdi).
+
+**Come si prova nel gioco** (il Capitano a piedi, con un'arma: `astra.weapons.give`): (1) `astra.fps.keys`: la scheda a tre colonne in alto a sinistra, con **Z X lean** e **G orders**; (2) **tieni Z o X**: la camera esce di lato (34 cm) e si inclina, le braccia e l'arma con lei; contro un muro si ferma prima; rilascia e rientra; il mirino con RMB funziona
+sporgendo e la mira è dalla camera sporta; `astra.fps.lean left|right|off` fa lo stesso dalla console e `astra.fps.info` dice «lean -1.00 (the eyes 34 cm out ...)»; (3) `astra.fps.watch on`: un abbordatore finto a 12 m davanti a dove guardi: girati e l'**arco ambra** entra dal bordo (e la riga di che cosa vuol dire);
+(4) un abbordaggio vero (`astra.board.assault out M1 - 2 port - ride`, o all'XO «prendi la Wreck, vengo anch'io»): entrando la scheda sale da sola; dietro uno spigolo il nemico non ti spara, sporgi e ti vede (arco ambra, poi il rosso dei colpi); sdraiato (C tenuto) dietro un banco basso (80-100 cm) non sei visto; `astra.board.order picture`
+scrive nel log il quadro dei marine con `posture`, `seen_by`.
+
+**Limiti noti**: (1) la scheda dell'**F1** e la riga della prima volta a piedi sono del controller (`HelpCard`, il suggerimento «WASD walk ...») e non dicono ancora Z X (richiesta al lead); (2) la sporgenza non spinge il capsule: il corpo resta dov'è, le ginocchia e i piedi non si vedono in prima persona e i soldati non lo vedono
+(la simulazione ha il corpo ai piedi e l'occhio sporto: a un colpo da vicino non c'è differenza); (3) sporgere dentro un soldato (la camera passa dal suo corpo: il canale della camera non lo vede) non è bloccato; (4) il Capitano resta il bersaglio preferito di chi lo vede e un tiratore solo lo abbatte in un paio di secondi allo
+scoperto da fermo: è il bilanciamento di prima (`BdCaptainArmor`, il tiro del Mandato) e la ragione per cui il riparo, la sporgenza e l'arco ambra contano; non l'ho toccato; (5) la percezione degli abbordatori è a quattro sguardi al secondo ognuno: l'arco ambra arriva fino a mezzo secondo dopo che il nemico lo vede (il suo sguardo, poi il quarto di secondo del gioco: il rosso non ha ritardo).

@@ -304,7 +304,9 @@ THE FIGHT, AS EVERYONE IN THE DETACHMENT KNOWS IT
   (and say so if the Captain orders it). What you order stands until you give it back to the drill (stand_down).
 - The Captain is a person in this fight: he may come down with a rifle, and he can fall. His life comes before the deck: when he falls, the two squads nearest to him go to him by
   themselves and stay round him until he is carried out or on his feet (the board shows it as `rescue_captain`); you may send more, or take them off. He commands; you adjust your
-  squads inside his orders.
+  squads inside his orders. The board says how he stands (standing, crouched, lying, leaning out of a corner) and how many of the enemy have him in sight now: he is a rifle in the
+  fight that the enemy will pick first. A Captain standing in the open with enemy on him is worth one short call to him (`to_captain`: "Captain, get down, two on you"), not a lecture, and not
+  again while it holds; he knows his own keys and his own body. What you can do for him is yours to order: a squad to him (`follow_captain` / `escort_captain` / `rescue_captain`).
 - The bridge has its own officers (the XO, Tactical, Operations...): they report the ship's side of it and run the ship. You are the marines: their news is yours, the ship's
   is theirs. What the bridge said on the net is in the log; do not say it again.
 
@@ -815,7 +817,12 @@ class MarineMinds:
         if isinstance(c, dict):
             armed = (b.get("captain") or {}).get("armed") if b else ""
             beside = [str(s.get("leader") or s["name"]) for s in self.squads.values() if cap_at and s.get("where_id") == cap_at and _n(s.get("able")) > 0]
+            body = ([f"{c['posture']}" + (f", leaning {c['leaning']}" if c.get("leaning") else "")] if c.get("posture") else [])
+            seen = _n(c.get("seen_by"))
+            if seen:
+                body.append(f"{seen} of the enemy have him in sight now" + (f", the nearest at {_n(c.get('nearest_seer_m'))} m" if _n(c.get("nearest_seer_m")) else ""))
             lines.append(f" the Captain in the fight: at {c.get('where')} [id {c.get('where_id')}], {_n(c.get('strength_pct'))}% strength{' — DOWN' if c.get('down') else ''}"
+                         + (f"; {'; '.join(body)}" if body else "")
                          + (f"; armed: {armed}" if armed else "")
                          + (f"; in the same room as {', '.join(beside)} (words of his that name no one are theirs; a squad he names is the one that answers)" if beside else ""))
         rec = pic.get("recent") or []

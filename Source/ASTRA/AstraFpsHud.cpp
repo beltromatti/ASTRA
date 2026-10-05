@@ -12,7 +12,9 @@ namespace
 	/** A key and what it does, for the card that is up when he arms. */
 	struct FKeyHint { const TCHAR* Key; const TCHAR* What; };
 	const FKeyHint FpsKeysWeapon[] = {{TEXT("LMB"), TEXT("fire")}, {TEXT("RMB"), TEXT("aim")}, {TEXT("R"), TEXT("reload")}, {TEXT("1"), TEXT("rifle")}, {TEXT("2"), TEXT("sidearm")}, {TEXT("Q"), TEXT("last weapon")}, {TEXT("H"), TEXT("holster")}};
-	const FKeyHint FpsKeysMove[] = {{TEXT("W A S D"), TEXT("move")}, {TEXT("Shift"), TEXT("run")}, {TEXT("C"), TEXT("crouch")}, {TEXT("hold C"), TEXT("prone")}, {TEXT("Space"), TEXT("jump")}, {TEXT("E"), TEXT("use")}, {TEXT("F1"), TEXT("all keys")}};
+	const FKeyHint FpsKeysMove[] = {{TEXT("W A S D"), TEXT("move")}, {TEXT("Shift"), TEXT("run")}, {TEXT("C"), TEXT("crouch")}, {TEXT("hold C"), TEXT("prone")}, {TEXT("Z X"), TEXT("lean")}, {TEXT("Space"), TEXT("jump")}, {TEXT("E"), TEXT("use")}};
+	// what commands: the voice and the keyboard to the crew (and, with the marines, to them), the wheel, the datapad
+	const FKeyHint FpsKeysCommand[] = {{TEXT("V hold"), TEXT("talk")}, {TEXT("T"), TEXT("type")}, {TEXT("G"), TEXT("orders")}, {TEXT("Tab"), TEXT("datapad")}, {TEXT("F1"), TEXT("all keys")}};
 }
 
 void SAstraCombatHud::Construct(const FArguments&)
@@ -80,6 +82,22 @@ int32 SAstraCombatHud::OnPaint(const FPaintArgs&, const FGeometry& G, const FSla
 		}
 		FSlateDrawElement::MakeLines(Out, L + 1, G.ToPaintGeometry(), Pts, ESlateDrawEffect::None, FLinearColor(0.95f, 0.1f, 0.06f, Arc.Alpha * 0.9f), true, 7.f * U);
 	}
+	// who has him in sight: a short amber arc at the edge of the picture towards each, finer and further in than the red ones (those are rounds that struck)
+	for (const FAstraFpsHudState::FArc& Arc : State.Watchers)
+	{
+		if (Arc.Alpha <= 0.02f)
+		{
+			continue;
+		}
+		const float R0 = FMath::DegreesToRadians(Arc.Yaw - 11.f), R1 = FMath::DegreesToRadians(Arc.Yaw + 11.f);
+		TArray<FVector2D> Pts;
+		for (int32 k = 0; k <= 5; ++k)
+		{
+			const float A = FMath::Lerp(R0, R1, k / 5.f);
+			Pts.Add(C + FVector2D(FMath::Sin(A) * Size.X * 0.255f, -FMath::Cos(A) * Size.Y * 0.31f));
+		}
+		FSlateDrawElement::MakeLines(Out, L + 1, G.ToPaintGeometry(), Pts, ESlateDrawEffect::None, FLinearColor(1.f, 0.74f, 0.2f, Arc.Alpha * 0.8f), true, 4.f * U);
+	}
 	// the crosshair: it opens with his cone; looking through the sights only a dot
 	if (State.bCrosshair)
 	{
@@ -144,11 +162,12 @@ int32 SAstraCombatHud::OnPaint(const FPaintArgs&, const FGeometry& G, const FSla
 	// the prompt of the key at hand, and the strip of keys
 	if (State.PromptAlpha > 0.02f && !State.Prompt.IsEmpty())
 	{
-		Text(State.Prompt, FVector2D(C.X - 200.f * U, Size.Y * 0.70f), Mid, FLinearColor(0.95f, 0.97f, 1.f, State.PromptAlpha), L + 2);
+		const float PW = FSlateApplication::Get().GetRenderer()->GetFontMeasureService()->Measure(State.Prompt, Mid).X;
+		Text(State.Prompt, FVector2D(C.X - 0.5f * PW, Size.Y * 0.70f), Mid, FLinearColor(0.95f, 0.97f, 1.f, State.PromptAlpha), L + 2);
 	}
 	if (State.KeysAlpha > 0.02f)
 	{
-		// the card: two columns of keys on caps (the weapon's and the walking ones), at the top left. Not at the bottom: the lower middle is where the crew's subtitles stand (the
+		// the card: columns of keys on caps (the weapon's, when he carries one, the walking ones, the ones that command), at the top left. Not at the bottom: the lower middle is where the crew's subtitles stand (the
 		// controller's: up to three rows of up to three lines, from 60 px above the edge to some 310 px) and the lower right has the walking notice and the rounds
 		const TSharedRef<FSlateFontMeasure> Measure = FSlateApplication::Get().GetRenderer()->GetFontMeasureService();
 		const float A = State.KeysAlpha;
@@ -166,15 +185,16 @@ int32 SAstraCombatHud::OnPaint(const FPaintArgs&, const FGeometry& G, const FSla
 		int32 NW = 0;
 		for (const FKeyHint& K : FpsKeysWeapon)
 		{
-			if (State.bRifle || FCString::Strcmp(K.What, TEXT("rifle")) != 0)
+			if (State.bCarries && (State.bRifle || FCString::Strcmp(K.What, TEXT("rifle")) != 0))
 			{
 				WeaponRows[NW++] = K;
 			}
 		}
-		constexpr int32 NM = UE_ARRAY_COUNT(FpsKeysMove);
-		const float W1 = ColWidth(WeaponRows, NW), W2 = ColWidth(FpsKeysMove, NM);
-		const float W = 2.f * Pad + W1 + ColGap + W2;
-		const float H = 1.5f * Pad + HeadH + FMath::Max(NW, NM) * RowH;
+		constexpr int32 NM = UE_ARRAY_COUNT(FpsKeysMove), NC = UE_ARRAY_COUNT(FpsKeysCommand);
+		const float W1 = NW > 0 ? ColWidth(WeaponRows, NW) : 0.f, W2 = ColWidth(FpsKeysMove, NM), W3 = ColWidth(FpsKeysCommand, NC);
+		const int32 Columns = (NW > 0 ? 3 : 2);
+		const float W = 2.f * Pad + W1 + W2 + W3 + (Columns - 1) * ColGap;
+		const float H = 1.5f * Pad + HeadH + FMath::Max3(NW, NM, NC) * RowH;
 		const FVector2D Origin(24.f * U, 24.f * U);
 		Box(Origin, FVector2D(W, H), FLinearColor(0.004f, 0.006f, 0.01f, 0.62f * A), L + 1);
 		const auto DrawColumn = [&](const TCHAR* Head, const FKeyHint* Col, int32 N, float X0)
@@ -190,8 +210,15 @@ int32 SAstraCombatHud::OnPaint(const FPaintArgs&, const FGeometry& G, const FSla
 				Text(Col[i].What, FVector2D(X0 + KW + 2.f * CapPad + After, Y + 5.f * U), Cap, FLinearColor(0.7f, 0.78f, 0.88f, 0.95f * A), L + 3);
 			}
 		};
-		DrawColumn(TEXT("WEAPON"), WeaponRows, NW, Origin.X + Pad);
-		DrawColumn(TEXT("MOVING"), FpsKeysMove, NM, Origin.X + Pad + W1 + ColGap);
+		float X = Origin.X + Pad;
+		if (NW > 0)
+		{
+			DrawColumn(TEXT("WEAPON"), WeaponRows, NW, X);
+			X += W1 + ColGap;
+		}
+		DrawColumn(TEXT("MOVING"), FpsKeysMove, NM, X);
+		X += W2 + ColGap;
+		DrawColumn(TEXT("COMMAND"), FpsKeysCommand, NC, X);
 	}
 	return L + 4;
 }
