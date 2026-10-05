@@ -112,6 +112,11 @@ abbordaggi contro l'Aquila, chiesto da ABBORDAGGI).
   - i capitani nemici senza nome.
 
   Da bilanciare: l'Aquila esce quasi intatta dalla battaglia col grosso (98 %, zero missili).
+- **Quinta prova dell'apertura** (dopo la dottrina che si batte). Il Mandato attacca davvero.
+  - Da ~325 s a ~420 s scontro vero, con siluri dei bombardieri, esche e scudi che cedono: Acheron, Hecate, Hypnos, Phlegethon e Styx distrutti.
+  - Poi il Mandato si ritira «dopo aver combattuto» (morale 0, 26 % della forza persa). Warden Thale chiede la resa, poi una tregua per recuperare i naufraghi.
+  - Resta: l'Aquila esce al 99 % (troppo forte, BATTAGLIA-3); le chiamate dei comandanti nemici tagliate dagli avvisi e ripetute.
+- **Unita ABBORDAGGI-4 tappa 3** (e3a2f22): il Capitano in prima persona (sporgersi con Z/X, il corpo vero nella simulazione, l'arco ambra di chi lo vede, la scheda dei tasti). Da provare a mano nel gioco.
 - **Uniti** BATTAGLIA-3 tappa 5 (la prua non più sventrata, la mira del Capitano) e ABBORDAGGI-4 tappa 2 (la fanteria si comanda: prendere, sfondare, rastrellare, imboscata, scortare il Capitano, chiudere dietro).
 - **Lo schermo principale racconta lo scontro a tagli** (il lead): il bersaglio, poi «ASN AQUILA · FIRING ON …» (l'Aquila da fuori che spara,
   `astra.viewscreen.broadside`), poi il bersaglio. Provato nel gioco. Brief pronti: **VFX-2**, **PRESTAZIONI-GPU** (oltre ad ARTE-SCAFI).
