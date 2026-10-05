@@ -39,7 +39,6 @@ namespace AstraBoard
 		Breach,      // open a door (a sealed bulkhead is charged) and go in through it: stack, charge, entry, clear, then hold what is taken
 		Take,        // take a room and hold it: stack at its door (several squads on a sync: each at its own door, in together), entry, clear, hold from inside
 		Ambush,      // hidden in the corners of a place with the fire held: it is opened all together when the enemy is in the killing ground, or when the squad is found
-		HoldLine,    // bar a sector or a deck: a pair at each opening that leaves it, on the ways the enemy takes first
 		Escort       // with the Captain in formation: a man ahead who looks past every opening, two at the sides, one behind
 	};
 	/** Where a squad is in the drill of one of the infantry orders. */
@@ -248,9 +247,7 @@ namespace AstraBoard
 		int32 RoomTo = INDEX_NONE;       // the room it goes in to (clear, take)
 		TArray<int32> Queue;             // sweep: the rooms still to clear (the first is next)
 		TArray<int32> Cleared;           // the rooms it has cleared, in order
-		TArray<int32> Sector;            // sweep and hold_line: the compartments of the place
-		TArray<int32> Guarded;           // hold_line: the openings (portals) it holds
-		int32 Uncovered = 0;             // hold_line: openings of the sector it has no men for
+		TArray<int32> Sector;            // sweep: the compartments of the place
 		int32 Sync = 0;                  // squads of one sync (a non-zero number) go through their doors together
 		int32 CoverComp = INDEX_NONE;    // the place the squad covers with its fire while another squad goes in
 		int32 Door = INDEX_NONE;         // the door the order names (breach), the damage map's index
@@ -342,7 +339,7 @@ namespace AstraBoard
 		FVector Pos = FVector::ZeroVector;
 		float Radius = 0.f;               // hold: how far round the place
 		int32 Door = INDEX_NONE;          // breach: the door the order names (the damage map's index)
-		TArray<int32> Sector;             // sweep, hold_line: the compartments of the place when it is a deck's section or a radius round a spot
+		TArray<int32> Sector;             // sweep: the compartments of the place when it is a deck's section or a radius round a spot
 		int32 CoverComp = INDEX_NONE;     // the place the squad covers with its fire
 		bool bFireHeld = false;           // nobody fires until the squad is found or the order is given
 		bool bInside = false;             // (hold) the corners of the room itself
@@ -577,7 +574,6 @@ private:
 	void DrillRoom(FSquad& S, const TArray<int32>& Able);       // breach, take, and every room of a sweep: approach, stack, (charge), entry, clear, hold
 	void DrillSweepNext(FSquad& S);                             // the next room of a sweep, or its end
 	void DrillAmbush(FSquad& S, const TArray<int32>& Able);
-	void DrillHoldLine(FSquad& S, const TArray<int32>& Able);
 	void DrillEscort(FSquad& S, const TArray<int32>& Able);
 	void StepSealBehind(FSquad& S, const TArray<int32>& Able);  // the last man closes a pressure door behind the squad
 	bool FindEntry(FSquad& S, int32 Room, const FUnit& From);   // the door the squad goes in by and where it stacks

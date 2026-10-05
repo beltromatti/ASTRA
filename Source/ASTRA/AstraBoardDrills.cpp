@@ -1,4 +1,4 @@
-// ASTRA — ABBORDAGGI-4: the infantry orders (docs/ABBORDAGGI.md §15.2). A squad that is given sweep, breach, take, ambush, hold the line or escort runs a drill with phases of its own; the men's
+// ASTRA — ABBORDAGGI-4: the infantry orders (docs/ABBORDAGGI.md §15.2). A squad that is given sweep, breach, take, ambush or escort runs a drill with phases of its own; the men's
 // work in each phase (corners, bursts, reloads, the stairs) is still the men's (AstraBoardSim.cpp), and what a drill is worth is what the mechanics below make it (the bench says it, with and without):
 //
 //   take / breach / sweep   approach the door the room is entered by; STACK beside it with the door held shut (a man who is stacked does not open it: nobody inside sees them); a sealed bulkhead
@@ -8,8 +8,6 @@
 //                           seen in the room for ClearHoldS; then the next room (sweep) or HOLD (take, breach). Squads of one sync stack at their own doors and go in at the same moment
 //   ambush                  the corners of a place, fire held, the men hidden (seen only from HiddenSeeCm): the enemy that walks in is fired on all at once when he is in the killing ground in sight
 //                           of half the squad, or when a man of the squad is found; the first volley is better (the men were laid on their targets) and the enemy is startled
-//   hold the line           a sector (a deck's section, the rooms round a place): a man (two when there are enough) at each opening that leaves it, the ones the enemy comes by first
-//   escort                  the Captain: a man ahead, two at the sides, the rest behind; when he stands, the corners round him
 //   seal behind (modifier)  the last man of a squad that has gone through a pressure door closes it behind them (four seconds at the console, nobody in the doorway): the enemy must cut it open
 //
 // Plain code over the same map and the same men: deterministic from the seed, nothing here knows a word of what the minds say.
@@ -27,7 +25,6 @@ namespace
 	constexpr float DrApproachQuiet = 0.9f;         // the approach to a door is a little quieter than the jog
 	constexpr int32 DrMaxSweepRooms = 16;
 	constexpr float DrRoomMarginCm = 100.f;         // the corners of a room a man goes to are this far off its walls
-	constexpr float DrGuardInCm = 160.f;            // (hold the line, no corner) a guard stands this far inside the opening
 	constexpr float DrSealWaitMaxS = 8.f;           // a door with somebody in it is waited for this long, then given up
 	constexpr float DrStragglerCm = 600.f;          // a man this near his place in the stack is not waited for ... if four in five are there
 
@@ -65,8 +62,6 @@ void FAstraBoardSim::ResetDrill(FSquad& S)
 	S.Queue.Reset();
 	S.Cleared.Reset();
 	S.Sector.Reset();
-	S.Guarded.Reset();
-	S.Uncovered = 0;
 	S.Sync = 0;
 	S.CoverComp = INDEX_NONE;
 	S.Door = INDEX_NONE;
@@ -130,9 +125,6 @@ FString FAstraBoardSim::DrillText(const FSquad& S) const
 	case ETask::Ambush:
 		T = S.SprungAt >= 0.f ? FString::Printf(TEXT("ambush at %s sprung %.0f s ago"), S.Where.IsEmpty() ? *Where(S.TargetComp) : *S.Where, (float)(Clock - S.SprungAt))
 		                      : FString::Printf(TEXT("hidden at %s, fire held, %.0f s"), S.Where.IsEmpty() ? *Where(S.TargetComp) : *S.Where, S.DrillT);
-		break;
-	case ETask::HoldLine:
-		T = FString::Printf(TEXT("holding the line at %s: %d of %d openings covered"), S.Where.IsEmpty() ? *Where(S.TargetComp) : *S.Where, S.Guarded.Num() - S.Uncovered, S.Guarded.Num());
 		break;
 	case ETask::Escort:
 		T = TEXT("escorting the Captain (a man ahead, two at his sides, the rest behind)");
@@ -853,193 +845,6 @@ void FAstraBoardSim::DrillAmbush(FSquad& S, const TArray<int32>& Able)
 	HoldAround(S, S.TargetPos, Radius, false);
 }
 
-// ================================================================================================================== hold the line
-
-void FAstraBoardSim::DrillHoldLine(FSquad& S, const TArray<int32>& Able)
-{
-	if (S.Drill == EDrill::None)
-	{
-		// the sector: the order's compartments, else the rooms and corridors round the place on its deck
-		TSet<int32> In;
-		for (const int32 C : S.Sector)
-		{
-			In.Add(C);
-		}
-		if (In.IsEmpty() && Map->GetComps().IsValidIndex(S.TargetComp))
-		{
-			const float Reach = S.Radius > 0.f ? S.Radius : 2500.f;
-			const int32 Deck = Map->GetComps()[S.TargetComp].Deck;
-			for (int32 c = 0; c < Map->GetComps().Num(); ++c)
-			{
-				if (Map->GetComps()[c].Deck == Deck && FVector::Dist2D(Map->CentreOf(c), S.TargetPos) < Reach)
-				{
-					In.Add(c);
-				}
-			}
-			In.Add(S.TargetComp);
-		}
-		// the openings that leave it, the ones the enemy is nearest to first
-		FVector Foe = Mis.BreachPos;
-		{
-			TArray<FSeen> Seen;
-			Intel(S.Side, Seen);
-			if (Seen.Num())
-			{
-				FVector C = FVector::ZeroVector;
-				for (const FSeen& X : Seen)
-				{
-					C += X.Pos;
-				}
-				Foe = C / Seen.Num();
-			}
-		}
-		TArray<TPair<float, int32>> Open;
-		TSet<int32> Seen;
-		for (const int32 C : In)
-		{
-			for (const int32 Pi : Map->GetComps()[C].Portals)
-			{
-				const FBoardPortal& P = Map->GetPortals()[Pi];
-				if (Seen.Contains(Pi) || In.Contains(P.A) == In.Contains(P.B))
-				{
-					continue;
-				}
-				Seen.Add(Pi);
-				Open.Emplace((float)FVector::Dist(Foe, P.Pos) + (P.bVertical() ? 400.f : 0.f), Pi);
-			}
-		}
-		Open.Sort([](const TPair<float, int32>& A, const TPair<float, int32>& B) { return A.Key < B.Key; });
-		S.Sector = In.Array();
-		S.Guarded.Reset();
-		for (const TPair<float, int32>& O : Open)
-		{
-			S.Guarded.Add(O.Value);
-		}
-		S.Uncovered = 0;
-		S.Drill = EDrill::Hold;
-		S.DrillT = 0.f;
-		for (const int32 M : S.Members)
-		{
-			People[M].StackIdx = INDEX_NONE;
-		}
-		Announce(S, FString::Printf(TEXT("%s takes the line round %s: %d openings to hold, %d men"), *S.Name, S.Where.IsEmpty() ? *Map->Describe(S.TargetComp) : *S.Where, S.Guarded.Num(), Able.Num()));
-	}
-	// the men to the openings: one at each of the first, a second at the ones the enemy is nearest to when there are men to spare
-	const int32 N = Able.Num(), M = S.Guarded.Num();
-	const int32 Covered = FMath::Min(N, M);
-	S.Uncovered = FMath::Max(0, M - Covered);
-	TArray<int32> Want;
-	Want.Init(0, M);
-	for (int32 k = 0; k < M; ++k)
-	{
-		Want[k] = k < Covered ? 1 : 0;
-	}
-	for (int32 k = 0, Extra = N - Covered; Extra > 0 && M > 0; k = (k + 1) % M, --Extra)
-	{
-		Want[k] += Want[k] > 0 ? 1 : 0;
-		if (Want[k] == 0)
-		{
-			break;
-		}
-	}
-	TArray<int32> Have;
-	Have.Init(0, M);
-	for (const int32 Mn : Able)
-	{
-		const FUnit& U = People[Mn];
-		if (U.StackIdx != INDEX_NONE && Have.IsValidIndex(U.StackIdx))
-		{
-			++Have[U.StackIdx];
-		}
-	}
-	for (const int32 Mn : Able)
-	{
-		FUnit& U = People[Mn];
-		if (U.bBusy)
-		{
-			continue;
-		}
-		if (U.StackIdx != INDEX_NONE && Have.IsValidIndex(U.StackIdx) && Have[U.StackIdx] <= Want[U.StackIdx])
-		{
-			continue;                                                    // he keeps his opening
-		}
-		if (U.StackIdx != INDEX_NONE && Have.IsValidIndex(U.StackIdx))
-		{
-			--Have[U.StackIdx];
-		}
-		U.StackIdx = INDEX_NONE;
-		int32 Best = INDEX_NONE;
-		float BestD = 1.0e9f;
-		for (int32 k = 0; k < M; ++k)
-		{
-			if (Have[k] >= Want[k])
-			{
-				continue;
-			}
-			const float D = (float)FVector::Dist(U.Pos, Map->GetPortals()[S.Guarded[k]].Pos) + (Have[k] > 0 ? 300.f : 0.f) + k * 40.f;      // (the first to be covered are the first to get a man)
-			if (D < BestD)
-			{
-				BestD = D;
-				Best = k;
-			}
-		}
-		if (Best != INDEX_NONE)
-		{
-			U.StackIdx = Best;
-			++Have[Best];
-			U.Slot = INDEX_NONE;
-			U.Path.Reset();
-		}
-	}
-	// each man at his opening: a corner of it on the side inside the sector, the second man at the other corner
-	for (const int32 Mn : Able)
-	{
-		FUnit& U = People[Mn];
-		if (U.bBusy || U.StackIdx == INDEX_NONE || !S.Guarded.IsValidIndex(U.StackIdx))
-		{
-			continue;
-		}
-		const int32 Pi = S.Guarded[U.StackIdx];
-		const FBoardPortal& P = Map->GetPortals()[Pi];
-		const int32 Inner = S.Sector.Contains(P.A) ? P.A : P.B;
-		int32 Which = 0;
-		for (const int32 O : Able)
-		{
-			if (O != Mn && People[O].StackIdx == U.StackIdx && O < Mn)
-			{
-				++Which;                                                 // (the one with the lower number is the first)
-			}
-		}
-		TArray<int32, TInlineAllocator<2>> Corners;
-		for (const int32 Si : Map->GetComps()[Inner].Slots)
-		{
-			if (Map->GetSlots()[Si].Portal == Pi)
-			{
-				Corners.Add(Si);
-			}
-		}
-		if (Corners.Num() > 0)
-		{
-			const int32 Si = Corners[Which % Corners.Num()];
-			U.Slot = Si;
-			if (U.Path.IsEmpty() && FVector::Dist2D(U.Pos, Map->GetSlots()[Si].Pos) > 60.f && U.Target == INDEX_NONE && U.Act != EAct::Reload && !U.bAtPeek)
-			{
-				GoTo(U, Map->GetSlots()[Si].Pos, Tuning.JogCmS);
-			}
-		}
-		else
-		{
-			// no corner (a corridor going on): a place inside the opening, on the way in
-			const FVector2D Into = P.A == Inner ? -P.Normal : P.Normal;
-			const FVector Spot = Map->Inset(Inner, P.PosIn(Inner) + FVector(Into.X, Into.Y, 0.0) * DrGuardInCm + FVector(P.Along.X, P.Along.Y, 0.0) * (Which % 2 ? 70.0 : -70.0), 50.f);
-			if (U.Path.IsEmpty() && FVector::Dist2D(U.Pos, Spot) > 90.f && U.Target == INDEX_NONE && U.Act != EAct::Reload)
-			{
-				GoTo(U, Spot, Tuning.JogCmS);
-			}
-		}
-	}
-}
-
 // ================================================================================================================== escort
 
 void FAstraBoardSim::DrillEscort(FSquad& S, const TArray<int32>& Able)
@@ -1266,9 +1071,6 @@ void FAstraBoardSim::StepDrill(FSquad& S, const TArray<int32>& Able)
 		break;
 	case ETask::Ambush:
 		DrillAmbush(S, Able);
-		break;
-	case ETask::HoldLine:
-		DrillHoldLine(S, Able);
 		break;
 	case ETask::Escort:
 		DrillEscort(S, Able);

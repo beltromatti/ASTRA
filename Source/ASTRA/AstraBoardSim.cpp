@@ -50,7 +50,6 @@ const TCHAR* AstraBoard::TaskName(ETask T)
 	case ETask::Breach: return TEXT("breach");
 	case ETask::Take: return TEXT("take");
 	case ETask::Ambush: return TEXT("ambush");
-	case ETask::HoldLine: return TEXT("hold the line");
 	case ETask::Escort: return TEXT("escort the Captain");
 	default: return TEXT("respond");
 	}

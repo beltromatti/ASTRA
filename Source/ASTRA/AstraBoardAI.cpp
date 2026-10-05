@@ -880,7 +880,6 @@ void FAstraBoardSim::PlanDefend(FSquad& S)
 	case ETask::Breach:
 	case ETask::Take:
 	case ETask::Ambush:
-	case ETask::HoldLine:
 	case ETask::Escort:
 		StepDrill(S, Able);                                         // the infantry orders: a drill with phases of its own (AstraBoardDrills.cpp)
 		break;

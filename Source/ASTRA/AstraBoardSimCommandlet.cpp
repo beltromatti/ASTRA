@@ -167,13 +167,17 @@ namespace
 		TArray<FFleetCasualty> DefCas;       // (a scene's fight) what it did to the people of the side that held the ship: the books' casualties (AstraBoardScene::CasualtiesOf)
 	};
 
-	FRunResult RunSim(FAstraBoardSim& Sim, double Seconds, const TFunction<void(FAstraBoardSim&)>& PerSecond = nullptr)
+	FRunResult RunSim(FAstraBoardSim& Sim, double Seconds, const TFunction<void(FAstraBoardSim&)>& PerSecond = nullptr, const TFunction<void(FAstraBoardSim&)>& PerStep = nullptr)
 	{
 		FRunResult R;
 		const FAstraBoardMap& Map = Sim.GetMap();
 		double NextSec = 1.0;
 		while (Sim.Time() < Seconds && !Sim.Over())
 		{
+			if (PerStep)
+			{
+				PerStep(Sim);                                                  // (a scripted man, the Captain, moves every step)
+			}
 			const double T0 = FPlatformTime::Seconds();
 			Sim.Tick(0.1f);
 			const double Ms = (FPlatformTime::Seconds() - T0) * 1000.0;
@@ -808,6 +812,7 @@ static FBoardFight RunBoarding(FRig& Rig, int32 Seed, int32 Boarders, int32 Duty
 }
 
 static int32 GSetup = -1;
+static int32 GBoarders = 0;                       // -boarders=N: the infantry-order scenarios run with this many Mandate boarders only (a trace's)
 
 static void BoardScenarioBoard(FRig& Rig, int32 Seed, int32 Seeds, int32 Boarders)
 {
@@ -1728,6 +1733,120 @@ static void BoardScenarioAmbush(FRig& Rig, int32 Seed, int32 Seeds)
 			BNote(FString::Printf(TEXT("    %2d boarders, twelve marines at the place: %-9s the Mandate beaten %2d of %2d (take Engineering %d), first contact at %4.1f s, ends %5.1f s; marines lost %4.1f, Mandate lost %4.1f, ambushes sprung %d"),
 			                      Boarders, Mode == 0 ? TEXT("hold") : TEXT("ambush"), Beaten, N, Takes, Contact / FMath::Max(1, N), T / FMath::Max(1, N), LossA / FMath::Max(1, N), LossM / FMath::Max(1, N), Ambushes));
 			(void)FirstDown;
+		}
+	}
+}
+
+/** The outermost room of Deck 7 on the other side of the hull from the bench's breach (the Mandate's second craft). */
+static FString BenchBreachOpposite(const FRig& Rig, const FString& First)
+{
+	const int32 C0 = Rig.Comp(*First);
+	if (C0 == INDEX_NONE)
+	{
+		return FString();
+	}
+	const double Side0 = 0.5 * (Rig.Map->GetComps()[C0].Box.Min.Y + Rig.Map->GetComps()[C0].Box.Max.Y);
+	float Best = -1.f;
+	FName Id;
+	for (const FAstraDmgComp& K : Rig.Src->Comps)
+	{
+		const double Y = 0.5 * (K.Box.Min.Y + K.Box.Max.Y);
+		if (K.Deck != 7 || K.bCorridor || K.Status == 0 || K.Section < TEXT('C') || K.Section > TEXT('F') || K.Box.GetSize().X < 600.0 || Y * Side0 >= 0.0)
+		{
+			continue;
+		}
+		if ((float)FMath::Abs(Y) > Best)
+		{
+			Best = (float)FMath::Abs(Y);
+			Id = K.Id;
+		}
+	}
+	return Id.ToString();
+}
+
+/** Hold: twelve marines (two squads of six) are in Main Engineering when a Mandate boarding party comes in, at one breach or at two (half of them at each, the two sides of the hull). Without an order they go and meet what comes;
+ *  told to hold the place they take the corners of Engineering and the doors round it (the order that wins); told to hold it wide, over the whole deck's section round it (what a "line" is, a man at each of the section's
+ *  ways in), they are spread thin. (A drill that posts a man or a pair at every opening of a section was written and measured here: 0 to 1 fights of 8 won against eight or more boarders, twelve marines lost for one or
+ *  two of theirs, against 8 of 8 for the place; it was taken out. The order of a line is `hold` with a wide place.) */
+static void BoardScenarioHold(FRig& Rig, int32 Seed, int32 Seeds)
+{
+	const FAstraBoardMap& M = *Rig.Map;
+	const FString BreachId = BenchBreach(Rig), BreachId2 = BenchBreachOpposite(Rig, BreachId);
+	const int32 Obj = Rig.Comp(TEXT("engineering")), Breach = Rig.Comp(*BreachId), Breach2 = Rig.Comp(*BreachId2);
+	if (Obj == INDEX_NONE || Breach == INDEX_NONE || Breach2 == INDEX_NONE)
+	{
+		BCheck("hold: arenas", false, TEXT("no Main Engineering or no breach rooms in the plan"));
+		return;
+	}
+	const auto CutOf = [&M](int32 Room)
+	{
+		const FBox& BB = M.GetComps()[Room].Box;
+		return FVector(0.5 * (BB.Min.X + BB.Max.X), BB.Max.Y > 0 ? BB.Max.Y - 80.0 : BB.Min.Y + 80.0, BB.Min.Z);
+	};
+	BNote(FString::Printf(TEXT("Main Engineering is %s; the two breaches: %s and %s"), *M.Describe(Obj), *M.Describe(Breach), *M.Describe(Breach2)));
+	for (const int32 Craft : {1, 2})
+	{
+		for (const int32 Boarders : GBoarders > 0 ? TArray<int32>({GBoarders}) : GTrace ? TArray<int32>({12}) : TArray<int32>({4, 8, 12, 16}))
+		{
+			for (const int32 Mode : {0, 1, 2})
+			{
+				if (GSetup >= 0 && Mode != GSetup)
+				{
+					continue;                                                         // (-setup N: only the order N, for a trace)
+				}
+				double LossA = 0.0, LossM = 0.0, T = 0.0, Contact = 0.0;
+				int32 Beaten = 0, Takes = 0, N = 0;
+				for (int32 s = 0; s < Seeds; ++s)
+				{
+					FAstraBoardSim Sim;
+					Sim.Init(Rig.Map.ToSharedRef(), Seed + s * 23);
+					Sim.Tuning = Rig.Tuning;
+					const auto Land = [&](int32 Room, int32 Count)
+					{
+						for (const int32 Sq : Sim.SpawnAttackers(ESide::Mandate, Room, CutOf(Room), Obj, Count, 2.f, Count))
+						{
+							Sim.SquadMutable(Sq)->BreachComp = Room;                      // (each craft's hatch is its squads' own)
+							Sim.SquadMutable(Sq)->BreachPos = CutOf(Room);
+						}
+					};
+					if (Craft == 1)
+					{
+						Land(Breach, Boarders);
+					}
+					else
+					{
+						Land(Breach, Boarders / 2);
+						Land(Breach2, Boarders - Boarders / 2);
+						Sim.SetMission(ESide::Mandate, Breach, CutOf(Breach), Obj);
+					}
+					int32 Counter = 0;
+					for (int32 q = 0; q < 2; ++q)
+					{
+						const int32 Sq = Sim.Squads().Num();
+						MakeMen(Sim, M, ESide::Aquila, FString::Printf(TEXT("Reaction %d"), q + 1), 6, M.Inset(Obj, M.CentreOf(Obj) + FVector(q ? 300.0 : -300.0, 0.0, 0.0), 80.f), TEXT("Marine"), Counter);
+						if (Mode > 0)
+						{
+							FOrder O;
+							O.Task = ETask::Hold;
+							O.Comp = Obj;
+							O.Pos = M.CentreOf(Obj);
+							O.Radius = Mode == 1 ? 800.f : 2600.f;
+							O.Where = M.Describe(Obj);
+							Sim.OrderEx(Sq, O);
+						}
+					}
+					const FRunResult R = RunSim(Sim, 200.0);
+					++N;
+					Contact += R.Book.FirstContactT;
+					LossA += R.Book.Killed[0] + R.Book.Down[0];
+					LossM += R.Book.Killed[1] + R.Book.Down[1];
+					T += R.T;
+					Beaten += (R.Outcome == EOutcome::DefenderHolds || R.Outcome == EOutcome::AttackerRepelled) ? 1 : 0;
+					Takes += R.Outcome == EOutcome::AttackerTakes ? 1 : 0;
+				}
+				BNote(FString::Printf(TEXT("    %d craft, %2d boarders, twelve marines in Engineering: %-24s the Mandate beaten %2d of %2d (take Engineering %2d), first contact %4.1f s, ends %5.1f s; marines lost %4.1f, Mandate lost %4.1f"),
+				                      Craft, Boarders, Mode == 0 ? TEXT("no order (meet them)") : Mode == 1 ? TEXT("hold the place") : TEXT("hold wide (a section)"), Beaten, N, Takes, Contact / FMath::Max(1, N), T / FMath::Max(1, N), LossA / FMath::Max(1, N), LossM / FMath::Max(1, N)));
+			}
 		}
 	}
 }
@@ -3344,6 +3463,7 @@ int32 UAstraBoardSimCommandlet::Main(const FString& Params)
 	FParse::Value(*Params, TEXT("-seed="), Seed);
 	FParse::Value(*Params, TEXT("-seeds="), Seeds);
 	FParse::Value(*Params, TEXT("-boarders="), Boarders);
+	GBoarders = Boarders;
 	FParse::Value(*Params, TEXT("-out="), OutPath);
 	FParse::Value(*Params, TEXT("-set="), Set, false);
 	GTrace = FParse::Param(*Params, TEXT("trace"));
@@ -3454,6 +3574,10 @@ int32 UAstraBoardSimCommandlet::Main(const FString& Params)
 	if (Scenario == TEXT("ambush") || Scenario == TEXT("drills"))
 	{
 		BoardScenarioAmbush(Rig, Seed, Seeds);
+	}
+	if (Scenario == TEXT("hold") || Scenario == TEXT("drills"))
+	{
+		BoardScenarioHold(Rig, Seed, Seeds);
 	}
 	int32 Failed = 0;
 	for (const FBCheck& C : BChecks)
