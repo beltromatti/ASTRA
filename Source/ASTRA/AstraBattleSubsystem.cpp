@@ -1130,18 +1130,21 @@ void UAstraBattleSubsystem::TickScenario(float Dt)
 		                        EAstraSide::Mandate, C + Polar(4 * OneKm, 160, -2), 70.f, 550.f, 130.f, 1300.f, 500.f);
 		const int32 E = AddShip(TEXT("T-24"), TEXT("Phlegethon"), TEXT("Kharon Mandate destroyer, Styx class"), TEXT("SM_SHIP_MANDATE_Styx"),
 		                        EAstraSide::Mandate, C + Polar(5 * OneKm, 250, 3), 70.f, 550.f, 130.f, 1300.f, 500.f);
-		for (int32 Idx : {A, B, D, E})
+		// a second cruiser (the March's F-M1 has one, "Hecate": with one the picket and the Aquila broke the group in three minutes without a loss, BATTAGLIA-3's bench, 5 Oct)
+		const int32 K = AddShip(TEXT("T-25"), TEXT("Hecate"), TEXT("Kharon Mandate cruiser, Acheron class"), TEXT("SM_SHIP_MANDATE_Acheron"),
+		                        EAstraSide::Mandate, C + Polar(6 * OneKm, 20, 2), 70.f, 500.f, 240.f, 3600.f, 1500.f);
+		for (int32 Idx : {A, B, D, E, K})
 		{
 			FAstraBattleShip& S = Ships[Idx];
 			S.bHostile = true;
 			S.Mode = EAstraShipMode::Attack;
 			S.CruiseSpeed = 450.f;
 			// the Archon and the Styx go for the Aquila (the carrier is the prize), the others for the escorts
-			S.TargetId = (Idx == A || Idx == B) ? Ships[0].Id : (Idx == D ? Ships[1].Id : Ships[2].Id);
+			S.TargetId = (Idx == A || Idx == B) ? Ships[0].Id : ((Idx == D || Idx == K) ? Ships[1].Id : Ships[2].Id);
 			SpawnVisual(S);
 		}
 		// the Archon's strike group: one battle group, the cruiser leading a wedge, sent at the picket and the carrier
-		NoteGroupSpawn(EAstraSide::Mandate, TEXT("Strike Group Varek Solm"), TEXT("wedge"), TArray<int32>({A, B, D, E}), -1);
+		NoteGroupSpawn(EAstraSide::Mandate, TEXT("Strike Group Varek Solm"), TEXT("wedge"), TArray<int32>({A, B, D, E, K}), -1);
 		if (FAstraBattleGroup* SG = FindGroup(Ships[A].GroupId))
 		{
 			SG->Objective = Ships[0].Pos;
@@ -1160,7 +1163,7 @@ void UAstraBattleSubsystem::TickScenario(float Dt)
 		TransmissionText = TEXT("T-21 — Archon Varek Solm hails the Aquila on an open channel");
 		Ships[A].bLeader = true;
 		bEngagementActive = true;
-		Report(TEXT("sensors: four new contacts at 25 km, bearing 070 — Kharon Mandate strike group: cruiser Acheron (T-21) "
+		Report(TEXT("sensors: five new contacts at 25 km, bearing 070 — Kharon Mandate strike group: cruisers Acheron (T-21) and Hecate (T-25) "
 		            "and three Styx-class destroyers (T-22 Styx, T-23 Cocytus, T-24 Phlegethon), closing at 450 m/s; the 7th Fleet is moving to engage"));
 	}
 	// stage 3: the strike group was the Interdiction Fleet's probe; its vanguard comes through the Janus Gate, and the 7th Fleet's relief
@@ -1230,7 +1233,7 @@ void UAstraBattleSubsystem::TickScenario(float Dt)
 	// outcome
 	if (bEngagementActive)
 	{
-		int32 Fighting = 0, Holding = 0, Withdrawing = 0, AgreedWithdraw = 0;
+		int32 Fighting = 0, Holding = 0, Withdrawing = 0, AgreedWithdraw = 0, OrderedWithdraw = 0;
 		for (const FAstraBattleShip& S : Ships)
 		{
 			if (S.bAlive && S.bHostile && !S.bDisabled)
@@ -1242,7 +1245,8 @@ void UAstraBattleSubsystem::TickScenario(float Dt)
 				Fighting += ((!S.bFleeing || bOrderedPause) && !S.bHoldFire) ? 1 : 0;
 				Holding += (S.bHoldFire && !S.bFleeing) ? 1 : 0;
 				Withdrawing += (S.bFleeing && !bOrderedPause) ? 1 : 0;
-				AgreedWithdraw += (S.bFleeing && S.bNegotiated) ? 1 : 0;
+				AgreedWithdraw += (S.bFleeing && S.bNegotiated && S.bParley) ? 1 : 0;           // terms spoken over the channel with the Captain
+				OrderedWithdraw += (S.bFleeing && S.bNegotiated && !S.bParley) ? 1 : 0;         // their commander's own order (no word was exchanged: the Mandate's admiral broke off in front of the 7th Fleet, 5 Oct)
 			}
 		}
 		// a ceasefire is a truce, not an end: the fight is over only when it has held for two minutes
@@ -1269,9 +1273,11 @@ void UAstraBattleSubsystem::TickScenario(float Dt)
 		else if (Fighting == 0 && Holding == 0)
 		{
 			Result = AgreedWithdraw > 0 ? TEXT("the enemy withdrew under the terms agreed over the channel")
-			       : (Withdrawing > 0 ? TEXT("victory: the surviving enemy ships broke off and withdrew") : TEXT("victory: no hostile ship left"));
+			       : (OrderedWithdraw > 0 ? TEXT("victory: the Mandate commander ordered the survivors to break off, and they withdrew")
+			       : (Withdrawing > 0 ? TEXT("victory: the surviving enemy ships broke off and withdrew") : TEXT("victory: no hostile ship left")));
 			Report(AgreedWithdraw > 0 ? TEXT("tactical: the Mandate ships are withdrawing as agreed over the channel; the engagement is over")
-			                          : TEXT("tactical: no hostile ship left fighting in the engagement zone — the engagement is over"));
+			       : (OrderedWithdraw > 0 ? TEXT("tactical: the Mandate ships are breaking off on their commander's order; the engagement is over")
+			                              : TEXT("tactical: no hostile ship left fighting in the engagement zone — the engagement is over")));
 		}
 		else if (Ships[0].Hull / Ships[0].HullMax < 0.08f)
 		{
@@ -1781,6 +1787,7 @@ bool UAstraBattleSubsystem::PlayerFire(const FString& Weapon, const FString& Con
 		// accused the Aquila of one when a standing "engage until they fall" fired on the Hypnos as the Mandate pulled back, 2 Oct). She is in the
 		// fight again and may turn on us
 		T->bNegotiated = false;
+		T->bParley = false;
 		Report(FString::Printf(TEXT("tactical: we are firing on the withdrawing %s (%s): she is fair game, and she may turn and fight"), *T->Name, *T->ContactId));
 	}
 	FAstraBattleShip& P = Ships[0];
@@ -2602,7 +2609,7 @@ bool UAstraBattleSubsystem::FleetRequest(const FString& Ship, const FString& Req
 	return true;
 }
 
-bool UAstraBattleSubsystem::EnemyOrder(const FString& Order, const FString& Reason, const FString& Commander, FString& OutDetail)
+bool UAstraBattleSubsystem::EnemyOrder(const FString& Order, const FString& Reason, const FString& Commander, FString& OutDetail, bool bParley)
 {
 	const FString O = Order.ToLower();
 	const FString Senior = MandateCommander();
@@ -2628,12 +2635,14 @@ bool UAstraBattleSubsystem::EnemyOrder(const FString& Order, const FString& Reas
 		{
 			S.bFleeing = true;
 			S.bNegotiated = true;
+			S.bParley = bParley;                       // (agreed over the channel with the Captain, or the commander's own order: the director says which)
 			S.Mode = EAstraShipMode::Evade;
 		}
 		else if (O == TEXT("continue_attack"))
 		{
 			S.bHoldFire = false;
 			S.bNegotiated = false;
+			S.bParley = false;
 			if (S.Hull >= S.HullMax * 0.25f)
 			{
 				S.bFleeing = false;
@@ -2644,6 +2653,7 @@ bool UAstraBattleSubsystem::EnemyOrder(const FString& Order, const FString& Reas
 		{
 			S.bHoldFire = true;
 			S.bNegotiated = true;
+			S.bParley = bParley;
 		}
 	}
 	bSurrenderAccepted |= (O == TEXT("accept_surrender") && bGroup);
@@ -2676,6 +2686,7 @@ void UAstraBattleSubsystem::BreakCeasefire(const FAstraBattleShip& Victim)
 			continue;
 		}
 		S.bNegotiated = false;
+		S.bParley = false;
 		S.bHoldFire = false;
 		if (S.Hull >= S.HullMax * 0.25f)
 		{

@@ -399,6 +399,7 @@ namespace
 			GEngine->Exec(World, *C.TrimStartAndEnd());   // astra.cmd: single quotes stand for double quotes
 		}
 		B->StartCampaign();
+		Ship->WaitForInterior(30.0);                   // (the Aquila's inside is read on a worker: the battle starts with it, as the game's does, not whenever the worker is done)
 		if (Jump >= 0.f)
 		{
 			GEngine->Exec(World, *FString::Printf(TEXT("astra.battle.time %f"), Jump));

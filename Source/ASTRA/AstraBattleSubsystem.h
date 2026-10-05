@@ -123,7 +123,8 @@ struct FAstraBattleShip
 	float GunT = 0.f;
 	float OrbitPhase = 0.f;
 	bool bJammed = false;                // an EW drone is degrading its fire control
-	bool bNegotiated = false;            // holding fire / withdrawing under terms agreed over the channel
+	bool bNegotiated = false;            // holding fire / withdrawing on a commander's order (EnemyOrder): the rules of engagement, the groups' view of an order from above
+	bool bParley = false;                // ... and the order was given over the open channel with the Captain: terms agreed in words (a ceasefire, a withdrawal both sides spoke), not a commander's own decision
 	bool bLeader = false;                // leads its group (the commander on the channel)
 	bool bDerelict = false;              // a dead station or hulk to investigate: no power, tumbling slowly
 	bool bFixture = false;               // a place of the system (Keeper Station, the Arsenal...: AstraSpaceLife.*): in the plot as a neutral contact, posed once and never moved, hit by nothing, run by no AI
@@ -473,7 +474,7 @@ public:
 	void GetHoloBlips(TArray<FAstraHoloBlip>& Out) const;
 	/** A Mandate commander's decision (from their mind): continue_attack | hold_fire | withdraw | accept_surrender.
 	 *  The senior surviving commander orders the whole strike group; any other captain only their own ship. */
-	bool EnemyOrder(const FString& Order, const FString& Reason, const FString& Commander, FString& OutDetail);
+	bool EnemyOrder(const FString& Order, const FString& Reason, const FString& Commander, FString& OutDetail, bool bParley = false);
 	/** The senior Mandate commander's tactical orders (from their mind, by datalink): focus of fire (focus), stance
 	 *  (standard | close | standoff | flank | screen), missiles (normal | salvo | conserve), fighters (launch | hold),
 	 *  optionally only some ships. What the Aquila's sensors can see of it is reported to the bridge. */

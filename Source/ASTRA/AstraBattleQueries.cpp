@@ -268,6 +268,21 @@ TSharedRef<FJsonObject> UAstraBattleSubsystem::DebugState() const
 				Q->SetNumberField(TEXT("heat_pct"), FMath::RoundToDouble(Ship->GetHeatPct() * 10.0) / 10.0);
 				Q->SetNumberField(TEXT("heat_factor"), FMath::RoundToDouble(Ship->HeatFactor() * 100.0) / 100.0);
 				Q->SetNumberField(TEXT("incidents"), Ship->GetDamage().Num());
+				{
+					// what is open, for the bench to see what the damage control is up against (the kind, the room, how bad, who is on it, how it stands): the first twelve, the worst first
+					TArray<const FAstraDamage*> Open;
+					for (const FAstraDamage& D : Ship->GetDamage())
+					{
+						Open.Add(&D);
+					}
+					Open.Sort([](const FAstraDamage& A, const FAstraDamage& B) { return A.Severity > B.Severity; });
+					TArray<TSharedPtr<FJsonValue>> L;
+					for (int32 i = 0; i < FMath::Min(12, Open.Num()); ++i)
+					{
+						L.Add(MakeShared<FJsonValueString>(FString::Printf(TEXT("%s|%s|%.2f|%d|%s"), *Open[i]->Kind, *Open[i]->Place, Open[i]->Severity, Open[i]->Team, *Open[i]->Note)));
+					}
+					Q->SetArrayField(TEXT("incident_list"), L);
+				}
 				Q->SetNumberField(TEXT("fires"), Fires);
 				Q->SetNumberField(TEXT("breaches"), Breaches);
 				Q->SetNumberField(TEXT("teams_busy"), Busy);
