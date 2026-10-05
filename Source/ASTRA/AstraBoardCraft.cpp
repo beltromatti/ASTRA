@@ -21,16 +21,90 @@ namespace AstraBoardCraft
 {
 	const FKind& Skiff()
 	{
-		// the Mandate's: a crude, armoured wedge with a cutting ring on its nose; slower to answer the stick than a Kestrel
-		static const FKind K{FName(TEXT("skiff")), TEXT("Skiff"), TEXT("SM_CRAFT_MANDATE_Skiff"), TEXT("Kharon Mandate boarding skiff"), true, 10, 140.f, 9.f, 7.5f, 220.f, 45.f, 0.06f, 70.f, 12.f};
+		// the Mandate's: a crude, armoured wedge with a cutting ring on its nose; a hull of 140, a drive that is all thrust (the boats of this war are flown in the target's frame: every
+		// capital ship of both sides runs at 288-500 m/s and a boat that cruised at 220 never caught one, nor came home to one that had moved; 640 against her, 60 m/s^2: 0.6 of a minute per 20 km)
+		static const FKind K{FName(TEXT("skiff")), TEXT("Skiff"), TEXT("SM_CRAFT_MANDATE_Skiff"), TEXT("Kharon Mandate boarding skiff"), true, 10, 140.f, 9.f, 7.5f, 640.f, 60.f, 0.06f, 70.f, 12.f};
 		return K;
 	}
 
 	const FKind& Kestrel()
 	{
-		// ASTRA's assault shuttle (Deck 8's bay): a heavier hull, a clamp collar that mates with a hatch
-		static const FKind K{FName(TEXT("kestrel")), TEXT("Kestrel"), TEXT("SM_CRAFT_ASTRA_Kestrel"), TEXT("ASTRA assault shuttle (Kestrel)"), false, 12, 200.f, 11.f, 9.f, 180.f, 40.f, 0.05f, 70.f, 9.f};
+		// ASTRA's assault shuttle (Deck 8's bay): a heavier hull, a clamp collar that mates with a hatch; a little slower and a little more nimble than the wedge
+		static const FKind K{FName(TEXT("kestrel")), TEXT("Kestrel"), TEXT("SM_CRAFT_ASTRA_Kestrel"), TEXT("ASTRA assault shuttle (Kestrel)"), false, 12, 200.f, 11.f, 9.f, 560.f, 65.f, 0.05f, 70.f, 9.f};
 		return K;
+	}
+
+	double CrossS(const FKind& K, double DistM)
+	{
+		if (DistM <= 0.0)
+		{
+			return 0.0;
+		}
+		const double A = FMath::Max(1.0, (double)K.Accel), B = A * BrakeShare, V = FMath::Max(1.0, (double)K.Cruise);
+		const double DUp = V * V / (2.0 * A), DDown = V * V / (2.0 * B);
+		if (DUp + DDown >= DistM)
+		{
+			const double Peak = FMath::Sqrt(2.0 * DistM / (1.0 / A + 1.0 / B));           // it never reaches its cruise: up, then down
+			return Peak / A + Peak / B;
+		}
+		return V / A + (DistM - DUp - DDown) / V + V / B;
+	}
+
+	double ApproachS(double AlongM)
+	{
+		// 0.30 per second of the distance left, at most 55 m/s: a straight run down to 183 m, then an exponential to the point where the floor of 2.5 m/s takes over, then the floor to 2.2 m
+		const double Knee = ApproachMaxMps / 0.30, Floor = 2.5 / 0.30, Touch = 2.2;
+		double T = 0.0;
+		double A = FMath::Max(AlongM, Touch);
+		if (A > Knee)
+		{
+			T += (A - Knee) / ApproachMaxMps;
+			A = Knee;
+		}
+		if (A > Floor)
+		{
+			T += FMath::Loge(A / Floor) / 0.30;
+			A = Floor;
+		}
+		return T + FMath::Max(0.0, A - Touch) / 2.5;
+	}
+
+	double FlightEtaS(const FKind& K, double DistToHatchM)
+	{
+		return LeaveS + CrossS(K, FMath::Max(0.0, DistToHatchM - StageM)) + ApproachS(StageM) + (double)K.LatchS;
+	}
+
+	double RemainingS(const FKind& K, EPhase Phase, bool bHome, double DistToStageM, double AlongM, float PhaseT)
+	{
+		const double Latch = bHome ? 0.0 : (double)K.LatchS;
+		switch (Phase)
+		{
+		case EPhase::Idle:
+		case EPhase::Leaving:
+			return FMath::Max(0.0, LeaveS - PhaseT) + CrossS(K, DistToStageM) + ApproachS(StageM) + Latch;
+		case EPhase::Transit:
+			return CrossS(K, DistToStageM) + ApproachS(StageM) + Latch;
+		case EPhase::Approach:
+		case EPhase::Hold:
+			return ApproachS(AlongM) + Latch;
+		case EPhase::Latching:
+			return FMath::Max(0.0, (double)K.LatchS - PhaseT);
+		case EPhase::Undocking:
+			return FMath::Max(0.0, 6.0 - PhaseT) + CrossS(K, DistToStageM) + ApproachS(StageM);
+		default:
+			return 0.0;
+		}
+	}
+
+	FString SpanText(double Seconds)
+	{
+		const int32 S = FMath::Max(0, FMath::RoundToInt(Seconds));
+		if (S < 60)
+		{
+			return FString::Printf(TEXT("%d s"), S);
+		}
+		const int32 M = S / 60, R = S % 60;
+		return R == 0 ? FString::Printf(TEXT("%d min"), M) : FString::Printf(TEXT("%d min %d s"), M, R);
 	}
 
 	const FKind* KindByKey(FName Key)
@@ -270,7 +344,7 @@ bool UAstraBattleSubsystem::AssessBoarding(int32 CarrierId, int32 TargetId, FAss
 		Out.bCarrierOk = true;
 	}
 	Out.DistKm = (float)(FVector::Dist(C->Pos, T->Pos) / 1000.0);
-	Out.EtaS = (float)(FMath::Max(0.0, FVector::Dist(C->Pos, T->Pos) - T->Radius - StageM) / FMath::Max(80.0, (double)Bth.Kind->Cruise * 0.85) + 20.0 + Bth.Kind->LatchS);
+	Out.EtaS = (float)FlightEtaS(*Bth.Kind, FVector::Dist(C->Pos, T->Pos) - T->Radius);
 	return true;
 }
 
@@ -433,6 +507,62 @@ void UAstraBattleSubsystem::ConsumeBoardEvents(TArray<FCraftEvent>& Out)
 	BoardEvents.Reset();
 }
 
+bool UAstraBattleSubsystem::BoatStatus(int32 CraftId, FBoatStatus& Out) const
+{
+	Out = FBoatStatus();
+	const FAstraBattleShip* S = FindById(CraftId);
+	if (!S || !S->bAlive || S->CraftKind != 3)
+	{
+		return false;
+	}
+	const FFlight& B = S->Board;
+	const FKind* K = KindByKey(B.Kind);
+	if (!K)
+	{
+		return false;
+	}
+	Out.bFound = true;
+	Out.Name = S->Name;
+	Out.Phase = B.Phase;
+	Out.bHome = B.bHome;
+	Out.Men = B.Men;
+	Out.bDockedOrLatched = B.Phase == EPhase::Latching || B.Phase == EPhase::Docked;
+	Out.bWaitingOnShield = B.Phase == EPhase::Hold;
+	const FAstraBattleShip* Anchor = FindById(B.bHome ? B.CarrierId : B.TargetId);
+	if (!Anchor || !Anchor->bAlive)
+	{
+		return true;                                                  // nothing to fly to: no distance, no time
+	}
+	const FVector HatchW = Anchor->Pos + Anchor->Att.RotateVector(B.bHome ? B.Bay : B.Dock);
+	const FVector NW = Anchor->Att.RotateVector((B.bHome ? B.BayNormal : B.DockNormal).GetSafeNormal()).GetSafeNormal();
+	const double ToStage = FVector::Dist(S->Pos, HatchW + NW * StageM);
+	Out.DistM = FVector::Dist(S->Pos, HatchW);
+	Out.EtaS = RemainingS(*K, B.Phase, B.bHome, ToStage, FMath::Max(0.0, FVector::DotProduct(S->Pos - HatchW, NW)), B.T);
+	return true;
+}
+
+int32 UAstraBattleSubsystem::SetBoardingCaptain(int32 Order, bool bOn)
+{
+	// the first boat of the order, not yet out of the bay (or in its mouth): the Captain is in it, or no longer
+	for (FPendingLaunch& P : BoardLaunches)
+	{
+		if (P.Req.Order == Order && P.Index == 0)
+		{
+			P.Req.bCaptain = bOn;
+			return 1;
+		}
+	}
+	for (FAstraBattleShip& S : Ships)
+	{
+		if (S.bAlive && S.CraftKind == 3 && S.Board.Order == Order && S.Board.Leg == 0 && !S.Board.bHome && (S.Board.Phase == EPhase::Idle || S.Board.Phase == EPhase::Leaving))
+		{
+			S.Board.bCaptain = bOn;
+			return 2;
+		}
+	}
+	return 0;
+}
+
 // ---------------------------------------------------------------------------------------------------------- events
 void UAstraBattleSubsystem::EmitBoardEvent(EEventKind Kind, const FAstraBattleShip& S, const FString& Cause)
 {
@@ -585,7 +715,7 @@ bool UAstraBattleSubsystem::LaunchBoarding(const FLaunch& Req, FLaunchResult& Ou
 	Out.bOk = true;
 	Out.Craft = N;
 	Out.KindKey = K.Key.ToString();
-	Out.EtaS = (float)(FMath::Max(0.0, FVector::Dist(C->Pos, T->Pos) - T->Radius - StageM) / FMath::Max(80.0, (double)K.Cruise * 0.85) + 20.0 + P.T + K.LatchS);
+	Out.EtaS = (float)(FlightEtaS(K, FVector::Dist(C->Pos, T->Pos) - T->Radius) + P.T);
 	if (N < Req.Docks.Num())
 	{
 		Out.Why = FString::Printf(TEXT("only %d of the %d %ss asked for were free"), N, Req.Docks.Num(), K.Callsign);
@@ -791,8 +921,8 @@ void UAstraBattleSubsystem::TickBoardingLaunches(float Dt)
 		{
 			const FAstraBattleShip* Cr = FindById(Req.CarrierId);
 			const double DistKm = FVector::Dist(TargetPos, CarrierPos) / 1000.0;
-			Report(FString::Printf(TEXT("sensors: %s has launched boarding craft (%d on this run) — they are heading for the Aquila's %s side, about %.0f s away; point defence and the fighters can stop them, and they cannot dock where our shield is up"),
-			                       Cr ? *KnownLabel(*Cr) : *CarrierName, Req.Docks.Num(), AstraWar::FacingName(FacingOfNormal(Dock.Normal)), (float)(FMath::Max(0.0, DistKm * 1000.0 - TargetRadius) / FMath::Max(80.0, (double)K->Cruise * 0.85) + 20.0)), true);
+			Report(FString::Printf(TEXT("sensors: %s has launched boarding craft (%d on this run) — they are heading for the Aquila's %s side, about %s from her hull; point defence and the fighters can stop them, and they cannot dock where our shield is up"),
+			                       Cr ? *KnownLabel(*Cr) : *CarrierName, Req.Docks.Num(), AstraWar::FacingName(FacingOfNormal(Dock.Normal)), *SpanText(FlightEtaS(*K, DistKm * 1000.0 - TargetRadius))), true);
 		}
 		(void)CarrierClass;
 		(void)TargetName;

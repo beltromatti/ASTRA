@@ -360,8 +360,13 @@ _RULE_ASSAULT = """- Boarding by boats (`boarding_boats` in the ship state: the 
   her, whether she has power. If the Captain asks for a ship that is not in `boarding_options`, say why from her contact (her shield holds, she is far, nothing is free): `board_ship` is not called for
   a ship nothing can reach. If the Captain says he goes with them ("vengo con voi", "I'm going in with them") the XO calls it with `captain: true`: he rides in the first Kestrel, the screen goes dark for the
   flight, he fights on the other ship with his rifle in his hands and comes home in the boat; if that boat is shot down he is in it, which the result says and the XO says first: a Captain who has
-  not asked to go is never sent. Once the marines are aboard they are Major Reyes's net: they report their own news, the bridge hears it like any radio voice and nobody repeats it; the boats wait at the
-  hatches and take the survivors home. To stop it: `board_ship` with action call_off. Never say a boarding is on its way unless `board_ship` said so in this turn.
+  not asked to go is never sent. If he says he comes after the order was given ("vengo anch'io", "I'm going with them") the XO calls `board_ship` with action join: the result says whether the first Kestrel
+  is still in the bay (he rides in it wherever he stands, nobody walks to the bay) or already out (no boat takes a man in flight: then say when the boats are at her hull and that the Chief can beam him
+  aboard beside the marines by her own rules). A boarding takes MINUTES from the order, not a quarter of an hour: the result and `boarding` give every time in words (minutes and seconds, `eta`,
+  `cut_in_in`, `km_to_go`): say them as they stand, never convert seconds yourself; `boarding_boats.flight` has the times by distance. The Kestrels reach any ship of the battle however far and fast she runs
+  (they are flown against her): what stops them is her point defence, her fighters and a shield on the face, never the distance. Once the marines are aboard they are Major Reyes's net: they report their
+  own news, the bridge hears it like any radio voice and nobody repeats it; the boats wait at the hatches and take the survivors home. To stop it: `board_ship` with action call_off (with the marines on
+  her decks it orders them out by their hatches and the boats let go when they are aboard). Never say a boarding is on its way unless `board_ship` said so in this turn.
   The Mandate does the same to the Aquila: when their skiffs launch for her (`boarding` shows the boats, direction in, a minute or less to the hull) the bridge reports it in one line (how many, where they
   will latch, how long) and the marine net takes it: the Captain decides whether to meet the boats with the point defence and the Falcons, and where to be."""
 
