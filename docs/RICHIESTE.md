@@ -4,17 +4,10 @@ Qui scrivo solo ciò che **non posso fare io** (per regole di sicurezza: creare 
 
 ## Aperte
 
-### 2026-10-05 — Accept Apple's updated developer agreement (2 minutes), then the release gets notarized
-Notarization of ASTRA 0.1.0-alpha was refused by Apple with *HTTP 403: a required agreement is missing or has expired*: the account
-holder has to accept the current Apple Developer Program License Agreement. Sign in at https://developer.apple.com/account (and
-https://appstoreconnect.apple.com, Business / Agreements, if it asks there too) and accept what is pending. Then tell me "notarizza" and I run
-`tools/release_mac.sh 0.1.0-alpha --skip-build` (it signs, notarizes, staples and zips the same build) and replace the release's file.
-Until then the published app is signed with your Developer ID but not notarized: macOS asks players to choose Open Anyway once.
-
 ### 2026-10-05 — Windows build (when you have a PC with UE 5.8.3 and Visual Studio 2022)
 Unreal cannot build Windows from a Mac. On the PC: `tools\windows\Setup-EpicContent.ps1`, then
 `powershell -NoProfile -ExecutionPolicy Bypass -File tools\windows\Pacchetto-Windows.ps1 -Config Shipping -Zip`, and send me the zip's path
-(or attach it to the release yourself: `gh release upload v0.1.0-alpha <zip>`).
+(or attach it to the release yourself: `gh release upload v0.1.1-alpha <zip>`).
 
 ### 2026-09-28 — Autorizzare l'account Epic nell'editor per i MetaHuman (una volta, 1 minuto) — ORA PRIORITARIO (fase F3: umani realistici per tutti)
 Per trasformare l'equipaggio da manichini a **MetaHuman** realistici, Unreal usa il servizio Epic di *auto-rigging* dei volti:
@@ -34,10 +27,14 @@ resta fluido (le tue impostazioni sono a 30 fps: c'è margine). Se è troppo pes
 
 ## Chiuse
 
+### 2026-10-06 — Apple developer agreement and notarization ✓
+
+The owner accepted the agreement. Apple accepted the 0.1.1-alpha app; the release pipeline staples and validates the ticket and checks
+Gatekeeper. The new release supersedes the old signed-only app. The original 0.1.0-alpha artifact is retained unchanged in release history.
+
 ### 2026-10-05 — Credito OpenRouter: ricaricato dall'utente (13,27 $ residui alle 13:40) ✓
 
 - 2026-10-02 — Credito OpenRouter: ricaricato (20 $ in tutto; 13,37 $ residui al 2/10 pomeriggio). Grazie. ✓
 - 2026-09-29 — Finestre di permesso di macOS dopo la prova dell'app dal Desktop: risolte, la compilazione è ripartita. ✓
 - 2026-09-29 — Permesso del microfono: concesso (la prima partita ha usato la voce). ✓
 - 2026-09-28 — Chiavi API, account gratuiti, accessi nel browser, Core Data MetaHuman, aggiornamenti Xcode bloccati. ✓
-

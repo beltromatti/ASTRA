@@ -92,13 +92,15 @@ narrator tells the end of the chapter on a black screen, in your language.
 ## Play the alpha
 
 **macOS** (Apple Silicon, macOS 14 Sonoma or later, 16 GB of memory recommended): download
-`ASTRA-0.1.0-alpha-macOS-AppleSilicon.zip` from the [latest release](https://github.com/beltromatti/ASTRA/releases), unzip it, move
-**ASTRA** to Applications and open it. The app is signed with the developer's Apple Developer ID. If macOS says it cannot verify the app
-(this first build is still waiting for Apple's notarization), open System Settings, Privacy & Security, and choose Open Anyway once.
+`ASTRA-0.1.1-alpha-macOS-AppleSilicon.zip` from the [0.1.1-alpha release](https://github.com/beltromatti/ASTRA/releases/tag/v0.1.1-alpha), unzip it, move
+**ASTRA** to Applications and open it. This Shipping app is signed with the developer's Apple Developer ID, notarized by Apple and carries
+a stapled notarization ticket. The [website download](https://astra.noesisai.it/download) always selects the newest available Mac release,
+including alphas. The original 0.1.0-alpha stays available in the release history.
 
 <a id="windows"></a>**Windows** is the main platform for players, and the project builds for it, but a Windows build has to be made on a
 Windows PC (Unreal Engine cannot build Windows from a Mac). With Unreal Engine 5.8.3 and Visual Studio 2022 installed, one command makes
-the package: see [Building on Windows](#building-on-windows). A ready-made Windows download will come with the next release.
+the package: see [Building on Windows](#building-on-windows). There is no prebuilt Windows executable yet, and Windows runtime validation
+still requires that PC.
 
 What you need:
 

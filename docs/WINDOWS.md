@@ -5,7 +5,12 @@ portare ASTRA lì costa una mattina di compilazione e una prova, non un rifacime
 cross-compilazione da macOS: `docs/ricerca/01`), quindi tutto ciò che è solo-Windows è piccolo, isolato dietro guardie, e **tutto il resto è provato qui**.
 Contratti: [ARCHITETTURA.md §1, regola 4](ARCHITETTURA.md). Piano: [PIANO.md](PIANO.md) F8.*
 
-## 0. Alpha 0.1.0 (5 October 2026): what changed for Windows
+## 0. Alpha 0.1.1 (6 October 2026): Windows readiness
+
+The 0.1.1 source retains the Windows packaging path below. K opens the complete controls card on every platform; F1 is an additional PC
+shortcut. Hold Q for equipment, tap it for quick switch. The current portability scan reports no disallowed findings, and the C++ shadow
+audit reports none. These checks do not substitute for an MSVC build, a microphone/voice check or a real Windows playtest. No Windows
+executable is attached to the 0.1.1 release.
 
 - **Build it on a PC**: `tools\windows\Setup-EpicContent.ps1`, then
   `powershell -NoProfile -ExecutionPolicy Bypass -File tools\windows\Pacchetto-Windows.ps1 -Config Shipping -Zip`. Shipping is the release
