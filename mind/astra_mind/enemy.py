@@ -15,6 +15,7 @@ import time
 from typing import Any, Awaitable, Callable
 
 from . import models
+from .prompt_layout import cached_prompt
 from .crew import CAPTAIN_WORD, LANG_NAMES
 from .openrouter import OpenRouter, ToolCall
 from .war_minds import picture
@@ -209,10 +210,13 @@ class EnemyAgent:
         mission = f"Your orders: {c['mission']}" if c.get("mission") else OPENING_MISSION
         if self.war is not None:
             self.war.preempt(self.contact)            # the Captain is talking to them: a pulse of their command mind in flight gives way
-        system = PERSONA.format(name=c["name"], rank=c["rank"], ship=c["ship"], bio=c["bio"], command_line=self._command_line(battle_state),
+        system, current_context = cached_prompt(PERSONA, dict(name=c["name"], rank=c["rank"], ship=c["ship"], bio=c["bio"], command_line=self._command_line(battle_state),
                                 where=where, mission=mission, lang_name=LANG_NAMES.get(lang, lang), captain=CAPTAIN_WORD.get(lang, "Captain"),
-                                log=self.war.recall("mandate") if self.war is not None else " (none)", state=self._picture(battle_state))
-        msgs = [{"role": "system", "content": system}] + history[-16:] + [{"role": "user", "content": stimulus}]
+                                log=self.war.recall("mandate") if self.war is not None else " (none)", state=self._picture(battle_state)), ('where', 'command_line', 'mission', 'log', 'state'))
+        msgs = [{"role": "system", "content": system}] + history[-16:] + [{"role": "user", "content": current_context + "\n\n" + stimulus}]
+        if self.war is not None:
+            msgs[-1]["content"] = self.war.person_history("mandate", c["name"]) + "\n\n" + msgs[-1]["content"]
+            self.war.remember_person("mandate", c["name"], "The Captain said on the channel: " + stimulus)
         spk = c["key"]
         lines: list[str] = []
         t0 = time.perf_counter()

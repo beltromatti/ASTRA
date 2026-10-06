@@ -13,6 +13,7 @@ import logging
 from typing import Any
 
 from .openrouter import OpenRouter, ToolCall
+from .prompt_layout import cached_prompt
 
 log = logging.getLogger("astra.style")
 
@@ -92,12 +93,12 @@ class StyleKeeper:
                     a = call.arguments() or {}
                     got.update({k: str(a.get(k) or "").strip() for k in ("xo_read", "mandate_read")})
 
+            system, current_context = cached_prompt(PROMPT, dict(n=int(self.store.get("battles", 0) or 0),
+                xo=self.store.get("xo") or "(nothing yet)", mandate=self.store.get("mandate") or "(nothing yet)",
+                outcome=outcome[:400], orders="\n".join(orders)), ("n", "xo", "mandate", "outcome", "orders"))
             comp = await self.llm.chat(model=MODEL, messages=[
-                {"role": "system", "content": PROMPT.format(n=int(self.store.get("battles", 0) or 0),
-                                                           xo=self.store.get("xo") or "(nothing yet)",
-                                                           mandate=self.store.get("mandate") or "(nothing yet)",
-                                                           outcome=outcome[:400], orders="\n".join(orders))},
-                {"role": "user", "content": "Update the files."}],
+                {"role": "system", "content": system},
+                {"role": "user", "content": current_context + "\n\nUpdate the files."}],
                 tools=[PROFILE], tool_choice="auto", providers=PROVIDERS, reasoning={"enabled": False}, max_tokens=500,
                 temperature=0.3, on_tool_call=on_call, allow_fallbacks=True)
             if comp.error:

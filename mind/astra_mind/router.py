@@ -13,6 +13,8 @@ the ship's vocabulary in five languages — is gone; its test sets, bench/router
 """
 from __future__ import annotations
 
+from .prompt_layout import cached_prompt
+
 import asyncio
 import json
 import logging
@@ -124,11 +126,11 @@ async def for_party(llm: OpenRouter, text: str, ctx: Context, wait_s: float = 4.
         return Route()
     t0 = time.perf_counter()
     fleet = ch.kind == "fleet"
-    system = PROMPT.format(party=ch.name or ch.party, kind=ch.kind or "radio", situation=_situation(ctx), crew=_CREW_LINE,
-                           reply=(REPLY_FLEET if fleet else REPLY).format(party=ch.name or ch.party))
+    system, current_context = cached_prompt(PROMPT, dict(party=ch.name or ch.party, kind=ch.kind or "radio", situation=_situation(ctx), crew=_CREW_LINE,
+                           reply=(REPLY_FLEET if fleet else REPLY).format(party=ch.name or ch.party)), ('situation',))
     try:
         comp = await asyncio.wait_for(role_chat(llm, "router", messages=[{"role": "system", "content": system},
-                                                                        {"role": "user", "content": text}], max_tokens=200),
+                                                                        {"role": "user", "content": current_context + "\n\nCaptain: " + text}], max_tokens=200),
                                       timeout=wait_s)
     except asyncio.TimeoutError:
         log.warning("comms: no decision in %.1f s, nothing goes out to %s", wait_s, ch.party)

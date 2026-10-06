@@ -51,7 +51,7 @@ ROLES: dict[str, Role] = {r.name: r for r in (
          note="the Captain's turns and the officers' reports: quality and Italian first"),
     Role("crew_backup", "openai/gpt-oss-120b", None, (("effort", "low"),), max_tokens=450, temperature=0.4, first_token_s=6.0,
          note="the crew when DeepSeek stalled twice (5 Oct: a Captain's order was lost to two stalls in a row): another model, any provider"),
-    Role("watch", DEEPSEEK, _DS, max_tokens=300, temperature=0.4, first_token_s=5.0, fallback="crew_backup",
+    Role("watch", DEEPSEEK, _DS, max_tokens=450, temperature=0.4, first_token_s=5.0, fallback="crew_backup",
          note="the initiative watch: adjust the consoles, at most two short lines"),
     Role("router", DEEPSEEK, _DS, max_tokens=16, temperature=0.0, first_token_s=1.2,
          note="who is the Captain talking to (only the cases the rules cannot settle)"),

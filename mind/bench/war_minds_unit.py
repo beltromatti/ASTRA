@@ -671,8 +671,8 @@ class AstraTests(Fixture):
         c = self.llm.calls[0]
         self.assertEqual(c["seat"], "astra/group/7th Fleet picket")
         self.assertIn("Captain Rhea Castellan", c["system"])
-        self.assertIn("Commander Daniel Okoro", c["system"])                              # one call voices the group's captains
-        self.assertIn("Senior officer present: the Captain of the ASN Aquila", c["system"])
+        self.assertIn("Commander Daniel Okoro", c["system"] + c["user"])                              # one call voices the group's captains
+        self.assertIn("Senior officer present: the Captain of the ASN Aquila", c["system"] + c["user"])
         self.assertIn("The ASN Aquila (the Captain's ship)", c["user"])
         self.assertIn("T-31 bearing 335", c["user"])                                      # a bearing with no range is told as such
         self.assertEqual(self.voices["castellan"][1], "estelle")

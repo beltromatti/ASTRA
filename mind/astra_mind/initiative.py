@@ -48,6 +48,7 @@ class Watch:
     last_run: float = 0.0
     last_digest: str = ""
     quiet_runs: int = 0                      # consecutive checks that changed nothing: the cadence relaxes
+    _calm_since: float = 0.0
     _events: list[str] = field(default_factory=list)
     _event_t: float = 0.0                    # when the first unhandled significant event arrived
     _board: str = ""                         # the consoles as they were at the last check (to say what changed)
@@ -66,6 +67,7 @@ class Watch:
         self._event_t = 0.0
         self.last_digest = ""
         self.quiet_runs = 0
+        self._calm_since = 0.0
 
     # ------------------------------------------------------------------------------------------------ the picture
     @staticmethod
@@ -117,20 +119,24 @@ class Watch:
         held_back: the story forbids it now (abandoning, a board of inquiry)."""
         if held_back or busy or now - captain_t < self.quiet_s or not state.get("stations"):
             return None
-        if not self.active(state, flags):
-            if self._events:
-                self._events.clear()
-                self._event_t = 0.0
-            self.quiet_runs = 0
-            return None
+        calm = not self.active(state, flags)
+        if calm:
+            if not self._calm_since:
+                self._calm_since = now
+            if now - max(self.last_run, self._calm_since) < 75.0:
+                return None
+        else:
+            self._calm_since = 0.0
         if now - self.last_run < self.min_gap_s:
             return None
         hostile, blind, _ = self.contacts(state)
         hull = state.get("hull_pct")
         intense = len(hostile) >= 3 or (isinstance(hull, (int, float)) and hull < 50) or any("incoming" in e or "missile" in e for e in self._events)
         interval = (self.base_s * 0.65 if intense else self.base_s) * (1.0 + min(self.quiet_runs, 3) * 0.35)
+        if calm:
+            interval = 75.0
         digest = self.digest(state, flags + ([picture] if picture else []))
-        event_due = bool(self._events) and now - (self._event_t or now) >= self.settle_s
+        event_due = not calm and bool(self._events) and now - (self._event_t or now) >= self.settle_s
         periodic_due = now - self.last_run >= interval
         if not event_due and not (periodic_due and digest != self.last_digest):
             if periodic_due:
@@ -291,6 +297,26 @@ def watch_system(lang: str, state: dict[str, Any], standing: str, style: str, or
         state=json.dumps(trimmed, separators=(",", ":"), ensure_ascii=False))
 
 
+def watch_prompt(lang: str, state: dict[str, Any], standing: str, style: str, orders: str, memories: str = "") -> tuple[str, str]:
+    """Same watch facts and instructions, with changing values after the cached prefix."""
+    from .prompt_layout import cached_prompt
+    roster = "\n".join(f"- {o.id}: {o.title} — {DUTIES_V2.get(o.id, o.duties)}. {o.personality}." for o in CREW.values() if o.id in DUTIES_V2)
+    trimmed = {k: v for k, v in state.items() if not k.startswith("_") and k not in ("stations", "sim_time_s", "contacts", "bearing_convention",
+                                                                                    "known_systems", "casualties", "medbay", "mess", "transporter")}
+    fields = dict(lang_name=LANG_NAMES.get(lang, lang), captain=CAPTAIN_WORD.get(lang, "Captain"),
+                  table=station_model.describe(station_model.available_from_state(state)), roster=roster,
+                  standing=standing or "- none", style=style or "- unknown yet", orders=orders or "- none yet",
+                  board=station_model.board(state, {k: v.title for k, v in CREW.items()}) or "(no consoles)",
+                  state=json.dumps(trimmed, separators=(",", ":"), ensure_ascii=False))
+    system, current = cached_prompt(_WATCH_SYSTEM, fields, ("standing", "style", "orders", "board", "state"))
+    system += ("\nIn a quiet watch outside a fight, keep useful routine work on the console logs. Do not launch an offensive, "
+               "change the Captain's plan or create work merely because you were asked to look. Lessons and experiences below "
+               "are context to weigh, not standing orders; live facts and the Captain's current intent take precedence. "
+               "Do not log status simply because you were asked to check. Log only something an officer actually changed or "
+               "learned beyond what the consoles already display. Most checks need no tools and no speech.")
+    return system, current + "\n\nWhat the officers remember:\n" + (memories or "- nothing yet")
+
+
 _EVENT_HEAD = "[Ship systems event, not the Captain speaking] "      # (what an event turn is recorded as in the crew's history: agent.handle_event)
 
 
@@ -327,3 +353,12 @@ def chatter_system(lang: str, mood: str, memories: str, bonds: str, home: str, s
     return _CHATTER_SYSTEM.format(lang_name=LANG_NAMES.get(lang, lang), roster=roster, mood=mood or "steady: a crew doing its job",
                                   memories=memories or "nothing yet", bonds=bonds or "a new ship and a new captain", home=home or "nothing lately",
                                   story="; ".join(story[-6:]) or "the patrol has just begun", events="; ".join(events[-5:]) or "none")
+
+
+def chatter_prompt(lang: str, mood: str, memories: str, bonds: str, home: str, story: list[str], events: list[str]) -> tuple[str, str]:
+    from .prompt_layout import cached_prompt
+    roster = "\n".join(f"- {o.id}: {o.title}, {o.role}. {o.personality}." for o in CREW.values() if o.id in DUTIES_V2)
+    fields = dict(lang_name=LANG_NAMES.get(lang, lang), roster=roster, mood=mood or "steady: a crew doing its job",
+                  memories=memories or "nothing yet", bonds=bonds or "a new ship and a new captain", home=home or "nothing lately",
+                  story="; ".join(story[-6:]) or "the patrol has just begun", events="; ".join(events[-5:]) or "none")
+    return cached_prompt(_CHATTER_SYSTEM, fields, ("mood", "memories", "bonds", "home", "story", "events"))

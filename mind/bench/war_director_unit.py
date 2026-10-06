@@ -143,7 +143,7 @@ class DirectorTest(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("Act I", system)
         self.assertNotIn("act", self.model.calls[0]["tools"])
         self.assertIn("The pulse", system)
-        self.assertIn("the Mandate gathers a second wave at Erebus", system)
+        self.assertIn("the Mandate gathers a second wave at Erebus", system + self.model.calls[0]["user"])
         self.assertIn("NEVER rig a fight in progress", system)
         self.assertNotIn('"act"', json.dumps(dr.BEAT_TOOL))
 

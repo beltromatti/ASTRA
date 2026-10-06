@@ -4,7 +4,7 @@ Every console has a delegation (`manual`: only on the Captain's orders · `advis
 his standing orders, and say so). The game holds it (`stations.<id>.delegation`, the XO's `delegation` mode sets it) and starts every launch with `auto` everywhere, which on
 5 October meant squadrons launched and a pursuit begun that nobody had asked for. Two things follow, and both are the mind's, because the game forgets and the Captain does not:
 
-  - what COMMITS the ship starts on `advise` in a new campaign (the flight deck's launches and the helm's pursuits: the officer proposes, the Captain says go), and
+  - the helm starts on `advise`; flight control starts on `auto` within the Captain's intent (routine patrol, protection, recall and rearming, never an unrequested offensive), and
   - what the Captain says («nessuno lancia senza il mio ordine», "Voss, decidi tu", «da qui in poi fate da soli») is kept with the campaign and put back in the game each time it is
     launched, so that he has to say it once.
 
@@ -23,7 +23,7 @@ log = logging.getLogger("astra.delegation")
 
 LEVELS = ("manual", "advise", "auto")
 # what commits the ship waits for the Captain's go in a new campaign; the consoles that keep the ship alive (defence, repairs, power, the picture, the channels) act inside his intent
-DEFAULTS = {"flight": "advise", "helm": "advise"}
+DEFAULTS = {"flight": "auto", "helm": "advise"}
 CONSOLES = tuple(s for s in station_model.STATIONS if s != "xo")
 
 
@@ -108,7 +108,13 @@ class Delegation:
         try:
             with open(p, encoding="utf-8") as f:
                 raw = json.load(f)
-            return {k: v for k, v in raw.items() if k in CONSOLES and v in LEVELS}
+            if not isinstance(raw, dict):
+                return {}
+            levels = {k: v for k, v in raw.items() if k in CONSOLES and v in LEVELS}
+            # Only the old untouched default pair migrates. Current explicit advice/manual choices keep their meaning.
+            if "_version" not in raw and levels == {"flight": "advise", "helm": "advise"}:
+                levels["flight"] = "auto"
+            return levels
         except (OSError, ValueError):
             log.warning("the saved delegation could not be read: %s", p)
             return {}
@@ -121,7 +127,7 @@ class Delegation:
             os.makedirs(os.path.dirname(p), exist_ok=True)
             tmp = p + ".tmp"
             with open(tmp, "w", encoding="utf-8") as f:
-                json.dump(self.levels, f, ensure_ascii=False, indent=1)
+                json.dump({**self.levels, "_version": 2}, f, ensure_ascii=False, indent=1)
             os.replace(tmp, p)
         except OSError:
             log.warning("the delegation could not be saved: %s", p)

@@ -27,6 +27,7 @@ from collections import deque
 from typing import Any, Awaitable, Callable
 
 from . import models
+from .prompt_layout import cached_prompt
 from .crew import CAPTAIN_WORD, LANG_NAMES, WORLD
 from .openrouter import OpenRouter, ToolCall
 from .war import OWNERS, WarMap
@@ -462,6 +463,7 @@ class Director:
         self.blocked = lambda: False             # the story waits (the ship being abandoned, the aftermath): set by the server
         self.standing: list[dict[str, str]] = []   # the Captain's standing orders (shared with the bridge agent)
         self.memories: dict[str, list[dict[str, str]]] = {}   # what each officer remembers of the Captain (memory.py)
+        self.people: dict[str, list[str]] = {}
         self.style: dict[str, Any] = {}          # how the Captain commands: the XO's read, the Mandate's (style.py)
         self.home: list[dict[str, Any]] = []     # the officers' own lives: news from home (told to the Captain or not yet)
         self.captain_style = lambda: ""          # the XO's read, for the story (set by the server)
@@ -486,6 +488,7 @@ class Director:
         self.threads = list(OPENING_THREADS)
         self.standing.clear()
         self.memories.clear()
+        self.people.clear()
         self.style.clear()
         self.home.clear()
         self.arc, self.decisive = 1, False
@@ -512,6 +515,8 @@ class Director:
             self.memories.clear()
             self.memories.update({str(k): [m for m in v if isinstance(m, dict) and m.get("memory")]
                                   for k, v in (d.get("memories") or {}).items() if isinstance(v, list)})
+            self.people.clear()
+            self.people.update({str(k): [str(r)[:400] for r in v][-8:] for k, v in (d.get("people") or {}).items() if isinstance(v, list)})
             self.style.clear()
             self.style.update(d.get("style") or {})
             self.home[:] = [h for h in (d.get("home") or []) if isinstance(h, dict) and h.get("officer") and h.get("news")][-12:]
@@ -537,7 +542,7 @@ class Director:
             with open(tmp, "w", encoding="utf-8") as f:
                 json.dump({"campaign": self.campaign, "voice_i": self.voice_i, "mood": self.mood, "bonds": self.bonds, "threads": self.threads,
                            "standing": self.standing, "arc": self.arc, "decisive": self.decisive, "memories": self.memories,
-                           "style": self.style, "home": self.home}, f, ensure_ascii=False, indent=1)
+                           "style": self.style, "home": self.home, "people": self.people}, f, ensure_ascii=False, indent=1)
             os.replace(tmp, self._story_path())
         except OSError:
             log.exception("could not save the story")
@@ -707,7 +712,10 @@ class Director:
                       campaign="\n".join(f"- {c}" for c in self.campaign) or "- (the war has just begun)",
                       pulse=self.pulse_facts(state),
                       state=json.dumps(_brief(state), ensure_ascii=False, separators=(",", ":")))
-        prompt = DIRECTOR_PROMPT_MARCH.format(march=self.march.m.director_view(), **fields) if march else DIRECTOR_PROMPT.format(**fields)
+        if march:
+            fields["march"] = self.march.m.director_view()
+        prompt, current_context = cached_prompt(DIRECTOR_PROMPT_MARCH if march else DIRECTOR_PROMPT, fields,
+                                               ("threads", "mood", "bonds", "captain_style", "war", "campaign", "pulse", "state") + (("march",) if march else ()))
         beat: dict[str, Any] = {}
         speech: list[str] = []
         news: list[dict[str, Any]] = []
@@ -742,7 +750,7 @@ class Director:
                    f"in {LANG_NAMES.get(lang, lang)}, as a game master would (what you are setting up, without spoiling "
                    "surprises); then the beat.")
             tools = tools + [NARRATE]
-        comp = await models.chat(self.llm, "director", messages=[{"role": "system", "content": prompt}, {"role": "user", "content": ask}],
+        comp = await models.chat(self.llm, "director", messages=[{"role": "system", "content": prompt}, {"role": "user", "content": current_context + "\n\n" + ask}],
                                  tools=tools, tool_choice="auto", on_tool_call=on_call, max_tokens=1300 if request else 900)
         for t in told:   # (the March) true things for the story's pace: a fleet found, the government's pressure
             if t["tool"] == "reveal":
@@ -958,10 +966,10 @@ class Director:
 
     async def _brief_line(self, beat: dict[str, Any], detail: str, lang: str, state: dict[str, Any]) -> list[str]:
         """The director forgot Rourke's briefing: he gives it now (one short transmission)."""
-        prompt = ADMIRAL_PROMPT.format(name=ADMIRAL["name"], bio=ADMIRAL["bio"], world=WORLD, lang_name=LANG_NAMES.get(lang, lang),
+        prompt, current_context = cached_prompt(ADMIRAL_PROMPT, dict(name=ADMIRAL["name"], bio=ADMIRAL["bio"], world=WORLD, lang_name=LANG_NAMES.get(lang, lang),
                                        captain=CAPTAIN_WORD.get(lang, "Captain"), war=self.war.brief(detail=False), allies=self._allies_line(),
                                        campaign="\n".join(f"- {c}" for c in self.campaign[-8:]),
-                                       state=json.dumps(_brief(state), ensure_ascii=False, separators=(",", ":")))
+                                       state=json.dumps(_brief(state), ensure_ascii=False, separators=(",", ":"))), ('allies', 'war', 'campaign', 'state'))
         ask = (f"You are calling the Aquila now to brief her captain on this: {beat.get('type')} — {beat.get('why', '')} "
                f"({detail}). One short transmission with `transmit`.")
         lines: list[str] = []
@@ -971,7 +979,7 @@ class Director:
             if call.name == "transmit" and len((a.get("text") or "").strip()) >= 4 and not lines:
                 lines.append(a["text"].strip())
 
-        msgs = [{"role": "system", "content": prompt}, {"role": "user", "content": ask}]
+        msgs = [{"role": "system", "content": prompt}, {"role": "user", "content": current_context + "\n\n" + ask}]
         comp = await models.chat(self.llm, "director", messages=msgs, tools=[TRANSMIT], tool_choice="auto", on_tool_call=on_call, max_tokens=300,
                                  temperature=0.6)
         if not lines and comp.content.strip() and not comp.error and not comp.tool_calls:
@@ -994,12 +1002,12 @@ class Director:
             for line in lines:
                 self.note(f"Rourke to the Aquila: {line}")
             return lines
-        prompt = ADMIRAL_PROMPT.format(name=ADMIRAL["name"], bio=ADMIRAL["bio"], world=WORLD, lang_name=LANG_NAMES.get(lang, lang),
+        prompt, current_context = cached_prompt(ADMIRAL_PROMPT, dict(name=ADMIRAL["name"], bio=ADMIRAL["bio"], world=WORLD, lang_name=LANG_NAMES.get(lang, lang),
                                        captain=CAPTAIN_WORD.get(lang, "Captain"), war=self.war.brief(detail=False), allies=self._allies_line(),
                                        campaign="\n".join(f"- {c}" for c in self.campaign[-12:]) or "- (the war has just begun)",
-                                       state=json.dumps(_brief(state), ensure_ascii=False, separators=(",", ":")))
+                                       state=json.dumps(_brief(state), ensure_ascii=False, separators=(",", ":"))), ('allies', 'war', 'campaign', 'state'))
         msgs = [{"role": "system", "content": prompt}] + self.admiral_history[-10:] + [
-            {"role": "user", "content": f"[The Aquila on the fleet net]: {message}"}]
+            {"role": "user", "content": current_context + f"\n\n[The Aquila on the fleet net]: {message}"}]
         lines: list[str] = []
 
         async def on_call(call: ToolCall) -> None:

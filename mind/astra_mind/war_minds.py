@@ -37,6 +37,7 @@ from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable
 
 from . import models
+from .prompt_layout import cached_prompt
 from .crew import LANG_NAMES, WORLD
 from .openrouter import Completion, OpenRouter, ToolCall
 
@@ -768,9 +769,17 @@ sentences), and then act with the tools: orders, or `no_change`. Always end with
 
 
 def system_prompt(seat: "Seat", cmd: "Commander", where: str, mission: str, chain: str = "", admiral_name: str = "", ships: str = "", voices: str = "",
-                  channel_open: bool = False, ops: bool = True, formation: bool = False) -> str:
+                  channel_open: bool = False, ops: bool = True, formation: bool = False, context_out: list[str] | None = None) -> str:
+    def fmt(template: str, **fields: Any) -> str:
+        if context_out is None:
+            return template.format(**fields)
+        changing = tuple(k for k in ("where", "mission", "chain", "ships", "voices") if k in fields)
+        system, current = cached_prompt(template, fields, changing)
+        context_out.append(current)
+        return system
+
     if seat.kind == "admiral" and seat.side == "mandate":
-        s = MANDATE_ADMIRAL.format(name=cmd.name, rank=cmd.rank, ship=cmd.ship, where=where, bio=cmd.bio, mission=mission, doctrine=doctrine(formation),
+        s = fmt(MANDATE_ADMIRAL, name=cmd.name, rank=cmd.rank, ship=cmd.ship, where=where, bio=cmd.bio, mission=mission, doctrine=doctrine(formation),
                                    commands=COMMANDS_OPS if ops else COMMANDS_PLAIN, boarding=MANDATE_BOARDING)
         if channel_open:
             s += ("\n\nA channel with the ASTRA captain is OPEN: they hear what you `transmit`. Silence is the usual: speak only when the picture "
@@ -778,11 +787,11 @@ def system_prompt(seat: "Seat", cmd: "Commander", where: str, mission: str, chai
                   "dignity, true to the battle below (what you say must match what your ships are really doing).")
         return s
     if seat.kind == "admiral":
-        return ASTRA_BENCH_ADMIRAL.format(name=cmd.name, rank=cmd.rank, ship=cmd.ship, bio=cmd.bio, doctrine=doctrine(formation))
+        return fmt(ASTRA_BENCH_ADMIRAL, name=cmd.name, rank=cmd.rank, ship=cmd.ship, bio=cmd.bio, doctrine=doctrine(formation))
     if seat.side == "mandate":
-        return MANDATE_COMMANDER.format(name=cmd.name, rank=cmd.rank, ship=cmd.ship, bio=cmd.bio, mission=mission, doctrine=doctrine(formation), where=where,
+        return fmt(MANDATE_COMMANDER, name=cmd.name, rank=cmd.rank, ship=cmd.ship, bio=cmd.bio, mission=mission, doctrine=doctrine(formation), where=where,
                                         group=seat.group, admiral_name=admiral_name or "the admiral", boarding=MANDATE_BOARDING)
-    return ASTRA_COMMANDER.format(name=cmd.name, rank=cmd.rank, ship=cmd.ship, bio=cmd.bio, group=seat.group, ships=ships, where=where, mission=mission,
+    return fmt(ASTRA_COMMANDER, name=cmd.name, rank=cmd.rank, ship=cmd.ship, bio=cmd.bio, group=seat.group, ships=ships, where=where, mission=mission,
                                   world=WORLD, doctrine=doctrine(formation), chain=chain, voices=voices)
 
 
@@ -901,6 +910,8 @@ class WarMinds:
         self.trace = trace                               # the bench keeps every pulse with its prompts
         self.captain = captain                           # (ship, rank, name): the game's interior of that ship takes the persona as her captain (FLOTTA-VIVA)
         self.waiting: Callable[[], list[tuple[str, str, str]]] = lambda: []   # the Aquila's speech backlog (speech.Voice.waiting, set by the server)
+        self.people: dict[str, list[str]] = {}
+        self.save_people: Callable[[], None] = lambda: None
         self.minds: dict[str, Mind] = {}
         self.allies: dict[str, Commander] = {}           # ASTRA captains by ship contact id
         self.told_captains: dict[str, str] = {}          # contact -> the captain's name the game's interior of that ship was given (FLOTTA-VIVA)
@@ -997,6 +1008,26 @@ class WarMinds:
         now = self.clock()
         rows = list(self.logs[side])[-n:]
         return "\n".join(f" {max(0, now - t):.0f} s ago · {txt}" for t, txt in rows) or " (nothing yet: the fight has just begun)"
+
+    def remember_person(self, side: str, name: str, text: str) -> None:
+        """A small historical record of this person's actual interactions, never shared across sides."""
+        key = side + ":" + name
+        rows = self.people.setdefault(key, [])
+        text = text[:400]
+        if rows and rows[-1] == text:
+            return
+        rows.append(text)
+        del rows[:-8]
+        while len(self.people) > 32:
+            self.people.pop(next(iter(self.people)))
+        self.save_people()
+
+    def person_history(self, side: str, name: str) -> str:
+        rows = self.people.get(side + ":" + name, [])
+        if not rows:
+            return ""
+        return ("Your earlier interactions (historical, including previous watches; not current tactical facts or standing orders). "
+                "Weigh them against today's picture, and never confuse another person's history with yours:\n" + "\n".join("- " + r for r in rows))
 
     # ------------------------------------------------------------------------------------------------ the feed
     def feed(self, state: dict[str, Any]) -> None:
@@ -1361,8 +1392,9 @@ class WarMinds:
                           "One of them may speak instead of you (`speaker`) when the words are about their own ship; they do not give orders to the group.")
             chain = self.chain_facts(view, state)
         channel_open = side == "mandate" and self.channel(cmd.contact)
+        context_out: list[str] = []
         system = system_prompt(seat, cmd, where, mission, chain=chain, admiral_name=(admiral.commander.name if admiral and admiral.commander else ""),
-                               ships=ships, voices=voices, channel_open=channel_open, ops=self.ops, formation=self.formation_doctrine)
+                               ships=ships, voices=voices, channel_open=channel_open, ops=self.ops, formation=self.formation_doctrine, context_out=context_out)
         pic = picture(side, seat.kind, seat.group, view, state, mind.aquila_seen, self.clock())
         if side == "astra" and seat.kind == "group":
             mind.aquila_seen = (*aquila_levels(state), self.clock())                    # (what the next look compares with)
@@ -1403,6 +1435,7 @@ class WarMinds:
             tools = [group_order_tool("commander"), REPORT] + ([BOARD] if boats else []) + [NO_CHANGE]
         else:
             tools = [group_order_tool("commander"), say_tool(speakers, LANG_NAMES.get(lang, lang)), POSTURE, NO_CHANGE]
+        user = "\n\n".join(context_out) + "\n\n" + self.person_history(cmd.side, cmd.name) + "\n\n" + user
         return system, user, tools
 
     @staticmethod
@@ -1438,6 +1471,9 @@ class WarMinds:
         seat, cmd = mind.seat, mind.commander
         assert cmd is not None
         by_captain = any(m.answer for m in inbox)
+        for message in inbox:
+            if message.src == "captain":
+                self.remember_person(seat.side, cmd.name, "The Captain said to this person: " + message.text)
         results: list[tuple[str, dict[str, Any], dict[str, Any]]] = []
         pending: list[tuple[str, dict[str, Any], asyncio.Task]] = []
         spoke: list[str] = []
@@ -1466,6 +1502,7 @@ class WarMinds:
                 text = str(a.get("text") or "").strip()
                 if len(text) >= 4:
                     self.journal("mandate", cmd.name, f"said on the channel: {text[:200]}")
+                    self.remember_person("mandate", cmd.name, "Said to the Captain: " + text)
                     spoke.append(text)
                     rec["lines"] += 1
                     key = cmd.key
@@ -1570,6 +1607,7 @@ class WarMinds:
             ok = bool(res.get("ok"))
             rec["ok" if ok else "failed"] += 1
             what = self._describe(name, a)
+            self.remember_person(mind.seat.side, cmd.name, f"{what}: {a.get('reason', '')} => {'ok' if ok else 'FAILED'}: {res.get('detail', '')}")
             self.journal(mind.seat.side, cmd.name, f"{what} — {str(a.get('reason', ''))[:110]} => {'ok' if ok else 'FAILED'}: {str(res.get('detail', ''))[:130]}")
             if ok and mind.seat.kind == "admiral" and name == "group_order":
                 mind.intent = f"{what}: {str(a.get('reason', ''))[:160]}"
@@ -1679,6 +1717,7 @@ class WarMinds:
         speaker = next((c for c in self.allies.values() if c.key == key), cmd)
         to = str(a.get("to") or "aquila")
         urgent = bool(a.get("urgent"))
+        self.remember_person("astra", speaker.name, f"Said to {to}: " + text)
         self.journal("astra", speaker.name + (f" to {to}" if to != "aquila" else ""), text[:200])
         if to not in ("aquila", "fleet", ""):
             self.deliver("astra", to, Message(self.clock(), speaker.key, text, urgent=True))
@@ -1702,8 +1741,10 @@ class WarMinds:
         cut = f" They had said only «{cut_after}» when the Captain spoke over them." if cut_after else ""
         ask = (f"{waited_s:.0f} seconds ago you were about to tell the Captain, over the fleet net: «{text}».{cut} The battle has moved on (the picture below is "
                f"now). If it still matters to him, say it now as it stands — updated, short — with say. If not, say nothing: call no_change.")
-        system = system_prompt(mind.seat, cmd, self.where(self.state), cmd.mission, chain=self.chain_facts(view, self.state), formation=self.formation_doctrine)
+        context_out: list[str] = []
+        system = system_prompt(mind.seat, cmd, self.where(self.state), cmd.mission, chain=self.chain_facts(view, self.state), formation=self.formation_doctrine, context_out=context_out)
         user = (f"{render_groups(view, only=mind.seat.group)}\nENEMY\n{render_enemy(view)}\n{render_astra_extras(self.state)}\n\n{ask}")
+        user = "\n\n".join(context_out) + "\n\n" + self.person_history(cmd.side, cmd.name) + "\n\n" + user
         said: list[str] = []
         CURRENT.set(mind)
         CURRENT_VIEW.set((view, self.state))
@@ -1729,8 +1770,9 @@ class WarMinds:
             return text
         cmd = mind.commander
         admiral = self.minds.get("mandate/admiral")
+        context_out: list[str] = []
         system = system_prompt(mind.seat, cmd, self.where(self.state), cmd.mission, admiral_name=(admiral.commander.name if admiral and admiral.commander else ""),
-                               channel_open=True, ops=self.ops, formation=self.formation_doctrine)
+                               channel_open=True, ops=self.ops, formation=self.formation_doctrine, context_out=context_out)
         heard = (f" They heard only «{cut_after}»: then their bridge cut in (an alarm, an officer, their Captain), and the rest did not reach them."
                  if cut_after else "")
         ask = (f"{waited_s:.0f} seconds ago you were saying to the ASTRA Captain over the open channel: «{text}».{heard} The battle has moved on "
@@ -1740,6 +1782,7 @@ class WarMinds:
         user = (f"WHAT YOU HAVE DECIDED AND SAID, AND WHAT YOU HEARD (your log, newest last)\n{self.recall('mandate')}\n\n"
                 f"{picture('mandate', mind.seat.kind, mind.seat.group, view, self.state, None, self.clock())}\n\n{ask} "
                 f"The Captain's language is {LANG_NAMES.get(lang, lang)}.")
+        user = "\n\n".join(context_out) + "\n\n" + self.person_history(cmd.side, cmd.name) + "\n\n" + user
         said: list[str] = []
         CURRENT.set(mind)
         CURRENT_VIEW.set((view, self.state))

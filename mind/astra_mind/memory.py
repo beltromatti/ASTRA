@@ -13,18 +13,21 @@ from typing import Any, Callable
 
 from .crew import CREW
 from .openrouter import OpenRouter, ToolCall
+from .prompt_layout import cached_prompt
 
 log = logging.getLogger("astra.memory")
 
 MODEL = "deepseek/deepseek-v4.1-flash"
 PROVIDERS = ["together", "modal"]
 PER_OFFICER = 14
+PER_PROFESSIONAL = 8      # separate capacity: lessons never evict existing personal memories
+PROFESSIONAL = ("lesson", "experience")
 EVERY = 8                 # lines heard between two readings
 
 REMEMBER = {"type": "function", "function": {"name": "remember", "description": "One lasting memory an officer keeps.",
             "parameters": {"type": "object", "properties": {
                 "officer": {"type": "string", "enum": list(CREW)},
-                "kind": {"type": "string", "enum": ["personal", "promise", "confidence", "moment"]},
+                "kind": {"type": "string", "enum": ["personal", "promise", "confidence", "moment", "lesson", "experience"]},
                 "memory": {"type": "string", "description": "in English, in the third person about the officer, one short "
                                                            "sentence (under 35 words), the Captain named each time: 'Ferri "
                                                            "knows the Captain's brother flies Falcons with the Third Fleet; the "
@@ -50,14 +53,23 @@ A memory belongs to the officer who lived it (the one spoken to, or present and 
 memory; if nothing lasting was said, call `nothing`. Write it in the third person about the officer, so nobody can
 mistake whose it is: the Captain's gender is not known, so name the Captain every time and never use "their" for the
 Captain's people or things ("Ferri knows the Captain's brother flies Falcons with the Third Fleet", not "their
-brother", not "my brother")."""
+brother", not "my brother").
+
+Also keep a PROFESSIONAL lesson when the Captain corrects an officer's judgement, explains an enduring preference or
+intent, or an officer learns something consequential from an experience they actually lived. Use kind `lesson` for
+the Captain's guidance and `experience` for the officer's own learning. Preserve the reason and the circumstances:
+these are knowledge to weigh against the current situation, NOT standing orders or automatic rules. An ordinary
+one-off command, a target id, routine telemetry or a repeated report is not a lasting lesson. Keep the Captain's
+unresolved longer-term intent when it would still matter after the recent conversation has gone, without inventing
+a conclusion or treating yesterday's tactical situation as current. Keep only what the words support."""
 
 
 class MemoryKeeper:
-    def __init__(self, llm: OpenRouter, store: dict[str, list[dict[str, str]]], note: Callable[[str], None]) -> None:
+    def __init__(self, llm: OpenRouter, store: dict[str, list[dict[str, str]]], note: Callable[[str], None], save: Callable[[], None] | None = None) -> None:
         self.llm = llm
         self.store = store               # officer id -> [{kind, memory}] (the director saves it with the story)
         self.note = note                 # promises reach the story
+        self.save = save or (lambda: None)
         self.heard: list[str] = []
         self.busy = False
 
@@ -71,7 +83,9 @@ class MemoryKeeper:
         out = []
         for oid, mems in self.store.items():
             if oid in CREW and mems:
-                out.append(f"- {CREW[oid].name} ({oid}): " + " / ".join(m["memory"] for m in mems[-8:]))
+                personal = [m for m in mems if m.get("kind") not in PROFESSIONAL][-8:]
+                professional = [m for m in mems if m.get("kind") in PROFESSIONAL][-6:]
+                out.append(f"- {CREW[oid].name} ({oid}): " + " / ".join(m["memory"] for m in personal + professional))
         return "\n".join(out)
 
     async def maybe_read(self, force: bool = False) -> None:
@@ -99,10 +113,11 @@ class MemoryKeeper:
                 if a.get("officer") in CREW and (a.get("memory") or "").strip():
                     kept.append(a)
 
+        system, context = cached_prompt(PROMPT, dict(ids=", ".join(f"{k} = {o.title}" for k, o in CREW.items()),
+                                                    known=known, said="\n".join(said)), ("known", "said"))
         await self.llm.chat(model=MODEL, messages=[
-            {"role": "system", "content": PROMPT.format(ids=", ".join(f"{k} = {o.title}" for k, o in CREW.items()), known=known,
-                                                        said="\n".join(said))},
-            {"role": "user", "content": "Keep what lasts."}],
+            {"role": "system", "content": system},
+            {"role": "user", "content": context + "\n\nKeep what lasts."}],
             tools=[REMEMBER, NOTHING], tool_choice="auto", providers=PROVIDERS, reasoning={"enabled": False}, max_tokens=500,
             temperature=0.3, on_tool_call=on_call, allow_fallbacks=True)
         for a in kept[:6]:
@@ -112,9 +127,14 @@ class MemoryKeeper:
                 continue
             mems.append({"kind": kind, "memory": mem})
             # the oldest go first, but a promise is kept until it is the only kind left
-            while len(mems) > PER_OFFICER:
-                drop = next((i for i, m in enumerate(mems) if m["kind"] != "promise"), 0)
-                mems.pop(drop)
+            for professional, limit in ((False, PER_OFFICER), (True, PER_PROFESSIONAL)):
+                indices = [i for i, m in enumerate(mems) if (m.get("kind") in PROFESSIONAL) == professional]
+                while len(indices) > limit:
+                    drop = next((i for i in indices if mems[i]["kind"] != "promise"), indices[0])
+                    mems.pop(drop)
+                    indices = [i for i, m in enumerate(mems) if (m.get("kind") in PROFESSIONAL) == professional]
             log.info("memory %s (%s): %s", oid, kind, mem)
             if kind == "promise":
                 self.note(f"promise: {mem} ({CREW[oid].name})")
+        if kept:
+            self.save()

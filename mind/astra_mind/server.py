@@ -34,7 +34,7 @@ from .style import StyleKeeper
 from . import router as router_mod
 from .context import Exchange, badge_of_raw, parse as parse_context, parse_lift
 from .delegation import Delegation
-from .initiative import Watch, chatter_system, recent_orders, watch_ask, watch_system
+from .initiative import Watch, chatter_system, recent_orders, watch_ask, watch_system, watch_prompt, chatter_prompt
 from .director import ADMIRAL, Director
 from .env import CACHE, SAVED
 from .host import install_stop_handlers, mind_port
@@ -245,7 +245,7 @@ class Mind:
                                    self.voice.busy_s)
         self.director.finale = Finale(self.llm, self._say_external, self._director_command, self.voice.busy_s)
         self.director.blocked = lambda: bool(((self.game.state if self.game else None) or {}).get("abandon")) or self.aftermath.active
-        self.memory = MemoryKeeper(self.llm, self.director.memories, self.director.note)
+        self.memory = MemoryKeeper(self.llm, self.director.memories, self.director.note, save=self.director.save)
         self.agent.memories = self.memory.lines
         # how this Captain commands: the XO learns it fight by fight, the Mandate's intelligence too (style.py)
         self.style = StyleKeeper(self.llm, self.director.style)
@@ -257,6 +257,8 @@ class Mind:
         self.war = WarMinds(self.llm, self._ally_say, self._war_execute, lang=lambda: self.lang, mandate_persona=COMMANDERS.get,
                             channel=lambda c: self.enemy.open and self.enemy.contact == c, register_voice=self._register_voice,
                             transmit=self._say_external, intel=self.style.mandate_line, note=self.director.note, captain=self._war_captain)
+        self.war.people = self.director.people
+        self.war.save_people = self.director.save
         self.war.disabled = os.environ.get("ASTRA_WAR_MINDS", "1") == "0"        # (ASTRA_WAR_MINDS=0: the groups fight on their reflexes, as before)
         self.war.formation_doctrine = os.environ.get("ASTRA_WAR_FORMATION", "0") == "1"   # (ASTRA_WAR_FORMATION=1: the doctrine also teaches the formation lever)
         # the flight net: the CAG, the squadron leaders and their wingmen, the Chief of the Deck (flight_minds.py)
@@ -1337,17 +1339,18 @@ class Mind:
 
     async def _chatter(self, event: str, lang: str, ask: str):
         """A quiet moment's talk: its own model role (small and cheap), a compact prompt that asks for two or three lines, only `speak`."""
-        system = chatter_system(lang, self.director.mood, self.memory.lines(), "; ".join(self.director.bonds_lines()), self.director.home_lines(),
+        system, current = chatter_prompt(lang, self.director.mood, self.memory.lines(), "; ".join(self.director.bonds_lines()), self.director.home_lines(),
                                 list(self.director.campaign), list(self.game.events)[-5:] if self.game else [])
-        return await self.agent.handle_event(event, lang, ask=ask, role="chatter", system=system, history_turns=2, speak_only=True)
+        return await self.agent.handle_event(event, lang, ask=ask, role="chatter", system=system, current_context=current, history_turns=2, speak_only=True)
 
     async def _event_turn(self, events: list[str], ask: str | None):
         """A report turn (or the officers' watch check: its own compact prompt, its own cheaper model, only the last few exchanges)."""
         if any(e.startswith("bridge: watch") for e in events):
             st = self.game.state if (self.game and self.game.state) else self.local.snapshot()
+            system, current = watch_prompt(self.lang, st, self.agent.standing_lines(), self.agent.style(),
+                                           recent_orders(self.agent.history), self.memory.lines())
             t = await self.agent.handle_event(" | ".join(events), self.lang, ask=watch_ask(self.lang), role="watch", history_turns=4,
-                                              system=watch_system(self.lang, st, self.agent.standing_lines(), self.agent.style(),
-                                                                  recent_orders(self.agent.history)))
+                                              system=system, current_context=current)
             chk = getattr(self, "_watch_check", None)
             if chk is not None:
                 self.watch.ran(chk, bool(t.lines or t.actions))

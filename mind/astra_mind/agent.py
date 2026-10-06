@@ -107,9 +107,16 @@ class BridgeAgent:
         `history_turns` + 6 turns. The Captain's orders older than that are not lost: they stay in their own list (`orders`, in the bridge now)."""
         starts = [i for i, m in enumerate(self.history) if m["role"] == "user"]
         limit = self.history_turns + 6
-        if len(starts) <= 2 * limit:
+        if not starts:
             return
-        self.history = self.history[starts[-limit]:]
+        if len(starts) <= 2 * limit and len(json.dumps(self.history, ensure_ascii=False)) <= 120_000:
+            return
+        self.history = self.history[starts[-min(limit, len(starts))]:]
+        # Large exchanges also have a size budget. Drop whole oldest turns, preserving recent exchanges and every tool pair.
+        starts = [i for i, m in enumerate(self.history) if m["role"] == "user"]
+        while len(starts) > 8 and len(json.dumps(self.history, ensure_ascii=False)) > 60_000:
+            self.history = self.history[starts[1]:]
+            starts = [i for i, m in enumerate(self.history) if m["role"] == "user"]
 
     def _last_turns(self, n: int) -> list[dict[str, Any]]:
         starts = [i for i, m in enumerate(self.history) if m["role"] == "user"]
@@ -258,7 +265,7 @@ class BridgeAgent:
             self._active.discard(turn)
 
     async def handle_event(self, event: str, lang: str, ask: str | None = None, *, role: str = "crew", system: str | None = None,
-                           history_turns: int | None = None, speak_only: bool = False) -> Turn:
+                           history_turns: int | None = None, speak_only: bool = False, current_context: str = "") -> Turn:
         """A ship event (not the Captain): the responsible officer reports it, and may act within their own authority.
         role: the model role ('crew', or 'watch' for the initiative watch); system: a prompt of its own (the watch's compact one)."""
         turn = Turn(text=f"[event] {event}", lang=lang, kind="event")
@@ -272,7 +279,7 @@ class BridgeAgent:
         hist = self.history if history_turns is None else self._last_turns(history_turns)
         sysmsg = {"role": "system", "content": system} if system else self._system(lang, state)
         msgs: list[dict[str, Any]] = [sysmsg] + hist
-        now = "" if system else self._now(state, news=True) + "\n\n"            # (a role with a prompt of its own carries its own view of the ship)
+        now = (current_context + "\n\n" if current_context else "") if system else self._now(state, news=True) + "\n\n"
         msgs.append({"role": "user", "content": now + user + "\n" + (ask or EVENT_ASK) + (STANDING_ASK if self.standing and not speak_only else "")})   # (a turn that can only speak carries nothing out)
         on_call = self._on_call(turn, lang, t0, pending, ts, state, fired, captain=False, allowed=allowed)
         tools = [t for t in ts.tools if t["function"]["name"] in (allowed | {"speak"} | (set() if speak_only else {"console_log"}))]   # (the log is silent: nobody's authority is needed)

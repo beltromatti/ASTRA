@@ -550,12 +550,12 @@ class TestDelegation(unittest.TestCase):
         self.dir = tempfile.mkdtemp(prefix="astra_delegation_")
         self.path = os.path.join(self.dir, "delegation.json")
 
-    def test_a_new_campaign_starts_with_what_commits_the_ship_on_advise(self) -> None:
+    def test_a_new_campaign_keeps_helm_advice_and_gives_flight_routine_autonomy(self) -> None:
         from astra_mind import delegation as d
         dg = d.Delegation(self.path)
         self.assertEqual(dg.pending(self.STATE), [], "nothing before a campaign is chosen")
         dg.begin(new=True)
-        self.assertEqual(sorted(dg.pending(self.STATE)), [("flight", "advise"), ("helm", "advise")])
+        self.assertEqual(sorted(dg.pending(self.STATE)), [("helm", "advise")])
         self.assertEqual(dg.pending({}), [], "nothing while the game has no consoles")
 
     def test_the_captains_word_is_kept_and_not_asked_of_the_game_twice(self) -> None:
@@ -589,7 +589,7 @@ class TestDelegation(unittest.TestCase):
         c.begin(new=True)                                                    # (a new war starts over: and a later «continue» does not bring the old levels back)
         c2 = d.Delegation(self.path)
         c2.begin(new=False)
-        self.assertEqual((c2.levels["flight"], c2.levels.get("tactical")), ("advise", None))
+        self.assertEqual((c2.levels["flight"], c2.levels.get("tactical")), ("auto", None))
 
     def test_the_ship_reads_a_delegation_however_the_model_writes_it(self) -> None:
         """The first live run: «nessuno lancia senza il mio ordine» made the model call `station flight delegation manual`: refused («flight has no mode delegation»), and the
@@ -648,13 +648,13 @@ class TestDelegation(unittest.TestCase):
                 await asyncio.sleep(5.0)
                 cmds = [c for _, k, c in r.game.rec.events if k == "json" and c.get("type") == "command"]
                 got = sorted((c["args"]["params"]["station"], c["args"]["params"]["delegation"]) for c in cmds if c["name"] == "station" and c["args"].get("station") == "xo")
-                self.assertEqual(got, [("flight", "advise"), ("helm", "advise")])
+                self.assertEqual(got, [("helm", "advise")])
                 self.assertTrue(all(c["by"] == "xo" for c in cmds))
                 # the game now has them: nothing more is asked
                 st = {"stations": {k: {**v, "delegation": m.delegation.levels.get(k, "auto")} for k, v in self.STATE["stations"].items()}}
                 r.game.push({"type": "ship_state", "state": st})
                 await asyncio.sleep(6.0)
-                self.assertEqual(len([1 for _, k, c in r.game.rec.events if k == "json" and c.get("type") == "command"]), 2)
+                self.assertEqual(len([1 for _, k, c in r.game.rec.events if k == "json" and c.get("type") == "command"]), 1)
                 # the Captain says it: the XO sets it, and it is kept
                 chat = m.llm.chat
 
@@ -1044,7 +1044,7 @@ class TestTheFleetNetIsNotWokenWhole(unittest.TestCase):
         reply = ['{"to_party": "Vigilant, qui l\'Aquila.", "to": "Vigilant"}']
 
         async def model(llm, role, messages, **kw) -> Completion:  # noqa: ANN001, ANN003
-            asked.append(messages[0]["content"])
+            asked.append("\n".join(m["content"] for m in messages))
             return Completion(content=reply[0], cost=0.0001)
 
         async def go() -> None:
