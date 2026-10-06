@@ -19,6 +19,11 @@
 #include "AstraArmory.h"
 #include "AstraCampaign.h"
 #include "AstraCommandWheel.h"
+#include "AstraEquipmentWheel.h"
+#include "Widgets/Layout/SScrollBox.h"
+#include "Widgets/SViewport.h"
+#include "AstraFpsComponent.h"
+#include "AstraBoardSubsystem.h"
 #include "AstraFighterPawn.h"
 #include "AstraHangar.h"
 #include "AstraLadderSubsystem.h"
@@ -119,6 +124,7 @@ void AASTRAPlayerController::BeginPlay()
 
 void AASTRAPlayerController::EndPlay(const EEndPlayReason::Type Reason)
 {
+	if (Equipment.IsValid()) { Equipment->Close(this, false); }
 	UGameViewportClient* VC = GEngine ? GEngine->GameViewport : nullptr;
 	if (VC)
 	{
@@ -146,9 +152,14 @@ void AASTRAPlayerController::SetupInputComponent()
 		InputComponent->BindKey(EKeys::AnyKey, IE_Released, this, &AASTRAPlayerController::OnBoundKeyReleased).bConsumeInput = false;
 		InputComponent->BindKey(EKeys::E, IE_Pressed, this, &AASTRAPlayerController::ToggleSeat).bConsumeInput = false;   // a Falcon uses E too
 		// the campaign menu (the game pauses behind it)
-		InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &AASTRAPlayerController::OpenMenu);
-		InputComponent->BindKey(EKeys::F10, IE_Pressed, this, &AASTRAPlayerController::OpenMenu);
-		InputComponent->BindKey(EKeys::F1, IE_Pressed, this, &AASTRAPlayerController::ToggleHelp);
+		InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &AASTRAPlayerController::OpenMenu).bExecuteWhenPaused = true;
+		InputComponent->BindKey(EKeys::F10, IE_Pressed, this, &AASTRAPlayerController::OpenMenu).bExecuteWhenPaused = true;
+		InputComponent->BindKey(EKeys::K, IE_Pressed, this, &AASTRAPlayerController::ToggleHelp).bExecuteWhenPaused = true;
+#if !PLATFORM_MAC // portable-ok: K works on every platform; F1 is an extra binding for PC keyboards
+		InputComponent->BindKey(EKeys::F1, IE_Pressed, this, &AASTRAPlayerController::ToggleHelp).bExecuteWhenPaused = true;
+#endif
+		InputComponent->BindKey(EKeys::Q, IE_Pressed, this, &AASTRAPlayerController::OnEquipmentPressed).bConsumeInput = false;
+		InputComponent->BindKey(EKeys::Q, IE_Released, this, &AASTRAPlayerController::OnEquipmentReleased).bConsumeInput = false;
 		InputComponent->BindKey(EKeys::T, IE_Pressed, this, &AASTRAPlayerController::OnTypePressed);
 		InputComponent->BindKey(EKeys::Tab, IE_Pressed, this, &AASTRAPlayerController::TogglePad);
 		// the command wheel: the ORDERS key held (G unless the player chose another); while it is open a number picks an order
@@ -322,6 +333,7 @@ void AASTRAPlayerController::OnBoundKeyReleased(FKey Key)
 
 void AASTRAPlayerController::ToggleSeat()
 {
+	if (Equipment.IsValid() && Equipment->IsOpen()) { return; }
 	// in a Falcon: E is the pilot's (on the catapult it climbs out, in flight it is a thruster)
 	if (AAstraFighterPawn* F = Cast<AAstraFighterPawn>(GetPawn()))
 	{
@@ -431,6 +443,7 @@ void AASTRAPlayerController::ToggleSeat()
 				return;
 			}
 		}
+		if (auto* Board = GetWorld()->GetSubsystem<UAstraBoardSubsystem>()) { FString Notice; if (Board->TryBoardBay(Me, Notice)) { ShowNotice(Notice, 4.f); return; } }
 		// a Falcon of Alpha on the flight deck
 		for (TActorIterator<AAstraHangar> It(GetWorld()); It; ++It)
 		{
@@ -488,7 +501,7 @@ void AASTRAPlayerController::SetSeated(bool bSit)
 		{
 			// the first time on foot: the keys for walking (the card at the start spoke of the chair)
 			bWalkHintShown = true;
-			ShowNotice(TEXT("WASD  walk  ·  Shift  run  ·  C  crouch (hold: lie down)  ·  Z X  lean  ·  Space  jump  ·  E  doors, lifts, use  ·  F1  all the controls"), 25.f);
+			ShowNotice(TEXT("WASD  walk  ·  Shift  run  ·  C  crouch (hold: lie down)  ·  Z X  lean  ·  Space  jump  ·  E  doors, lifts, use  ·  K  all the controls"), 25.f);
 		}
 	}
 	bSeated = bSit;
@@ -552,7 +565,7 @@ void AASTRAPlayerController::BoardFalcon(AAstraHangar* Hangar, APawn* Walker)
 
 void AASTRAPlayerController::ShowStartHint(float Seconds)
 {
-	ShowNotice(FString::Printf(TEXT("F1  controls  ·  W or E  stand up  ·  hold %s  talk to the crew  ·  T  type  ·  hold %s  orders  ·  Tab  datapad"),
+	ShowNotice(FString::Printf(TEXT("K  controls  ·  W or E  stand up  ·  hold %s  talk to the crew  ·  T  type  ·  hold %s  orders  ·  Tab  datapad"),
 	                           *FAstraSettings::KeyName(FAstraSettings::Get().TalkKey), *FAstraSettings::KeyName(FAstraSettings::Get().OrdersKey)), Seconds);
 }
 
@@ -563,6 +576,7 @@ void AASTRAPlayerController::SetCinematic(bool bOn)
 		return;
 	}
 	bCinematic = bOn;
+	if (bOn) { bEquipmentHeld = false; if (Equipment.IsValid()) { Equipment->Close(this, false); } }
 	UGameViewportClient* VC = GetWorld() ? GetWorld()->GetGameViewport() : nullptr;
 	SetIgnoreMoveInput(bOn);                    // (counters: the chair's own hold is not undone)
 	SetIgnoreLookInput(bOn);
@@ -712,6 +726,7 @@ namespace
 		TEXT("  the Captain's quarters: the door at the end of the starboard corridor;\n")
 		TEXT("  E beside the bunk to rest (the XO wakes you if anything happens)\n")
 		TEXT("\n")
+		TEXT("EQUIPMENT: hold Q, point and release for rifle, sidearm, datapad or empty hands\n")
 		TEXT("ARMED (the armory, Deck 8: E at the rack takes the rifle and the sidearm)\n")
 		TEXT("  left mouse      fire (the rifle holds fire: the sidearm one round a click)\n")
 		TEXT("  right mouse     look through the sights (slower turn, steadier aim)\n")
@@ -736,7 +751,7 @@ namespace
 		TEXT("  gamepad         left stick fly · right stick yaw/lift · triggers throttle · A guns · B missile\n")
 		TEXT("                  RB boost · LB decoys · Y recover/land · X descend\n")
 		TEXT("\n")
-		TEXT("F1  this card");
+		TEXT("K  this card");
 
 	/** The card with the player's own TALK and ORDERS keys (SETTINGS) in place of V and G. */
 	FString HelpWithKeys()
@@ -1014,10 +1029,9 @@ void AASTRAPlayerController::PlayerTick(float DeltaTime)
 		{
 			WindowHud->Tick(this, DeltaTime);
 		}
-		if (Orders.IsValid())
-		{
-			Orders->Tick(this, DeltaTime);
-		}
+		if (Orders.IsValid()) { Orders->Tick(this, DeltaTime); }
+		if (bEquipmentHeld && Equipment.IsValid() && !Equipment->IsOpen() && GetWorld()->GetRealTimeSeconds() - EquipmentDownAt >= 0.24) { Equipment->Open(this); }
+		if (Equipment.IsValid()) { Equipment->Tick(this, DeltaTime); }
 		if (const UAstraLiftSubsystem* Lifts = GetWorld() ? GetWorld()->GetSubsystem<UAstraLiftSubsystem>() : nullptr)
 		{
 			const bool bList = Lifts->IsMenuOpen();
@@ -1060,6 +1074,7 @@ void AASTRAPlayerController::PlayerTick(float DeltaTime)
 
 void AASTRAPlayerController::OnTypePressed()
 {
+	bEquipmentHeld = false; if (Equipment.IsValid()) { Equipment->Close(this, false); }
 	GetWorldTimerManager().SetTimerForNextTick(this, &AASTRAPlayerController::OpenOrderLine);
 }
 
@@ -1179,7 +1194,17 @@ void AASTRAPlayerController::CloseOrderLine()
 
 void AASTRAPlayerController::ToggleHelp()
 {
-	ShowHelp(!HelpWidget.IsValid());
+    if (bCinematic) { return; }
+    bEquipmentHeld = false;
+    if (Equipment.IsValid()) { Equipment->Close(this, false); }
+    if (!HelpWidget.IsValid())
+    {
+        if (auto* Campaign = GetWorld()->GetSubsystem<UAstraCampaignSubsystem>())
+        {
+            if (Campaign->IsMenuOpen()) { if (Campaign->IsStarted()) { ShowControlsFromMenu(); } return; }
+        }
+    }
+    ShowHelp(!HelpWidget.IsValid());
 }
 
 void AASTRAPlayerController::ShowHelp(bool bShow)
@@ -1198,26 +1223,47 @@ void AASTRAPlayerController::ShowHelp(bool bShow)
 	{
 		VC->RemoveViewportWidgetContent(HelpWidget.ToSharedRef());
 		HelpWidget.Reset();
+		SetIgnoreMoveInput(false); SetIgnoreLookInput(false);
+		SetInputMode(FInputModeGameOnly()); bShowMouseCursor = false;
+		UGameplayStatics::SetGamePaused(GetWorld(), bHelpWasPaused);
+		if (bHelpFromMenu) { bHelpFromMenu = false; if (auto* Campaign = GetWorld()->GetSubsystem<UAstraCampaignSubsystem>()) { Campaign->ShowMenu(true); } }
 		return;
 	}
 	if (bShow && !HelpWidget.IsValid())
 	{
 		UFont* Mono = AstraFonts::Mono();
 		const FSlateFontInfo Font = Mono ? FSlateFontInfo(Mono, 14) : FCoreStyle::GetDefaultFontStyle("Mono", 14);
-		HelpWidget = SNew(SBox).HAlign(HAlign_Center).VAlign(VAlign_Center)
+        bHelpWasPaused = UGameplayStatics::IsGamePaused(GetWorld());
+        UGameplayStatics::SetGamePaused(GetWorld(), true);
+        SetIgnoreMoveInput(true); SetIgnoreLookInput(true);
+        FVector2D Area(1280.f, 720.f);
+        if (VC->GetGameViewportWidget().IsValid()) { Area = VC->GetGameViewportWidget()->GetCachedGeometry().GetLocalSize(); }
+        HelpWidget = SNew(SBox).HAlign(HAlign_Center).VAlign(VAlign_Center)
 		[
-			SNew(SBorder).BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush")).BorderBackgroundColor(FLinearColor(0.004f, 0.006f, 0.01f, 0.85f))
-			.Padding(FMargin(40, 30))
-			[
-				SNew(STextBlock).Font(Font).ColorAndOpacity(FLinearColor(0.82f, 0.88f, 0.95f)).Text(FText::FromString(HelpWithKeys()))
-			]
+            SNew(SBox).WidthOverride(Area.X * 0.86f).HeightOverride(Area.Y * 0.86f)
+            [
+                SNew(SBorder).BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush")).BorderBackgroundColor(FLinearColor(0.004f, 0.006f, 0.01f, 0.96f)).Padding(FMargin(28, 22))
+                [
+                    SNew(SVerticalBox)
+                    + SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 16)
+                    [ SNew(STextBlock).Font(Font).ColorAndOpacity(FLinearColor(1.f, 0.78f, 0.35f)).Text(FText::FromString(TEXT("CONTROLS  ·  SCROLL TO READ  ·  K OR ESC TO CLOSE"))) ]
+                    + SVerticalBox::Slot().FillHeight(1.f)
+                    [
+                        SNew(SScrollBox)
+                        + SScrollBox::Slot()
+                        [ SNew(STextBlock).Font(Font).AutoWrapText(true).ColorAndOpacity(FLinearColor(0.82f, 0.88f, 0.95f)).Text(FText::FromString(HelpWithKeys())) ]
+                    ]
+                ]
+            ]
 		];
-		VC->AddViewportWidgetContent(HelpWidget.ToSharedRef(), 40);
+		VC->AddViewportWidgetContent(HelpWidget.ToSharedRef(), 80);
+		FInputModeGameAndUI HelpInput; HelpInput.SetHideCursorDuringCapture(false); SetInputMode(HelpInput); bShowMouseCursor = true;
 	}
 }
 
 void AASTRAPlayerController::OnOrdersPressed()
 {
+	if (bEquipmentHeld || (Equipment.IsValid() && Equipment->IsOpen())) { return; }
 	if (!Orders.IsValid())
 	{
 		Orders = MakeShared<FAstraCommandWheel>();
@@ -1238,6 +1284,9 @@ void AASTRAPlayerController::OnOrdersReleased()
 
 void AASTRAPlayerController::OpenMenu()
 {
+	bEquipmentHeld = false;
+	if (Equipment.IsValid() && Equipment->IsOpen()) { Equipment->Close(this, false); bEquipmentHeld = false; return; }
+	if (HelpWidget.IsValid()) { ShowHelp(false); return; }
 	if (Orders.IsValid() && Orders->IsOpen())
 	{
 		Orders->Close(this, false);                     // Esc: no order (the pause menu is for when the wheel is closed)
@@ -1259,3 +1308,35 @@ void AASTRAPlayerController::OpenMenu()
 		}
 	}
 }
+
+void AASTRAPlayerController::ShowControlsFromMenu()
+{
+    if (auto* Campaign = GetWorld()->GetSubsystem<UAstraCampaignSubsystem>()) { Campaign->HideMenu(); }
+    bHelpFromMenu = true;
+    UGameplayStatics::SetGamePaused(GetWorld(), true);
+    ShowHelp(true);
+}
+
+void AASTRAPlayerController::OnEquipmentPressed()
+{
+    if (bCinematic || bSeated || !Cast<ACharacter>(GetPawn()) || OrderLine.IsValid() || IsMoveInputIgnored()) { return; }
+    if (auto* Campaign = GetWorld()->GetSubsystem<UAstraCampaignSubsystem>()) { if (Campaign->IsMenuOpen()) { return; } }
+    if (Orders.IsValid() && Orders->IsOpen()) { return; }
+    if (!Equipment.IsValid()) { Equipment = MakeShared<FAstraEquipmentWheel>(); }
+    bEquipmentHeld = true;
+    EquipmentDownAt = GetWorld()->GetRealTimeSeconds();
+}
+
+void AASTRAPlayerController::OnEquipmentReleased()
+{
+    if (!bEquipmentHeld) { return; }
+    bEquipmentHeld = false;
+    if (Equipment.IsValid() && Equipment->IsOpen()) { Equipment->Close(this, true); }
+    else if (auto* Fps = GetPawn() ? GetPawn()->FindComponentByClass<UAstraFpsComponent>() : nullptr)
+    {
+        if (bPadUp) { TogglePad(); }
+        Fps->QuickSwitch();
+    }
+}
+
+bool AASTRAPlayerController::IsEquipmentOpen() const { return Equipment.IsValid() && Equipment->IsOpen(); }

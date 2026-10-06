@@ -11,12 +11,12 @@ def save(asset) -> bool:
     return eal.save_loaded_asset(asset, only_if_is_dirty=False)
 
 
-def assign_materials_by_slot(folder: str, mi_dir: str = MI_DIR, delete_stubs: bool = True) -> list:
+def assign_materials_by_slot(folder: str, mi_dir: str = MI_DIR, delete_stubs: bool = True, asset_paths: list[str] | None = None) -> list:
     """Every static mesh in `folder`: slot named X gets <mi_dir>/X when it exists.
     Then deletes the placeholder materials/instances the FBX import created in `folder`."""
     report = []
     stubs = set()
-    for path in eal.list_assets(folder, recursive=False, include_folder=False):
+    for path in (asset_paths if asset_paths is not None else eal.list_assets(folder, recursive=False, include_folder=False)):
         mesh = eal.load_asset(path)
         if not isinstance(mesh, unreal.StaticMesh):
             continue

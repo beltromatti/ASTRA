@@ -11,6 +11,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Components/TextRenderComponent.h"
 #include "Engine/StaticMeshActor.h"
+#include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "GameFramework/Character.h"
@@ -363,6 +364,10 @@ void UAstraRoomLifts::Build(UWorld& W)
 			{
 				continue;
 			}
+			// A room's entire shell can share the door's origin. Copy only door-sized pieces:
+			// cloning the hangar's 150 m detail mesh put a second hangar wall through Deck 8's Kestrels.
+			const FVector DoorSize = Mc->GetStaticMesh()->GetBounds().BoxExtent * It->GetActorScale3D().GetAbs() * 2.0;
+			if (DoorSize.GetMax() > 600.0) { continue; }
 			AAstraRoomLift::FLeaf Leaf;
 			Leaf.Mesh = Mc->GetStaticMesh();
 			for (int32 m = 0; m < Mc->GetNumMaterials(); ++m)

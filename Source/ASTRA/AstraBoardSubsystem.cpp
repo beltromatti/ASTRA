@@ -872,6 +872,7 @@ void UAstraBoardSubsystem::Tick(float DeltaTime)
 	}
 	TickArms(DeltaTime);                                     // the weapons: the posts' pictures near the Captain, the armourer's delivery (AstraBoardArms.cpp)
 	TickAssault(DeltaTime);                                  // the boats of an assault: what they do becomes the fight (AstraBoardAssault.cpp)
+	TickBay(DeltaTime);
 	TickRide(DeltaTime);                                     // the Captain who goes along: the boat, the other ship's decks, the way home (AstraBoardRide.cpp)
 	if (Phase != EPhase::Active && Phase != EPhase::Over)
 	{

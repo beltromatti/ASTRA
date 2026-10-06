@@ -1735,7 +1735,7 @@ void UAstraBattleSubsystem::FireLaser(FAstraBattleShip& From, FAstraBattleShip& 
 		bStrikes = HullSweep(To, From.Pos, From.Pos + Aim * ((double)Range + 2.0 * To.Radius), Entry);
 		Hit = bStrikes ? Entry : From.Pos + Aim * (double)Range;
 	}
-	AddBeam(From.Pos, Hit, 0.35f, From.Side == EAstraSide::Mandate ? FLinearColor(1.f, 0.35f, 0.15f) : FLinearColor(0.5f, 0.8f, 1.f), EAstraFxShot::Laser, From.Id, To.Id);
+	AddBeam(From.Pos, Hit, 0.25f, From.Side == EAstraSide::Mandate ? FLinearColor(1.f, 0.35f, 0.15f) : FLinearColor(0.5f, 0.8f, 1.f), EAstraFxShot::Laser, From.Id, To.Id);
 	static AstraWar::FTuneVar KLaserDmg(TEXT("laser_dmg"), 1.f);
 	const float Damage = (From.LaserDamage > 0.f ? From.LaserDamage : 18.f) * KLaserDmg.Get() * FMath::Lerp(1.f, From.LaserFalloff, FMath::Clamp(Range / FMath::Max(From.LaserRange, 1.f), 0.f, 1.f));
 	if (!To.bCraft)

@@ -13,7 +13,7 @@ from ship_lib import (COMPOSITE, CRATE_GREY, CRATE_OLIVE, CRATE_ORANGE, DGLASS, 
 
 
 # ---------------------------------------------------------------------------------------------------------------------- the shuttle bay
-def launch_portal(b: SParts, w: float = 5.6, h: float = 3.2, tag: str = "eq_launch") -> None:
+def launch_portal(b: SParts, w: float = 5.6, h: float = 3.2, tag: str = "eq_launch", with_leaves: bool = True) -> None:
     """A launch tube's door in a wall, seen from the room (x = out of the wall, y across, centred on y = 0): a heavy brushed frame, two sliding leaves of grey plate with
     an orange hazard band at the top and a dark seam between them, a guide rail along the floor, a pair of beacons and the tube's tag over the header."""
     t = 0.22
@@ -23,7 +23,7 @@ def launch_portal(b: SParts, w: float = 5.6, h: float = 3.2, tag: str = "eq_laun
         b.body.box((t - 0.02, sy * (w / 2) - (0.0 if sy > 0 else 0.12), 0.0), (t + 0.04, sy * (w / 2) + (0.12 if sy > 0 else 0.0), h), STRUCT)
     b.body.box((0.0, -w / 2 - 0.28, h), (t, w / 2 + 0.28, h + 0.26), TRIM)                              # the header
     b.body.box((t - 0.02, -w / 2, h - 0.14), (t + 0.04, w / 2, h), STRUCT)
-    for sy in (-1, 1):                                                                                  # the two leaves, a dark seam between them
+    for sy in ((-1, 1) if with_leaves else ()):                                                           # the two leaves, a dark seam between them
         lo, hi = sorted((sy * 0.02, sy * w / 2))
         b.body.box((0.02, lo, 0.05), (0.12, hi, h - 0.14), CRATE_GREY)
         for k in range(1, 4):                                                                           # horizontal stiffeners

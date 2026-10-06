@@ -40,6 +40,9 @@ public:
 	void SetStoryHold(bool bOn) { bShouldPerformFullTickWhenPaused = bOn; }
 	// --- ABBORDAGGI: what the weapons ask of the controller (UAstraFpsComponent): the datapad is raised (a menu that holds the walking still, the lift's list, is told by IsMoveInputIgnored)
 	bool IsPadUp() const { return bPadUp; }
+	bool IsEquipmentOpen() const;
+	void SetPadRaised(bool bRaised) { if (bPadUp != bRaised) { TogglePad(); } }
+	void ShowControlsFromMenu();
 
 protected:
 
@@ -103,7 +106,7 @@ protected:
 	void BoardFalcon(class AAstraHangar* Hangar, APawn* Walker);
 	/** The lifts (docs/ASCENSORI.md): E at a panel or inside a car goes to UAstraLiftSubsystem::Use; the list on the car's screen holds the walking still. */
 	bool bLiftListHeld = false;
-	/** F1: the controls card (shown for a while at the start of a campaign as a hint). */
+	/** K: the controls card (shown for a while at the start of a campaign as a hint). */
 	void ToggleHelp();
 	UFUNCTION(Exec) void AstraHelp() { ToggleHelp(); }
 	/** Console: the lift the Captain is in goes to a deck (what the voice does). */
@@ -117,6 +120,11 @@ protected:
 	TSharedPtr<class FAstraWindowHud> WindowHud;
 	/** G: the Captain's orders without a word (AstraCommandWheel.h): hold, point, let go; a number picks; Esc gives no order. */
 	TSharedPtr<class FAstraCommandWheel> Orders;
+	TSharedPtr<class FAstraEquipmentWheel> Equipment;
+	bool bEquipmentHeld = false, bHelpFromMenu = false, bHelpWasPaused = false;
+	double EquipmentDownAt = 0.0;
+	void OnEquipmentPressed();
+	void OnEquipmentReleased();
 	void OnOrdersPressed();
 	void OnOrdersReleased();
 	UPROPERTY() TObjectPtr<class UStaticMeshComponent> PadMesh;

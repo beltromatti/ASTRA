@@ -14,6 +14,7 @@
 
 #include "ASTRA.h"
 #include "ASTRACharacter.h"
+#include "ASTRAPlayerController.h"
 #include "AstraBattleSubsystem.h"
 #include "AstraBoardInterior.h"
 #include "AstraCombatant.h"
@@ -22,6 +23,10 @@
 #include "AstraLifeSubsystem.h"
 #include "AstraShipSubsystem.h"
 #include "Camera/PlayerCameraManager.h"
+#include "Camera/CameraActor.h"
+#include "Camera/CameraComponent.h"
+#include "AstraDeckStreaming.h"
+#include "Misc/App.h"
 #include "Components/CapsuleComponent.h"
 #include "Engine/World.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -282,7 +287,23 @@ void UAstraBoardSubsystem::RideBegin(FLeg& L)
 		}
 	}
 	LockCaptain(true, false);
-	FadeCaptain(true, RdFadeS);
+    if (!bTestCaptain && FApp::CanEverRender())
+    {
+        if (auto* Decks = GetWorld()->GetSubsystem<UAstraDeckStreaming>()) { Decks->RequestAt(HomeSpot(), 10.f); }
+        FActorSpawnParameters SP; SP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+        DepartureCamera = GetWorld()->SpawnActor<ACameraActor>(ACameraActor::StaticClass(), SP);
+        if (DepartureCamera)
+        {
+            const float X = L.Index == 0 ? 47.5f : 32.5f;
+            const FVector From(X * 100.f + 650.f, -2340.f, -5970.f), At(X * 100.f, -3070.f, -6080.f);
+            DepartureCamera->SetActorLocationAndRotation(From, (At - From).Rotation());
+            DepartureCamera->GetCameraComponent()->SetFieldOfView(65.f);
+            if (auto* PC = UGameplayStatics::GetPlayerController(GetWorld(), 0)) { PC->SetViewTarget(DepartureCamera); }
+            if (auto* PC = Cast<AASTRAPlayerController>(UGameplayStatics::GetPlayerController(GetWorld(), 0))) { PC->SetCinematic(true); }
+            RideStep = -1;
+        }
+    }
+    if (RideStep == 0) { FadeCaptain(true, RdFadeS); }
 	Tell(FString::Printf(TEXT("the Captain rides with the marines in %s"), L.CraftName.IsEmpty() ? TEXT("the first Kestrel") : *L.CraftName), false);
 }
 
@@ -354,6 +375,7 @@ void UAstraBoardSubsystem::RideArrive(FLeg& L)
 
 void UAstraBoardSubsystem::CaptainLostInBoat(const FString& Cause)
 {
+	EndDepartureView();
 	Ride = ERide::None;
 	LockCaptain(false, false);
 	if (Cabin)
@@ -369,6 +391,7 @@ void UAstraBoardSubsystem::CaptainLostInBoat(const FString& Cause)
 
 void UAstraBoardSubsystem::CaptainLeftScene(const TCHAR* Why)
 {
+	EndDepartureView();
 	if (!bCaptainAboard)
 	{
 		return;
@@ -395,6 +418,7 @@ void UAstraBoardSubsystem::CaptainLeftScene(const TCHAR* Why)
 
 void UAstraBoardSubsystem::RideHome(const TCHAR* Why)
 {
+	EndDepartureView();
 	if (Ride != ERide::Aboard)
 	{
 		return;
@@ -427,6 +451,7 @@ void UAstraBoardSubsystem::TickRide(float Dt)
 		return;
 	}
 	RideT += Dt;
+	if (DepartureCamera && (Ride != ERide::Out || RideStep >= 1)) { EndDepartureView(); }
 	FLeg* Leg = LegOf(RideLeg);
 	// the assault is gone (closed, the world torn down): he is where he is; the ride ends
 	if (!Assault.bOn && Ride != ERide::Aboard && RideStep < 40)
@@ -441,8 +466,13 @@ void UAstraBoardSubsystem::TickRide(float Dt)
 	{
 	case ERide::Out:
 	{
+        if (RideStep == -1 && RideT >= 4.8f)
+        {
+            FadeCaptain(true, 0.45f); RideStep = 0; RideT = 0.5f;
+        }
 		if (RideStep == 0 && RideT >= RdFadeS + 0.2f)
 		{
+			EndDepartureView();
 			MakeCabin();
 			TeleportCaptain(CabinSpot, 0.f, false);
 			LockCaptain(true, false);
@@ -695,4 +725,12 @@ namespace
 			}
 			B->SetTestCaptain(true, A.Num() >= 3 ? FVector(FCString::Atod(*A[0]), FCString::Atod(*A[1]), FCString::Atod(*A[2])) : FVector::ZeroVector, A.Num() >= 4 ? FCString::Atof(*A[3]) : 0.f);
 		}));
+}
+
+void UAstraBoardSubsystem::EndDepartureView()
+{
+    if (!DepartureCamera) { return; }
+    if (auto* PC = UGameplayStatics::GetPlayerController(GetWorld(), 0)) { PC->SetViewTarget(PC->GetPawn()); }
+    if (auto* PC = Cast<AASTRAPlayerController>(UGameplayStatics::GetPlayerController(GetWorld(), 0))) { PC->SetCinematic(false); }
+    DepartureCamera->Destroy(); DepartureCamera = nullptr;
 }

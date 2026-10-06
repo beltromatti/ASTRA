@@ -16,7 +16,7 @@ namespace
 	const FKeyHint FpsKeysWeapon[] = {{TEXT("LMB"), TEXT("fire")}, {TEXT("RMB"), TEXT("aim")}, {TEXT("R"), TEXT("reload")}, {TEXT("1"), TEXT("rifle")}, {TEXT("2"), TEXT("sidearm")}, {TEXT("Q"), TEXT("last weapon")}, {TEXT("H"), TEXT("holster")}};
 	const FKeyHint FpsKeysMove[] = {{TEXT("W A S D"), TEXT("move")}, {TEXT("Shift"), TEXT("run")}, {TEXT("C"), TEXT("crouch")}, {TEXT("hold C"), TEXT("prone")}, {TEXT("Z X"), TEXT("lean")}, {TEXT("Space"), TEXT("jump")}, {TEXT("E"), TEXT("use")}};
 	// what commands: the voice and the keyboard to the crew (and, with the marines, to them), the wheel, the datapad
-	const FKeyHint FpsKeysCommand[] = {{TEXT("V hold"), TEXT("talk")}, {TEXT("T"), TEXT("type")}, {TEXT("G"), TEXT("orders")}, {TEXT("Tab"), TEXT("datapad")}, {TEXT("F1"), TEXT("all keys")}};
+	const FKeyHint FpsKeysCommand[] = {{TEXT("V hold"), TEXT("talk")}, {TEXT("T"), TEXT("type")}, {TEXT("G"), TEXT("orders")}, {TEXT("Tab"), TEXT("datapad")}, {TEXT("K"), TEXT("all keys")}};
 }
 
 void SAstraCombatHud::Construct(const FArguments&)

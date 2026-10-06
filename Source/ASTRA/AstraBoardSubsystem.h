@@ -29,6 +29,9 @@ class AAstraBoardBreach;
 class AAstraBoardInterior;
 class AAstraCombatant;
 class APawn;
+class ACameraActor;
+class AStaticMeshActor;
+class ASkeletalMeshActor;
 class UAstraBattleSubsystem;
 class UAstraCombatFx;
 class UAstraFpsComponent;
@@ -112,6 +115,7 @@ public:
 	 *  (the screen goes dark, he is in the troop bay: nobody walks to the bay). Out in flight the first boat takes nobody: the answer says so, with the time to the hull and the way aboard then (the transporter, by its
 	 *  own rules). False, and why, when it cannot be. */
 	bool CaptainJoins(FString& OutDetail);
+	bool TryBoardBay(APawn* Pawn, FString& OutDetail);
 	/** The Captain rides in a boat (in its troop bay, flying), or is aboard the other ship, or is coming home: he is not on the Aquila's decks. */
 	bool CaptainAway() const { return Ride != ERide::None; }
 	bool CaptainAboardOther() const { return bCaptainAboard; }
@@ -434,6 +438,14 @@ private:
 	void EndEnemyDecks();
 	int32 BoatForTheWayHome() const;                 // a leg whose boat is at her hatches (the first), or INDEX_NONE
 	void TickRide(float Dt);
+	void TickBay(float Dt);
+	void BeginBayDeparture(int32 Slot, const FLeg& Leg);
+	void EndDepartureView();
+	UPROPERTY() TArray<TObjectPtr<AStaticMeshActor>> BayCraft;
+	UPROPERTY() TArray<TObjectPtr<AStaticMeshActor>> BayLeaves;
+	UPROPERTY() TArray<TObjectPtr<ASkeletalMeshActor>> BayBoarders;
+	UPROPERTY() TObjectPtr<ACameraActor> DepartureCamera;
+	float BayAge[2] = {-1.f, -1.f};
 	void RideBegin(FLeg& L);
 	void RideArrive(FLeg& L);
 	void RideHome(const TCHAR* Why);

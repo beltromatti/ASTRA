@@ -1255,6 +1255,7 @@ void UAstraBoardSubsystem::OnCraftEvent(const AstraBoardCraft::FCraftEvent& E)
 	case AstraBoardCraft::EEventKind::Launched:
 	{
 		L->State = FLeg::EState::Flying;
+		if (Assault.bRoster) { BeginBayDeparture(FMath::Clamp(L->Index, 0, 1), *L); }
 		L->bSailing = true;
 		if (E.bCaptain && Assault.bCaptain)
 		{

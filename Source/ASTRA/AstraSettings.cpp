@@ -90,7 +90,7 @@ namespace
 	/** The keys the game already gives other work: a TALK or ORDERS key cannot take them. */
 	bool Reserved(const FKey& K)
 	{
-		static const TArray<FKey> Taken = {EKeys::W, EKeys::A, EKeys::S, EKeys::D, EKeys::E, EKeys::Escape, EKeys::Tab, EKeys::T, EKeys::F1, EKeys::F10,
+		static const TArray<FKey> Taken = {EKeys::W, EKeys::A, EKeys::S, EKeys::D, EKeys::E, EKeys::Escape, EKeys::Tab, EKeys::T, EKeys::F1, EKeys::K, EKeys::F10,
 		                                   EKeys::SpaceBar, EKeys::C, EKeys::LeftShift, EKeys::Z, EKeys::X, EKeys::R, EKeys::H, EKeys::Q, EKeys::One,
 		                                   EKeys::Two, EKeys::Enter, EKeys::LeftMouseButton, EKeys::RightMouseButton, EKeys::MouseScrollUp,
 		                                   EKeys::MouseScrollDown, EKeys::MouseX, EKeys::MouseY};

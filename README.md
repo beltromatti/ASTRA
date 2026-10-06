@@ -96,7 +96,7 @@ What you need:
 - **A microphone** is optional: press T to type an order instead.
 
 The introduction at the start of your first campaign shows the bridge, the ship and the war in two minutes (Space skips a shot, Esc skips
-it all). F1 shows every control; SETTINGS has graphics, sound, language, the keys and your AI key.
+it all). Hold Q for equipment; K shows every control (F1 also works on PC); SETTINGS has graphics, sound, language, the keys and your AI key.
 
 ## How it works
 

@@ -1,7 +1,7 @@
 // ASTRA — ABBORDAGGI: the screen of a Captain with a weapon in his hands: a quiet overlay, like the window's (AstraWindowHud.*): the crosshair (it opens with the cone his
 // rounds go in), the rounds, how he is (the strength bar when he is hurt or a fight is on), the red at the edges and the arcs that say where a round came from, the white cross of a
 // round that struck, the amber arcs towards the ones who have him in sight, the prompt of the key at hand and the card of keys that is up for a while when he arms or a fight begins:
-// the weapon's keys, the moving ones (lean among them) and the ones that command, each key on a cap (F1 has the whole card), and the marines' squads (how many are on their feet and what each
+// the weapon's keys, the moving ones (lean among them) and the ones that command, each key on a cap (K has the whole card), and the marines' squads (how many are on their feet and what each
 // does, in amber when it is in contact) at the top right while a boarding is on. UAstraFpsComponent owns one and fills its state every frame.
 
 #pragma once

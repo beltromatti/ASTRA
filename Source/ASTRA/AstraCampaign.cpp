@@ -73,6 +73,7 @@ public:
 		SLATE_EVENT(FSimpleDelegate, OnResume)
 		SLATE_EVENT(FSimpleDelegate, OnContinue)
 		SLATE_EVENT(FSimpleDelegate, OnNew)
+		SLATE_EVENT(FSimpleDelegate, OnControls)
 		SLATE_EVENT(FSimpleDelegate, OnSettings)
 		SLATE_EVENT(FSimpleDelegate, OnIntro)
 		SLATE_EVENT(FSimpleDelegate, OnQuit)
@@ -117,6 +118,7 @@ public:
 		if (Args._InGame)
 		{
 			Item(TEXT("RESUME"), FString(), Args._OnResume, 0);
+			Item(TEXT("CONTROLS"), TEXT("the Captain's controls and equipment"), Args._OnControls, 5);
 		}
 		else if (bHasSave)
 		{
@@ -197,7 +199,7 @@ public:
 	}
 
 private:
-	TSharedPtr<SButton> Buttons[5];
+	TSharedPtr<SButton> Buttons[6];
 	TArray<TPair<int32, FSimpleDelegate>> Order;   // the items as they stand, top to bottom (their index, what they do)
 	int32 Selected = -1;                           // the one lit by the keyboard (none until a key is pressed)
 	FSimpleDelegate FirstDo;     // Enter: the first item (resume, or continue the saved war)
@@ -343,6 +345,7 @@ void UAstraCampaignSubsystem::ShowMenu(bool bInGame)
 		.OnResume_Lambda([Self]() { if (Self.IsValid()) { Self->HideMenu(); } })
 		.OnContinue_Lambda([Self]() { if (Self.IsValid()) { Self->Continue(); } })
 		.OnNew_Lambda([Self]() { if (Self.IsValid()) { Self->StartNew(); } })
+		.OnControls_Lambda([Self]() { if (Self.IsValid()) { if (auto* PC = Cast<AASTRAPlayerController>(UGameplayStatics::GetPlayerController(Self->GetWorld(), 0))) { PC->ShowControlsFromMenu(); } } })
 		.OnSettings_Lambda([Self]() { if (Self.IsValid()) { Self->ShowSettings(); } })
 		.OnIntro_Lambda([Self]() { if (Self.IsValid()) { Self->PlayIntro(); } })
 		.OnQuit_Lambda([Self]()

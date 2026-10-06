@@ -990,7 +990,7 @@ void UAstraWarFX::OnBeam(EAstraFxShot Kind, const FVector& A, const FVector& B, 
 	{
 	case EAstraFxShot::Laser:
 		Bm.Width = Src ? FMath::Clamp(Src->Radius * 0.016f, 2.5f, 7.f) : 3.f;
-		Bm.Inten = ASTRA_FX_TUNE("laser", 240.f);              // (a white-hot core with the beam's own colour at its edges: at 520 the whole width was over the exposure's white, 5 Oct, from the broadside)
+		Bm.Inten = ASTRA_FX_TUNE("laser", 168.f);              // (a white-hot core with the beam's own colour at its edges: at 520 the whole width was over the exposure's white, 5 Oct, from the broadside)
 		break;
 	case EAstraFxShot::Cannon:
 		Bm.Width = 1.1f;
@@ -1077,7 +1077,7 @@ void UAstraWarFX::DrawBeams()
 			// the pulse is drawn in from the gun to the target in the first instants, holds, and thins out
 			const float Reach = FMath::Min(1.f, Bm.Age / 0.06f);
 			const FVector HeadW = AW + Dir * (LenCm * Reach);
-			const float Fade = 1.f - Ease((K - 0.45f) / 0.55f);
+			const float Fade = 1.f - Ease((K - 0.30f) / 0.70f);
 			FTransform* X;
 			if (float* D = Tubes.Next(X))
 			{

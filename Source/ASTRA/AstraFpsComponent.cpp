@@ -225,7 +225,7 @@ bool UAstraFpsComponent::Locked() const
 	{
 		return true;                                  // not the player's (or not possessed): nothing in the hands
 	}
-	if (PC->IsSeated() || PC->IsPadUp() || PC->IsMoveInputIgnored())       // (the lift's list on a car's screen holds the walking still: the clicks and the number keys are its own)
+	if (PC->IsSeated() || PC->IsPadUp() || (PC->IsMoveInputIgnored() && !PC->IsEquipmentOpen()))       // (the lift's list on a car's screen holds the walking still: the clicks and the number keys are its own)
 	{
 		return true;
 	}
@@ -243,6 +243,7 @@ bool UAstraFpsComponent::Locked() const
 
 void UAstraFpsComponent::FirePressed()
 {
+	if (BrowsingEquipment()) { return; }
 	++FireEvents;
 	bFireHeld = true;
 	bTriggerLatched = false;
@@ -261,6 +262,7 @@ void UAstraFpsComponent::FireReleased()
 
 void UAstraFpsComponent::AimPressed()
 {
+	if (BrowsingEquipment()) { return; }
 	++AimEvents;
 	bAimHeld = true;
 	UE_LOG(LogASTRA, Log, TEXT("[Fps] aim: pressed (%s, %s)"), bHasKit ? (IsArmed() ? TEXT("weapon in hand") : TEXT("weapon holstered")) : TEXT("no kit"), Locked() ? TEXT("locked: seated, in a lift or down") : TEXT("free"));
@@ -274,6 +276,7 @@ void UAstraFpsComponent::AimReleased()
 
 void UAstraFpsComponent::ReloadPressed()
 {
+	if (BrowsingEquipment()) { return; }
 	if (State == EState::Ready && !Locked())
 	{
 		StartReload();
@@ -282,6 +285,7 @@ void UAstraFpsComponent::ReloadPressed()
 
 void UAstraFpsComponent::SelectWeapon(EAstraWeapon W)
 {
+	if (BrowsingEquipment()) { return; }
 	if (!bHasKit || Locked() || W == EAstraWeapon::None)
 	{
 		return;
@@ -291,6 +295,7 @@ void UAstraFpsComponent::SelectWeapon(EAstraWeapon W)
 		Prompt(W == EAstraWeapon::Rifle ? TEXT("NO RIFLE: only the sidearm (the Marine Armory has one)") : TEXT("NO SIDEARM: only the rifle"), 2.2f);
 		return;
 	}
+	if (State == EState::Holstering) { Next = W; return; }
 	if (State == EState::Holstered)
 	{
 		StartDraw(W);
@@ -1658,4 +1663,11 @@ namespace
 				Ar.Logf(TEXT("no Captain on foot"));
 			}
 		}));
+}
+
+bool UAstraFpsComponent::BrowsingEquipment() const
+{
+    const AASTRACharacter* C = Owner();
+    const auto* PC = C ? Cast<AASTRAPlayerController>(C->GetController()) : nullptr;
+    return PC && PC->IsEquipmentOpen();
 }

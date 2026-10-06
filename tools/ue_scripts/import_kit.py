@@ -25,7 +25,7 @@ unreal.AssetToolsHelpers.get_asset_tools().import_asset_tasks(tasks)
 import importlib  # noqa: E402
 import astra_editor  # noqa: E402
 importlib.reload(astra_editor)
-materials = astra_editor.assign_materials_by_slot(DST)  # FBX placeholder materials -> ASTRA instances
+materials = astra_editor.assign_materials_by_slot(DST, asset_paths=[f"{DST}/{name}" for name in sorted(imported)])
 
 report = []
 eal = unreal.EditorAssetLibrary

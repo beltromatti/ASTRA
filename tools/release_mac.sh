@@ -48,6 +48,10 @@ SRC=$(find Packaged/Mac -maxdepth 2 -name "*.app" -type d | head -1)
 APP="$OUT/ASTRA.app"
 rm -rf "$APP"
 ditto "$SRC" "$APP"
+# Keep the signed bundle’s public version in sync with the release tag.
+ASTRA_RELEASE_NUM=${VER%%-*}
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $ASTRA_RELEASE_NUM" "$APP/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $ASTRA_RELEASE_NUM" "$APP/Contents/Info.plist"
 
 # 2. what travels with the game: uv (the crew's Python environment is made with it on the first start, in Application Support), with its licence
 step "uv inside the app"

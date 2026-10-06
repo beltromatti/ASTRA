@@ -1,6 +1,6 @@
 // The Captain's controls on foot, built in code (no input assets): Enhanced Input actions and their default keys for
 // keyboard and mouse and for a gamepad. The player controller owns one set and adds its mapping context; the character
-// binds to its actions. The discrete keys of the ship (V, T, E, Tab, F1, Esc) stay bound on the controller.
+// binds to its actions. The discrete keys of the ship (V, T, E, Tab, K, Esc) stay bound on the controller.
 
 #pragma once
 

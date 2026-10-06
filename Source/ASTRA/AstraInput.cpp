@@ -110,7 +110,7 @@ void UAstraInputSet::Build()
 	OnFoot->MapKey(Reload, EKeys::Gamepad_FaceButton_Left);
 	OnFoot->MapKey(Weapon1, EKeys::One);
 	OnFoot->MapKey(Weapon2, EKeys::Two);
-	OnFoot->MapKey(QuickSwitch, EKeys::Q);
+	// Q tap/hold is handled by the controller: quick switch / equipment wheel.
 	OnFoot->MapKey(QuickSwitch, EKeys::Gamepad_FaceButton_Top);
 	OnFoot->MapKey(Holster, EKeys::H);
 	OnFoot->MapKey(Holster, EKeys::Gamepad_DPad_Down);

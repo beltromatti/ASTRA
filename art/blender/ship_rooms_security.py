@@ -36,15 +36,16 @@ def shuttle_bay(name: str = "SM_SHIP_ShuttleBay"):
     towards the entrance; between them the bay boss's console against the middle pier of the far wall; a tool bench, the rocket-pod cage and the parts store along the left wall,
     ground power, a tow tug, fuel and foam carts along the right one; hoses hang from the ceiling to the craft's fuel ports."""
     spec, L, D, H_ = _dims("shuttle_bay")
+    spec = dict(spec)
+    spec["doors"] = list(spec["doors"]) + [SPEC.door("far", x, 9.2, 3.45) for x in KESTREL_X]
     b = SParts(bevel=0.005, fine_bevel=0.0)
     build_shell(b, spec, _style("security_dim", "white_warm"))
     yf = D - WS - WF
     xl, xr = WS + WF, L - WS - WF
     # the craft, the launch portals, the floor markings and rails
     for cx, tag, col in zip(KESTREL_X, ("eq_k1", "eq_k2"), (-1, 1)):
-        with b.at(frame(cx, KESTREL_Y, 0.0, 90.0)):
-            C.kestrel(b, col, tag)
-        place(b, cx, yf, -90, K.launch_portal, 5.6, 3.2, "eq_launch")
+        # Parked craft are separate runtime meshes: they leave and return with the real boarding operation.
+        place(b, cx, yf, -90, K.launch_portal, 9.2, 3.45, "eq_launch", False)
         for sx in (-0.5, 0.5):                                                                                        # the launch rails: steel with a lit channel between them
             b.body.box((cx + sx - 0.06, 1.2, 0.0), (cx + sx + 0.06, yf - 0.4, 0.025), TRIM)
         lamp_strip(b.emit, (cx, 1.4, 0.004), (cx, yf - 0.6, 0.004), 0.05, 0.004, "amber", LAMP_DIM)

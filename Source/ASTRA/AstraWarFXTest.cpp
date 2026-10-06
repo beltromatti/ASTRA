@@ -62,6 +62,11 @@ struct FAstraWarFXTest
 	static float CamYaw, CamPitch, CamFov;
 	static int32 CamW, CamH;
 	static FString CamTarget;
+	static bool bRecording, bOldFixed;
+	static double OldDelta;
+	static float RecordOrbit;
+	static TWeakObjectPtr<UWorld> RecordWorld;
+	static FDelegateHandle RecordCleanup;
 
 	static FVector Polar(double RangeM, double BearingDeg, double MarkDeg)
 	{
@@ -387,6 +392,37 @@ struct FAstraWarFXTest
 			bCamOn = true;
 			MakeCamera(Fx);
 		}
+		else if (Name == TEXT("record"))
+        {
+            if (Arg(0, TEXT("off")) == TEXT("off"))
+            {
+                if (bRecording) { FApp::SetUseFixedTimeStep(bOldFixed); FApp::SetFixedDeltaTime(OldDelta); }
+                bRecording = false; SeriesLeft = 0; return;
+            }
+            if (bRecording) { FApp::SetUseFixedTimeStep(bOldFixed); FApp::SetFixedDeltaTime(OldDelta); }
+            bOldFixed = FApp::UseFixedTimeStep();
+            OldDelta = FApp::GetFixedDeltaTime();
+            const float Fps = FMath::Clamp(FCString::Atof(*Arg(2, TEXT("60"))), 24.f, 60.f);
+            FApp::SetFixedDeltaTime(1.0 / Fps); FApp::SetUseFixedTimeStep(true);
+            bRecording = true;
+            RecordWorld = Fx.Owner ? Fx.Owner->GetWorld() : nullptr;
+            if (!RecordCleanup.IsValid())
+            {
+                RecordCleanup = FWorldDelegates::OnWorldCleanup.AddLambda([](UWorld* W, bool, bool)
+                {
+                    if (bRecording && RecordWorld.Get() == W) { FApp::SetUseFixedTimeStep(bOldFixed); FApp::SetFixedDeltaTime(OldDelta); bRecording = false; SeriesLeft = 0; }
+                });
+            }
+            SeriesPrefix = Arg(0, TEXT("cinematic"));
+            SeriesLeft = FMath::Clamp(FCString::Atoi(*Arg(1, TEXT("180"))), 1, 3600);
+            SeriesIdx = 0; SeriesGap = 1.f / Fps; SeriesNext = 0.f;
+            bSeriesCam = true; bSeriesVs = false;
+            if (!bCamOn) { Run(Fx, TEXT("cam"), {TEXT("broadside")}); }
+            CamW = FMath::Clamp(FCString::Atoi(*Arg(3, TEXT("1920"))), 640, 3840);
+            CamH = FMath::Clamp(FCString::Atoi(*Arg(4, TEXT("1080"))), 360, 2160);
+            RecordOrbit = FCString::Atof(*Arg(5, TEXT("0")));
+            MakeCamera(Fx);
+        }
 		else if (Name == TEXT("series"))
 		{
 			SeriesPrefix = Arg(0, TEXT("series"));
@@ -656,7 +692,7 @@ struct FAstraWarFXTest
 		}
 		if (!Fx.TestTarget || Fx.TestTarget->SizeX != CamW || Fx.TestTarget->SizeY != CamH)
 		{
-			UTextureRenderTarget2D* RT = NewObject<UTextureRenderTarget2D>(Fx.Owner, TEXT("RT_FxTestCam"));
+			UTextureRenderTarget2D* RT = NewObject<UTextureRenderTarget2D>(Fx.Owner, NAME_None);
 			RT->RenderTargetFormat = ETextureRenderTargetFormat::RTF_RGBA8;
 			RT->ClearColor = FLinearColor::Black;
 			RT->InitAutoFormat(CamW, CamH);
@@ -746,6 +782,7 @@ struct FAstraWarFXTest
 	/** One step of astra.fx.series: a picture of the game's view (and of the main viewscreen's feed) every SeriesGap seconds of the effects' clock. */
 	static void Series(UAstraWarFX& Fx)
 	{
+		if (bRecording && bCamLook) { CamLookAz += RecordOrbit * Fx.Dt; }
 		UpdateCamera(Fx);
 		if (SeriesLeft <= 0)
 		{
@@ -754,16 +791,17 @@ struct FAstraWarFXTest
 		if (!FApp::CanEverRender() || !Fx.Owner || !Fx.Owner->GetWorld())
 		{
 			SeriesLeft = 0;
+			if (bRecording) { FApp::SetUseFixedTimeStep(bOldFixed); FApp::SetFixedDeltaTime(OldDelta); bRecording = false; }
 			return;
 		}
-		SeriesNext -= Fx.Dt;
-		if (SeriesNext > 0.f)
-		{
-			return;
-		}
-		SeriesNext = SeriesGap;                // (a frame longer than the gap does not catch up)
+        if (!bRecording)
+        {
+            SeriesNext -= Fx.Dt;
+            if (SeriesNext > 0.f) { return; }
+            SeriesNext = SeriesGap;
+        }                // (a frame longer than the gap does not catch up)
 		const FString Base = FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir() / TEXT("Play") / FString::Printf(TEXT("%s_%02d"), *SeriesPrefix, SeriesIdx));
-		FScreenshotRequest::RequestScreenshot(Base + TEXT(".png"), false, false);
+		if (!bRecording) { FScreenshotRequest::RequestScreenshot(Base + TEXT(".png"), false, false); }
 		if (bSeriesVs)
 		{
 			GEngine->Exec(Fx.Owner->GetWorld(), *FString::Printf(TEXT("astra.viewscreen.dump %s_vs.png"), *Base));
@@ -775,6 +813,7 @@ struct FAstraWarFXTest
 		++SeriesIdx;
 		if (--SeriesLeft == 0)
 		{
+			if (bRecording) { FApp::SetUseFixedTimeStep(bOldFixed); FApp::SetFixedDeltaTime(OldDelta); bRecording = false; }
 			UE_LOG(LogASTRA, Display, TEXT("[WarFX] series %s: %d pictures in Saved/Play"), *SeriesPrefix, SeriesIdx);
 		}
 	}
@@ -834,6 +873,12 @@ float FAstraWarFXTest::CamFov = 60.f;
 int32 FAstraWarFXTest::CamW = 1280;
 int32 FAstraWarFXTest::CamH = 720;
 FString FAstraWarFXTest::CamTarget;
+bool FAstraWarFXTest::bRecording = false;
+bool FAstraWarFXTest::bOldFixed = false;
+double FAstraWarFXTest::OldDelta = 0.0;
+float FAstraWarFXTest::RecordOrbit = 0.f;
+TWeakObjectPtr<UWorld> FAstraWarFXTest::RecordWorld;
+FDelegateHandle FAstraWarFXTest::RecordCleanup;
 
 void UAstraWarFX::RunTests()
 {
@@ -866,3 +911,5 @@ ASTRA_FX_COMMAND(swatch, "A lineup of every kind of effect 1.2 km ahead of the b
 ASTRA_FX_COMMAND(stats, "What the war's effects hold and what they cost");
 ASTRA_FX_COMMAND(series, "Pictures of the game's view in steps: astra.fx.series <prefix> [n 8] [every_s 0.25] [vs] [cam] [do <astra.fx command>] (Saved/Play/<prefix>_NN.png; vs: the main viewscreen's feed too; cam: the free camera's)");
 ASTRA_FX_COMMAND(cam, "A free camera for the tests: astra.fx.cam <x> <y> <z> <yaw> <pitch> [fov 60] (metres in the bridge's frame: only while the Aquila is held) | broadside [T] (the Aquila-firing shot of the main viewscreen) | look <T> <range_m> <azimuth> <elevation> [fov 50] (round a ship, whatever the Aquila does) | off");
+
+ASTRA_FX_COMMAND(record, "Fixed-step cinematic frames: astra.fx.record <prefix> [frames 180] [fps 60] [width 1920] [height 1080] [orbit_deg_s 0] | off; uses the free camera, restores the previous timestep when done");

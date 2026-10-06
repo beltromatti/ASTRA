@@ -114,6 +114,7 @@ public:
 	void Describe(FOutputDevice& Ar) const;
 
 private:
+	bool BrowsingEquipment() const;
 	enum class EState : uint8 { Holstered, Drawing, Ready, Reloading, Holstering };
 	struct FAmmo { int32 Mag = 0; int32 Reserve = 0; };
 
