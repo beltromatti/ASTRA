@@ -37,8 +37,9 @@ void UAstraBoardSubsystem::BeginBayDeparture(int32 Slot, const FLeg& Leg)
         if (!BayBoarders[i] || BayBoarders[i]->ActorHasTag(Tag)) { if (BayBoarders[i]) { BayBoarders[i]->Destroy(); } BayBoarders.RemoveAt(i); }
     }
     auto* Walk = LoadObject<UAnimSequence>(nullptr, TEXT("/Game/Characters/Mannequins/Anims/Unarmed/Walk/MF_Unarmed_Walk_Fwd.MF_Unarmed_Walk_Fwd"));
-    auto* Uniform = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/ASTRA/Crew/Materials/MI_Crew_Dept_Security.MI_Crew_Dept_Security"));
-    for (int32 i = 0; i < Leg.Arrivals.Num(); ++i)
+    auto* Uniform = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/ASTRA/Crew/Materials/MI_Crew_Uniform.MI_Crew_Uniform"));
+    auto* Jacket = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/ASTRA/Crew/Materials/MI_Crew_Dept_Security.MI_Crew_Dept_Security"));
+    for (int32 i = 0; i < FMath::Min(6, Leg.Arrivals.Num()); ++i)
     {
         bool Female = false;
         if (auto* BayLife = LifeSub()) { const int32 Person = BayLife->Sim().PersonOfRoster(Leg.Arrivals[i].Roster); if (Person != INDEX_NONE) { Female = BayLife->Sim().Person(Person).bFemale; } }
@@ -51,7 +52,8 @@ void UAstraBoardSubsystem::BeginBayDeparture(int32 Slot, const FLeg& Leg)
         auto* Skeletal = BoardingBody->GetSkeletalMeshComponent();
         Skeletal->SetSkeletalMesh(Mesh); Skeletal->SetCollisionEnabled(ECollisionEnabled::NoCollision);
         if (Uniform) { Skeletal->SetMaterial(0, Uniform); }
-        if (Walk) { Skeletal->PlayAnimation(Walk, true); }
+        if (Jacket && Skeletal->GetNumMaterials() > 1) { Skeletal->SetMaterial(1, Jacket); }
+        if (Walk) { Skeletal->PlayAnimation(Walk, true); Skeletal->SetPlayRate(1.4f); }
         BayBoarders.Add(BoardingBody);
     }
 }
@@ -98,13 +100,13 @@ void UAstraBoardSubsystem::TickBay(float Dt)
     {
         if (BayAge[i] >= 0.f) { BayAge[i] += Dt; }
         const float Age = BayAge[i];
-        const bool TakingOff = Age >= 0.f && Age < 5.f;
+        const bool TakingOff = Age >= 0.f && Age < 5.3f;
         const float X = i == 0 ? 4750.f : 3250.f;
         BayCraft[i]->SetActorHiddenInGame(!TakingOff && i >= Free);
         BayCraft[i]->GetStaticMeshComponent()->SetCollisionEnabled(!TakingOff && i < Free ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
-        const float Slide = TakingOff ? FMath::Clamp((Age - 2.8f) / 2.2f, 0.f, 1.f) : 0.f;
+        const float Slide = TakingOff ? FMath::Clamp((Age - 3.1f) / 2.2f, 0.f, 1.f) : 0.f;
         BayCraft[i]->SetActorLocation(FVector(X, -3140.f - 1600.f * Slide * Slide, -6200.f + FMath::Min(Slide * 40.f, 12.f)));
-        const float Open = Age >= 0.f ? FMath::Clamp(FMath::Min(Age / 1.2f, (6.2f - Age) / 1.2f), 0.f, 1.f) : 0.f;
+        const float Open = Age >= 0.f ? FMath::Clamp(FMath::Min(Age / 1.2f, (6.5f - Age) / 1.2f), 0.f, 1.f) : 0.f;
         for (int32 j = 0; j < 2; ++j)
         {
             if (BayLeaves.IsValidIndex(i * 2 + j) && BayLeaves[i * 2 + j]) { BayLeaves[i * 2 + j]->SetActorLocation(FVector(X + (j == 0 ? -1.f : 1.f) * (230.f + 470.f * Open), -3770.f, -6200.f)); }
@@ -115,11 +117,13 @@ void UAstraBoardSubsystem::TickBay(float Dt)
         auto* BoardingBody = BayBoarders[i].Get();
         const int32 Slot = BoardingBody && BoardingBody->ActorHasTag(TEXT("ASTRA.BayVisual.1")) ? 1 : 0;
         const float Age = BayAge[Slot];
-        if (!BoardingBody || Age < 0.f || Age > 2.8f) { if (BoardingBody) { BoardingBody->Destroy(); } BayBoarders.RemoveAt(i); continue; }
+        if (!BoardingBody || Age < 0.f || Age > 3.1f) { if (BoardingBody) { BoardingBody->Destroy(); } BayBoarders.RemoveAt(i); continue; }
         const int32 N = BoardingBody->Tags.Num() > 1 ? FCString::Atoi(*BoardingBody->Tags[1].ToString()) : 0;
         const float X = Slot == 0 ? 4750.f : 3250.f;
-        const float A = FMath::Clamp((Age - N * 0.055f) / 1.8f, 0.f, 1.f);
-        BoardingBody->SetActorLocationAndRotation(FVector(X + (N % 2 ? 32.f : -32.f), FMath::Lerp(-2290.f + (N / 2) * 28.f, -2820.f, A), -6200.f), FRotator(0.f, 180.f, 0.f));
+        const float A = FMath::Clamp((Age - N * 0.12f) / 2.f, 0.f, 1.f);
+        const float Y = FMath::Lerp(-2420.f + (N / 2) * 70.f, -2820.f, A);
+        const float RampZ = FMath::Clamp((-Y - 2380.f) / 440.f, 0.f, 1.f) * 70.f;
+        BoardingBody->SetActorLocationAndRotation(FVector(X + (N % 2 ? 38.f : -38.f), Y, -6200.f + RampZ), FRotator(0.f, 180.f, 0.f));
         BoardingBody->SetActorHiddenInGame(A >= 1.f);
     }
 }
