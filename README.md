@@ -76,6 +76,19 @@ narrator tells the end of the chapter on a black screen, in your language.
 
 <p align="center"><img src="docs/media/intro.jpg" width="70%" alt="The introduction, narrated and subtitled in the player's language"/></p>
 
+
+### A new watch: alpha 0.1.1
+
+<table>
+  <tr><td><img src="docs/media/reactor_blast.jpg" alt="A reactor breach, fragments and the shock front above New Ravenna"/></td><td><img src="docs/media/close_exchange.jpg" alt="The Aquila firing across a close exchange"/></td></tr>
+  <tr><td><img src="docs/media/fleet_war.jpg" alt="The Seventh Fleet battle line"/></td><td><img src="docs/media/aquila_war.jpg" alt="The Aquila in a fleet battle"/></td></tr>
+  <tr><td><img src="docs/media/falcon_cockpit.jpg" alt="The actual view from the Captain's Falcon cockpit"/></td><td><img src="docs/media/falcon_wing.jpg" alt="Eagle with the two Falcons on the Captain's wing"/></td></tr>
+  <tr><td><img src="docs/media/mandate_war.jpg" alt="An Acheron of the Kharon Mandate"/></td><td><img src="docs/media/hull_damage.jpg" alt="Damage and fires on a Mandate warship"/></td></tr>
+  <tr><td><img src="docs/media/kestrel_bay.jpg" alt="The two Kestrels in the assault-shuttle bay"/></td><td><img src="docs/media/bridge_watch.jpg" alt="A watch on the Aquila's bridge"/></td></tr>
+</table>
+
+[Visit ASTRA](https://astra.noesisai.it) for the in-game films and the newest available download.
+
 ## Play the alpha
 
 **macOS** (Apple Silicon, macOS 14 Sonoma or later, 16 GB of memory recommended): download
