@@ -28,6 +28,8 @@ REMEMBER = {"type": "function", "function": {"name": "remember", "description": 
             "parameters": {"type": "object", "properties": {
                 "officer": {"type": "string", "enum": list(CREW)},
                 "kind": {"type": "string", "enum": ["personal", "promise", "confidence", "moment", "lesson", "experience"]},
+                "source": {"type": "integer", "minimum": 0, "maximum": 39,
+                           "description": "For lesson/experience: the numbered utterance that contains the guidance or experience. Its ORIGINAL words are kept, including every negation and exception."},
                 "memory": {"type": "string", "description": "in English, in the third person about the officer, one short "
                                                            "sentence (under 35 words), the Captain named each time: 'Ferri "
                                                            "knows the Captain's brother flies Falcons with the Third Fleet; the "
@@ -61,7 +63,11 @@ the Captain's guidance and `experience` for the officer's own learning. Preserve
 these are knowledge to weigh against the current situation, NOT standing orders or automatic rules. An ordinary
 one-off command, a target id, routine telemetry or a repeated report is not a lasting lesson. Keep the Captain's
 unresolved longer-term intent when it would still matter after the recent conversation has gone, without inventing
-a conclusion or treating yesterday's tactical situation as current. Keep only what the words support."""
+a conclusion or treating yesterday's tactical situation as current. Keep only what the words support.
+For `lesson` and `experience`, ALWAYS give `source`, the number of the original utterance to remember. The tool keeps
+that utterance verbatim; do not combine or paraphrase its conditions. Especially preserve NOT, BEFORE, ONLY IF, UNLESS,
+and exceptions: 'recover before another sortie unless an emergency prevents it' NEVER means 'recover only in an emergency'.
+Choose the source that actually supports this officer's memory; personal memories keep their existing short form."""
 
 
 class MemoryKeeper:
@@ -114,7 +120,7 @@ class MemoryKeeper:
                     kept.append(a)
 
         system, context = cached_prompt(PROMPT, dict(ids=", ".join(f"{k} = {o.title}" for k, o in CREW.items()),
-                                                    known=known, said="\n".join(said)), ("known", "said"))
+                                                    known=known, said="\n".join(f"[{i}] {line}" for i, line in enumerate(said))), ("known", "said"))
         await self.llm.chat(model=MODEL, messages=[
             {"role": "system", "content": system},
             {"role": "user", "content": context + "\n\nKeep what lasts."}],
@@ -122,6 +128,13 @@ class MemoryKeeper:
             temperature=0.3, on_tool_call=on_call, allow_fallbacks=True)
         for a in kept[:6]:
             oid, kind, mem = a["officer"], a.get("kind", "moment"), a["memory"].strip()[:400]
+            if kind in PROFESSIONAL:
+                source = a.get("source")
+                if not isinstance(source, int) or not 0 <= source < len(said):
+                    log.warning("professional memory has no valid source reference for %s", oid)
+                    continue
+                # The model chooses what to remember. The tool retrieves the actual words, not a rewritten command.
+                mem = f"{CREW[oid].name} recalls this earlier {kind}, to weigh against the current situation: «{said[source]}»"
             mems = self.store.setdefault(oid, [])
             if any(m["memory"].lower() == mem.lower() for m in mems):
                 continue

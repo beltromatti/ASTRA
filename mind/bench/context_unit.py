@@ -104,19 +104,21 @@ class MemoriesTests(unittest.IsolatedAsyncioTestCase):
         class Model:
             async def chat(self, **kw):
                 self.messages = kw['messages']
-                await kw['on_tool_call'](ToolCall('remember', json.dumps({'officer': 'flight', 'kind': 'lesson',
-                    'memory': 'Price knows the Captain wants damaged Falcons recalled before another sortie.'}), 'lesson'))
+                await kw['on_tool_call'](ToolCall('remember', json.dumps({'officer': 'flight', 'kind': 'lesson', 'source': 0,
+                    'memory': 'Price thinks damaged Falcons should be recalled only in an emergency.'}), 'lesson'))
                 return Completion()
         model = Model()
         personal = [{'kind': 'personal', 'memory': f'Personal fact {i}'} for i in range(14)]
         store = {'flight': copy.deepcopy(personal)}
         saved = []
         keeper = MemoryKeeper(model, store, lambda _: None, save=lambda: saved.append(copy.deepcopy(store)))
-        await keeper._read(['Captain: Recall damaged Falcons before another sortie.'])
+        await keeper._read(['Captain: Recall damaged Falcons before another sortie, unless a real emergency prevents it.'])
         self.assertEqual(store['flight'][:14], personal)
         self.assertEqual(store['flight'][-1]['kind'], 'lesson')
         self.assertEqual(saved[-1], store)
         self.assertIn('damaged Falcons', keeper.lines())
+        self.assertIn('unless a real emergency prevents it', keeper.lines())
+        self.assertNotIn('only in an emergency', keeper.lines())
         self.assertIn('Captain: Recall damaged Falcons', model.messages[-1]['content'])
 
     async def test_the_record_belongs_only_to_the_person_and_side_who_lived_it(self):
