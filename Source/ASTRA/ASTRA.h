@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 
 /** The version a player sees (the title menu) and the release carries (tools/release_mac.sh, the GitHub release). */
-#define ASTRA_VERSION TEXT("0.1.0-alpha")
+#define ASTRA_VERSION TEXT("0.1.1-alpha")
 
 /** Main log category used across the project */
 DECLARE_LOG_CATEGORY_EXTERN(LogASTRA, Log, All);
