@@ -3,8 +3,30 @@
 *The project's working memory, updated at every step: a new session starts here. From 5 October 2026 new entries are in English; the older
 sections below stay in Italian.*
 
-**Last update:** 2026-10-06 · **Current milestone:** **ASTRA 0.1.1-alpha**, the notarized public refinement and its website. Next: Piano v0.7
+**Last update:** 2026-10-07 · **Current milestone:** **development paused after ASTRA 0.1.1-alpha**, the notarized public refinement and its website. Next: Piano v0.7
 ([PIANO.md §0bis](PIANO.md)) and the open items at the end of this section.
+
+## DEVELOPMENT PAUSE (7 October 2026): storage prepared for a later return
+
+The owner confirmed that the normal app's clean first launch works, then requested a recoverable cleanup of both Desktop projects.
+The installed game is now `/Applications/ASTRA.app`; its live saves, memories, key and voice data in Application Support are retained.
+The production website is unchanged and remains online.
+
+- Removed reproducible Unreal/project/plugin binaries, Intermediate, cook/staging/shader caches, development Python environments, bytecode,
+  website node_modules/.next/TypeScript build cache and duplicate packaged apps. The exact published ZIPs remain on GitHub; their local
+  checksums, release notes and Apple metadata remain in the project.
+- Removed fifteen old helper worktrees. Every committed head was already in main. Two had tracked local changes and one had an untracked
+  header: private Git snapshots/patches and compressed evidence preserve those changes without merging them into main. Historical
+  non-reproducible ignored/untracked material was verified before removal and remains in `.pause/`. Branches and Git history are retained.
+- Current Content LFS payloads rest as pointers; their exact verified objects remain in the local LFS store. No asset source was changed.
+  Downloaded creative sources, original exports, current development campaign/screenshots and the legacy voice models remain available.
+  The clean VSCO sample clone is restorable at its recorded revision. Credentials and Vercel linkage were preserved.
+- **Resume both projects:** `tools/resume-development.sh`. It checks out local LFS assets, reinstalls locked Python/Node environments and
+  rebuilds the editor module, without launching a game or changing the player's data. Shaders/derived caches regenerate when the editor
+  opens. Historical worktrees and samples are restored explicitly only when needed. See [DEVELOPMENT-PAUSE.md](DEVELOPMENT-PAUSE.md).
+
+Do not delete `.pause/` or `.git/`: together they retain the private historical recovery data. This cleanup does not change gameplay,
+model prompts, balance or the released binary.
 
 ## ALPHA 0.1.1 (6 October 2026): notarized alpha and website
 

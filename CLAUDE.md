@@ -39,6 +39,10 @@ voice and real tools. This file is for AI coding agents (Claude Code and the lik
 
 ## Build and run
 
+- On the maintainer's Mac the development checkout was paused on 7 October 2026. Run `tools/resume-development.sh` before opening Unreal:
+  Content LFS payloads were replaced with pointers while their verified local objects remain in `.git/lfs`. See
+  [docs/DEVELOPMENT-PAUSE.md](docs/DEVELOPMENT-PAUSE.md) for dependency preparation and historical-worktree recovery. Do not delete `.pause/` or `.git/`.
+
 - Unreal Engine 5.8.3. On a Mac there is no Live Coding: close the editor, build with
   `tools/ricompila.sh --no-launch` (it prints `build ok` or `BUILD FALLITA` and the errors; the full log is `Saved/Logs/build_last.log`).
   The game module builds as a unity build with `-Wshadow -Werror`: a name in an anonymous namespace of one file can break another file of

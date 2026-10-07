@@ -6,7 +6,7 @@ notes, fixes and ideas are all welcome.
 ## Playing and reporting
 
 - Download the latest release, start it, paste your OpenRouter key when it asks, and play. The in-game introduction shows the basics; F1
-  shows every control.
+  also works on PC; K shows every control on all platforms.
 - Found a bug? Open an issue with what you did, what you expected and what happened. Attach the logs if you can:
   - macOS: `astra-mind.log` (the crew's log) in `~/Library/Application Support/Epic/ASTRA/Saved/Logs/`, and the crash report macOS
     offers if the game closes by itself.

@@ -73,3 +73,5 @@ Packaged/
 # worktrees of the helper agents (each works on its own branch; the lead merges)
 .claude/worktrees/
 /cache/
+# Private pause snapshots, evidence and local restoration metadata.
+.pause/
